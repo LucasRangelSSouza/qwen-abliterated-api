@@ -1,0 +1,82 @@
+{
+ "steps": [
+  {
+   "step": "baseline endpoint up + completion",
+   "pass": true,
+   "seconds": null,
+   "detail": "pid=26034\nWelcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.\nHave fun!\n /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)"
+  },
+  {
+   "step": "configure.sh no-op when config unchanged",
+   "pass": true,
+   "seconds": 4,
+   "detail": "rc=0 nothing_to_do=True pid 26034\nWelcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.\nHave fun!\n /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)->26034\nWelcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.\nHave fun!\n /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.) weights_same=True"
+  },
+  {
+   "step": "hf download re-run moves no bytes",
+   "pass": true,
+   "seconds": 3,
+   "detail": ""
+  },
+  {
+   "step": "publish-endpoint.sh second run unchanged",
+   "pass": true,
+   "seconds": null,
+   "detail": "edge: dynamic.yml unchanged"
+  },
+  {
+   "step": "publish-endpoint.sh leaves exactly 3 managed blocks (no duplication)",
+   "pass": true,
+   "seconds": null,
+   "detail": "blocks=3"
+  },
+  {
+   "step": "dns-upsert.sh already in place",
+   "pass": true,
+   "seconds": null,
+   "detail": "dns: qwen.rangeltech.net already -> 66.94.101.153"
+  },
+  {
+   "step": "configure.sh repairs config drift and API returns",
+   "pass": true,
+   "seconds": 423,
+   "detail": "max_model_len restored=True"
+  },
+  {
+   "step": "weights untouched by drift repair (no re-download)",
+   "pass": true,
+   "seconds": null,
+   "detail": ""
+  },
+  {
+   "step": "hard restart #1: API back, no download, weights identical",
+   "pass": false,
+   "seconds": 418,
+   "detail": ""
+  },
+  {
+   "step": "hard restart #2: API back, no download, weights identical",
+   "pass": false,
+   "seconds": 421,
+   "detail": ""
+  },
+  {
+   "step": "Vast stop via API: endpoint goes down",
+   "pass": true,
+   "seconds": 48,
+   "detail": "{\"success\": true}"
+  },
+  {
+   "step": "Vast start via API: same endpoint returns without redeploy",
+   "pass": true,
+   "seconds": 478,
+   "detail": "{\"success\": true}"
+  },
+  {
+   "step": "weights survived stop/start",
+   "pass": true,
+   "seconds": null,
+   "detail": ""
+  }
+ ]
+}

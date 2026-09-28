@@ -1,0 +1,23 @@
+{
+ "cases": [
+  {
+   "spoken": "Qual é a capital do Brasil e quantos estados o país tem?",
+   "transcript": "Qual é a capital do Brasil e quantos estados o país tem?",
+   "answer": "Brasília; 26 estados e 1 distrito federal.",
+   "tts_s": 0.5,
+   "stt_s": 42.7,
+   "llm_s": 2.9,
+   "pass": true
+  },
+  {
+   "spoken": "Quanto é quinze vezes quatro?",
+   "transcript": "Quanto é 15 vezes 4?",
+   "answer": "60",
+   "tts_s": 0.5,
+   "stt_s": 42.0,
+   "llm_s": 1.4,
+   "pass": true
+  }
+ ],
+ "pass": true
+}

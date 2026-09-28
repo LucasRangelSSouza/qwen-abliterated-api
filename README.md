@@ -11,21 +11,25 @@ Traefik on the edge VPS  (TLS: Let's Encrypt, DNS: Hostinger A record)
    ▼
 Vast.ai container (GB10, 119 GB unified memory)
    Caddy edge :8000 ─► vLLM 0.30 :18000
-                        ├─ target : Qwen3.8-27B abliterated, NVFP4 (W4A4)        29 GB
+                        ├─ target : Qwen3.8-27B abliterated, BF16 checkpoint quantised to FP8 at load   52 GB on disk
                         └─ drafter: DFlash2 block-diffusion speculative decoder   3.6 GB
 ```
 
-## Measured result
+## Measured result (default profile: FP8)
 
 | metric | value |
 |---|---|
-| time to first token | 0.7 – 2.2 s |
-| decode, code, thinking off | ~41 tok/s |
-| decode, thinking on | ~37 tok/s |
-| context | 32 768 tokens |
-| restart (kill → healthy), no download | ~4.5 min |
+| time to first token, short prompt | 1.3 - 3 s |
+| decode, code / SQL, thinking off | ~35 - 38 tok/s |
+| decode, thinking on | 20 - 28 tok/s (free prose ~14-19) |
+| aggregate throughput, 4 / 8 clients | ~99 / ~107 tok/s |
+| context | 160 000 tokens configured; needle retrieval 8/8 up to 140k (prefill 12 s at 30k, ~100 s at 140k; repeat prompt ~2 s via prefix cache) |
+| HumanEval / GSM8K | 96.3 % / 96.0 % (Sonnet 5 medium on the same grader: 100 % / 98.5 %) |
+| vision | image_url (base64 or URL) works |
+| audio | not a model modality: send audio through speech-to-text first (tested pipeline) |
+| restart (kill -> healthy), weights on local disk | ~7 min, no download (real Vast stop/start: ~8 min) |
 
-Full numbers, methodology and per-test tables: [reports/REPORT.md](reports/REPORT.md). Why these numbers are what they are: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+`PROFILE=nvfp4` selects the pre-quantised NVFP4 checkpoint: same quality within noise, slower prefill and lower aggregate throughput. Full tables, statistics and cost per task: [docs/RESULTS.md](docs/RESULTS.md). Why the numbers are what they are: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Use it
 
@@ -59,10 +63,13 @@ r = c.chat.completions.create(model="qwen-abliterated", temperature=0, max_token
 | `scripts/dns-upsert.sh` | idempotent Hostinger A record (touches only the named record) |
 | `scripts/vast-power.sh` | start / stop / status of the Vast instance through its API |
 | `scripts/smoke-test.sh`, `benchmark.sh` | quick checks |
-| `tests/suite.py` | end-to-end test + benchmark suite (auth, speed, thinking on/off, heavy context, coding with executed asserts, tools, concurrency, stability) |
+| `tests/suite.py` | end-to-end suite (auth, speed, thinking on/off, heavy context, coding, tools, vision, audio contract, parallel Q&A, concurrency, stability) |
+| `tests/quality.py`, `quality_claude.py` | HumanEval + GSM8K on the endpoint and on Claude Code (the yardstick) with one shared grader |
+| `tests/pipeline_audio.py` | speech -> whisper.cpp -> API round trip |
 | `tests/idempotency.py` | idempotency and restart tests |
 | `tests/make_report.py` | JSON → Markdown report |
-| `.github/workflows/deploy-vast.yml` | one-click rebuild on any Vast container with sshd |
+| `.github/workflows/deploy-vast.yml` | one-click rebuild on any Vast container with sshd (profile input, default fp8) |
+| `infra/terraform-vast/` | Terraform (no provider needed) for the Vast profile: configure, Traefik route, DNS, acceptance test; `plan` after `apply` is empty |
 | `.github/workflows/deploy.yml` + `infra/terraform` | the same for a genuine Ubuntu GPU VM (Docker + Caddy + Terraform) |
 | `docs/` | architecture, runbook, article notes |
 | `reports/` | raw JSON and rendered reports of every test run |
@@ -73,6 +80,6 @@ r = c.chat.completions.create(model="qwen-abliterated", temperature=0, max_token
 2. Run **Actions → Deploy to Vast instance** with `ssh_host`, `ssh_port`, `api_port`, `instance_id`.
 3. The workflow downloads weights (skipped if present), writes the vLLM config, publishes the route, upserts DNS, waits for `/v1/models` and smoke-tests a completion.
 
-Repository secrets: `DEPLOY_SSH_PRIVATE_KEY`, `VLLM_API_KEY`, `HOSTINGER_API_KEY`, `EDGE_SSH_PRIVATE_KEY`. The same values live in the private personal-skills vault (`secrets/qwen-api.env`).
+Repository secrets: `DEPLOY_SSH_PRIVATE_KEY`, `VLLM_API_KEY`, `HOSTINGER_API_KEY`, `EDGE_SSH_PRIVATE_KEY`, `VAST_API_KEY`, `VAST_INSTANCE_ID`. The same values live in the private personal-skills vault (`secrets/qwen-api.env`).
 
 Turning the machine on and off: [docs/RUNBOOK.md](docs/RUNBOOK.md).

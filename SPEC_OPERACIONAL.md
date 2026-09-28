@@ -2,63 +2,67 @@
 
 ## Objetivo
 
-Operar uma API compatível com OpenAI para um Qwen abliterated em uma GPU alugada, com reconstrução automatizada em outra máquina e sem redownload dos pesos em reinícios normais.
+Operar uma API compatível com OpenAI para um Qwen3.8-27B abliterated (thinking, código, tool calling, visão) em uma GPU alugada, publicada em `https://qwen.rangeltech.net/v1`, reconstruível em outra máquina mudando apenas o endereço dela, e sem redownload dos pesos em reinícios normais.
 
 ## Contrato de acesso
 
-- A máquina definitiva deve ser uma VM com `sshd` funcional, não apenas um container de template.
-- A chave pública de deploy é cadastrada na VM no provisionamento. A chave privada correspondente fica exclusivamente no secret `DEPLOY_SSH_PRIVATE_KEY` do GitHub e no operador autorizado.
-- O workflow GitHub Actions usa `DEPLOY_HOST`, `DEPLOY_PORT`, `DEPLOY_USER` e `DEPLOY_SSH_PRIVATE_KEY`; trocar de provedor/máquina consiste em atualizar esses secrets e rodar o deploy.
-- O acesso Jupyter é contingência para containers Vast que anunciam SSH, mas não entregam `sshd`; ele não satisfaz o contrato de produção.
+- SSH real na instância (`VAST_TCP_PORT_22`), com chave própria de deploy. O Jupyter/navegador não é caminho de operação.
+- A chave pública é cadastrada **na conta e na instância** pela API da Vast (a Vast reescreve `authorized_keys` a partir das chaves da conta; cadastrar só na instância não persiste). A privada fica nos secrets do GitHub e no cofre privado (`personal-skills/secrets/qwen-api.env`).
+- Secrets do repositório: `DEPLOY_SSH_PRIVATE_KEY`, `VLLM_API_KEY`, `HOSTINGER_API_KEY`, `EDGE_SSH_PRIVATE_KEY`, `VAST_API_KEY`, `VAST_INSTANCE_ID`.
+- Trocar de máquina = informar novo IP, porta SSH, porta da API e id da instância no workflow `deploy-vast.yml` ou nas variáveis do Terraform.
 
 ## Persistência e ciclos de energia
 
-- Pesos (`/root/models`) e caches ficam em volume/disco persistente, separado do root efêmero quando o provedor disponibilizar volume. Nesta instância de transição, os arquivos estão em `/root/models` no disco local de 80 GB e sobrevive a stop/start da instância Vast.
-- Reiniciar ou parar/iniciar não pode disparar `hf download` se o arquivo já passou na verificação de tamanho/hash.
-- Recriar/destruir não é reiniciar: o bootstrap deve baixar novamente a partir do repositório de modelo, usando o cache/volume anexado quando existir.
+- Pesos em `/root/models` (disco local da instância): BF16 do checkpoint (52 GB) + drafter (3,6 GB). Sobrevivem a stop/start; `PRUNE_UNUSED=1` remove pesos do perfil não usado (disco cobrado não guarda arquivo sem uso).
+- Reiniciar ou parar/iniciar nunca dispara download: `hf download` só move bytes se faltar arquivo. **Medido**: `tests/idempotency.py`.
+- Recriar/destruir não é reiniciar: o bootstrap baixa de novo (~10 min para 56 GB). Nunca destruir sem pedido explícito.
+- Ligar/desligar por API: `scripts/vast-power.sh start|stop|status` (chave de conta). Parada cobra só disco (~US$ 0,007/h).
 
 ## Infraestrutura reproduzível
 
 ```text
-Terraform                 GitHub Actions                    VM
----------                 --------------                    --
-alocação/rede/volume  ->  SSH + bootstrap idempotente   ->  Docker + NVIDIA
-secrets de conexão     ->  compose pull/up               ->  vLLM + Caddy
+Terraform (infra/terraform-vast)          GitHub Actions (deploy-vast.yml)
+---------------------------------         -------------------------------
+configure  -> pesos + vLLM na instância   mesmas etapas, disparo manual
+publish    -> rota Traefik + cookie Vast  inputs: ssh_host, ssh_port, api_port,
+dns        -> registro A na Hostinger              instance_id, profile (fp8|nvfp4)
+verify     -> completion real pela URL
 ```
 
-- Terraform é responsável por instância, disco/volume, IP/rede e outputs de conexão.
-- `scripts/bootstrap-vm.sh` instala pré-requisitos de forma idempotente.
-- `scripts/deploy-vm.sh` sincroniza a stack e executa Compose de forma idempotente.
-- Aplicação e configuração residem em `compose.yaml`; nenhum procedimento manual é requisito para uma VM com SSH funcional.
-- O container vLLM do Vast é um perfil transitório. Ele usa Supervisor e `/workspace/.env`; o script `scripts/configure-vast-vllm.sh` documenta essa adaptação, mas produção deve usar a VM/Compose acima.
+- Cada etapa do Terraform re-executa só quando suas entradas mudam (`triggers_replace`), e cada script é idempotente: `terraform plan` após `apply` mostra *No changes* (verificado) e um segundo `apply` não altera nada.
+- `scripts/configure-vast-vllm.sh`: bloco gerenciado em `/workspace/.env`; só reinicia o vLLM se o bloco difere do desejado; espera até 15 min pelo health check antes de considerar que falhou (não reinicia um servidor que ainda está carregando).
+- `scripts/publish-endpoint.sh`: reescreve exatamente 3 blocos gerenciados no Traefik (router, middleware, service); segunda execução responde *unchanged*.
+- `scripts/dns-upsert.sh`: toca apenas o registro nomeado (`overwrite=false`).
+- Caminho alternativo para uma VM Ubuntu genuína (Docker + Caddy): `compose.yaml` + `infra/terraform` + `deploy.yml`.
 
 ## API
 
-- Endpoint: `POST /v1/chat/completions` e `GET /v1/models`.
-- Nome servido: `qwen-abliterated`.
-- Autenticação: bearer token configurado por secret (`VLLM_API_KEY`), nunca embutido no repositório.
-- Aceite: `/v1/models` anuncia `qwen-abliterated`; uma completion retorna conteúdo; benchmark registra TTFT, tokens/s e código HTTP; a mesma verificação passa após stop/start.
+- Endpoint: `POST /v1/chat/completions`, `GET /v1/models` (também Responses API do vLLM).
+- Modelo servido: `qwen-abliterated`. Contexto configurado: 160 000 tokens (cache de KV em bf16; fp8 corrompe contextos longos).
+- Autenticação: `Authorization: Bearer <VLLM_API_KEY>` (chave estável, imposta pelo vLLM). A borda injeta o cookie de autenticação da Vast, que muda a cada instância e nunca chega ao cliente.
+- Thinking: ligado por padrão quando o cliente não diz nada; `chat_template_kwargs.enable_thinking=false` desliga. O raciocínio vem em `reasoning`, a resposta em `content`.
+- Visão: `image_url` (URL ou data URI). Áudio não é modalidade do modelo: a API rejeita `input_audio` com 400 e o caminho suportado é fala → texto (whisper) → API (`tests/pipeline_audio.py`).
+- Aceite (todos automatizados em `tests/`): auth 401/401/200; completion real; thinking on/off; tool calling; imagem; áudio rejeitado sem derrubar o servidor; 16 perguntas paralelas com respostas corretas; recuperação de informação em prompts de até ~140k tokens; HumanEval e GSM8K; estabilidade em 60 requisições; idempotência (re-execução, reparo de configuração, restarts forçados, stop/start real pela API).
 
-## Modelos e decisão de quantização
+## Modelo e decisão de quantização
 
-A GB10 (~273 GB/s) é limitada por banda de memória: cada token lê todos os pesos do modelo denso de 27B. Medido/publicado:
+A GB10 (~273 GB/s) tem decode limitado por banda de memória; a decodificação especulativa (drafter DFlash2, 7 tokens) muda o gargalo. Decisão por medição (detalhes em `docs/RESULTS.md`):
 
-| Variante | Peso | Decode 1 stream |
-|---|---:|---|
-| BF16 | ~54 GB | 4,4 tok/s (medido) |
-| FP8 online | ~27 GB | ~8 tok/s (teto teórico) |
-| NVFP4 (W4A4) | ~20 GB | ~11,5 tok/s (publicado) |
-| **NVFP4 + DFlash2 (perfil atual)** | 29 GB + 3,6 GB drafter | **41-42 tok/s código, 37 com thinking (medido)** |
+| | qualidade (HumanEval / GSM8K) | prefill 140k | vazão agregada 4 clientes |
+|---|---|---:|---:|
+| **FP8 (padrão)** | 96,3 % / 96,0 % | ~100 s | ~99 tok/s |
+| NVFP4 | 93,9 % / 97,0 % | ~121 s | ~78 tok/s |
 
-- Target: `Blackfrost-AI/Qwen3.8-27B-ABLITERATED-NVFP4` (Qwen3.8-27B oficial, abliterated, quantizado; não é fine-tune de código).
-- Drafter: `z-lab/Qwen3.8-27B-DFlash2`, 7 tokens especulativos. Acelera em proporção à previsibilidade do texto (código é o melhor caso).
-- vLLM 0.30 rejeita GGUF; por isso NVFP4 em vez de Q4/Q6.
-- Medição (endpoint externo): TTFT 0,75-2,2 s; reinício completo (kill + start) até API pronta: 271 s, sem download.
+A diferença de qualidade entre os dois não é estatisticamente significativa (McNemar p ≥ 0,125); FP8 vence em prefill e vazão. Régua: Sonnet 5 medium, 100 % / 98,5 % no mesmo avaliador.
 
-## Sequência de entrega
+- Target padrão: `Blackfrost-AI/Qwen3.8-27B-ABLITERATED-BF16` quantizado para FP8 pelo vLLM no carregamento; alternativa `PROFILE=nvfp4` (`...-NVFP4`).
+- Drafter: `z-lab/Qwen3.8-27B-DFlash2`.
+- GGUF (Q4/Q6/Q8) não é opção neste runtime: vLLM 0.30 rejeita GGUF.
 
-1. Corrigir e validar a API Q4 na instância de transição.
-2. Validar SSH real em uma VM compatível e tornar o workflow de deploy o caminho principal.
-3. Rodar benchmark comparativo Q4/Q6 (e Q8 se houver margem), registrar decisão.
-4. Validar stop/start e tempo até `GET /v1/models` responder, sem novo download.
-5. Parar — nunca destruir — a instância quando não estiver sendo usada.
+## Limites conhecidos
+
+- Reinício completo (kill → API pronta) ≈ 7 min no FP8 (52 GB lidos do disco, mais quantização); NVFP4 ≈ 4,5 min.
+- Prosa livre ≈ 14 tok/s (o drafter acerta menos em texto imprevisível); código e SQL ≈ 35-38 tok/s.
+- Prompts longos custam prefill: ~12 s com 30k tokens, ~100 s com 140k (o prefix cache reduz repetições para ~2 s).
+- Uma carga de GPU em tempo real ao lado (por exemplo vídeo) divide a mesma banda de memória e reduz a vazão do LLM; `GPU_UTIL` deixa memória livre, mas não banda.
+- Não é equivalente a um modelo de fronteira em código agêntico (ver régua).

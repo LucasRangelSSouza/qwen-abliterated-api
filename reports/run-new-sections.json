@@ -1,0 +1,41 @@
+{
+ "base_url": "https://qwen.rangeltech.net/v1",
+ "started": "2026-09-28T12:19:15-0300",
+ "sections": {
+  "image": {
+   "status": 200,
+   "answer": "On the left there is a red square, and on the right there is a blue circle.",
+   "ttft": 2.3440074920654297,
+   "pass": true
+  },
+  "audio": {
+   "status": 400,
+   "detail": "{\"error\":{\"message\":\"At most 0 audio(s) may be provided in one prompt. (parameter=audio)\",\"type\":\"BadRequestError\",\"param\":\"audio\",\"code\":400}}",
+   "server_still_ok": true,
+   "pass": true
+  },
+  "parallel_qa": {
+   "correct": 13,
+   "of": 16,
+   "wall": 5.4,
+   "wrong": [
+    {
+     "q": "Capital do Japao? So a cidade.",
+     "ok": false,
+     "got": "T\u00f3quio."
+    },
+    {
+     "q": "Qual o maior planeta do sistema solar? So o nome.",
+     "ok": false,
+     "got": "J\u00fapiter"
+    },
+    {
+     "q": "Formula quimica da agua? So a formula.",
+     "ok": false,
+     "got": "H\u2082O"
+    }
+   ],
+   "pass": false
+  }
+ }
+}

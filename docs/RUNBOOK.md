@@ -25,7 +25,7 @@ The account API key is required to **start** (a stopped container cannot authori
 export VAST_API_KEY=... VAST_INSTANCE_ID=53155573
 scripts/vast-power.sh status
 scripts/vast-power.sh stop      # GPU billing stops; disk (~US$0.007/h) keeps weights
-scripts/vast-power.sh start     # weights are still on disk; vLLM comes back by itself (~4.5 min)
+scripts/vast-power.sh start     # weights are still on disk; vLLM comes back by itself (~8 min measured, same IP and ports)
 ```
 
 Stopping from inside the instance works with the container-scoped key Vast injects (`CONTAINER_API_KEY`), useful for idle auto-shutdown:
@@ -68,7 +68,7 @@ nvidia-smi
 
 | symptom | cause | fix |
 |---|---|---|
-| 502 from the public URL | vLLM still loading (up to ~4.5 min) or stopped | wait / `supervisorctl start vllm` |
+| 502 from the public URL | vLLM still loading (up to ~8 min for FP8) or stopped | wait (FP8: up to ~8 min) / `supervisorctl start vllm` |
 | `Address already in use` in vllm.log | old engine still holds :18000 | `pkill -f "[v]llm serve"; pkill -f "[V]LLM::EngineCor"` then start |
 | 401 from the public URL | wrong `VLLM_API_KEY` | key is in the vault |
 | 401 only after an instance recreate | Traefik still injects the previous Vast token | re-run `publish-endpoint.sh` |

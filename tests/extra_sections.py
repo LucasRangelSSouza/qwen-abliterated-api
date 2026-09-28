@@ -3,6 +3,7 @@ import base64
 import concurrent.futures as cf
 import struct
 import time
+import unicodedata
 import zlib
 
 
@@ -55,7 +56,7 @@ def make(call):
         qs = [("Quanto e 12*12? Responda so o numero.", "144"), ("Capital da Franca? Responda so a cidade.", "paris"),
               ("Quanto e 250+175? So o numero.", "425"), ("Qual o simbolo quimico do ouro? So o simbolo.", "au"),
               ("Quantos dias tem uma semana? So o numero.", "7"), ("Raiz quadrada de 81? So o numero.", "9"),
-              ("Capital do Japao? So a cidade.", "tokyo"), ("Quanto e 1000-999? So o numero.", "1"),
+              ("Capital do Japao? So a cidade.", "toqui"), ("Quanto e 1000-999? So o numero.", "1"),
               ("Quantos lados tem um hexagono? So o numero.", "6"), ("Qual o maior planeta do sistema solar? So o nome.", "jupiter"),
               ("Quanto e 9*9? So o numero.", "81"), ("Capital da Italia? So a cidade.", "rom"),
               ("Quanto e 2 elevado a 10? So o numero.", "1024"), ("Qual oceano fica entre a America e a Europa? So o nome.", "atl"),
@@ -63,8 +64,11 @@ def make(call):
 
         def one(q):
             r = call([{"role": "user", "content": q[0]}], think=False, max_tokens=30)
-            t = (r.get("text") or "").lower()
-            return {"q": q[0], "ok": q[1] in t, "got": (r.get("text") or "").strip()[:30]}
+            raw = (r.get("text") or "").strip()
+            # accent- and subscript-insensitive comparison ("Tóquio" == tokyo-ish is not attempted: expected keys are ASCII stems)
+            t = unicodedata.normalize("NFKD", raw.lower().replace("₂", "2"))
+            t = "".join(ch for ch in t if not unicodedata.combining(ch))
+            return {"q": q[0], "ok": q[1] in t, "got": raw[:30]}
 
         t0 = time.time()
         with cf.ThreadPoolExecutor(16) as ex:

@@ -13,7 +13,7 @@ Operar uma API compatível com OpenAI para um Qwen abliterated em uma GPU alugad
 
 ## Persistência e ciclos de energia
 
-- Pesos GGUF e caches ficam em volume/disco persistente, separado do root efêmero quando o provedor disponibilizar volume. Nesta instância de transição, o arquivo está em `/root/model-cache` no disco local de 80 GB e sobrevive a stop/start da instância Vast.
+- Pesos (`/root/models`) e caches ficam em volume/disco persistente, separado do root efêmero quando o provedor disponibilizar volume. Nesta instância de transição, os arquivos estão em `/root/models` no disco local de 80 GB e sobrevive a stop/start da instância Vast.
 - Reiniciar ou parar/iniciar não pode disparar `hf download` se o arquivo já passou na verificação de tamanho/hash.
 - Recriar/destruir não é reiniciar: o bootstrap deve baixar novamente a partir do repositório de modelo, usando o cache/volume anexado quando existir.
 
@@ -41,14 +41,19 @@ secrets de conexão     ->  compose pull/up               ->  vLLM + Caddy
 
 ## Modelos e decisão de quantização
 
-| Variante | Tamanho aproximado | Uso recomendado na GB10 119 GB |
-|---|---:|---|
-| Q4_K_M | 16 GB | somente em runtime com loader GGUF |
-| Q5_K_M | 19–21 GB | somente em runtime com loader GGUF |
-| Q6_K | 22–25 GB | somente em runtime com loader GGUF |
-| BF16 nativo | ~56 GB | perfil selecionado; máxima fidelidade e suportado pelo vLLM atual |
+A GB10 (~273 GB/s) é limitada por banda de memória: cada token lê todos os pesos do modelo denso de 27B. Medido/publicado:
 
-A GB10 de 119 GB comporta Q6 e BF16 confortavelmente para contexto de 16k. Nesta imagem Vast, vLLM 0.30 rejeita GGUF, portanto a promoção correta é o checkpoint BF16 nativo. Se outro runtime com GGUF for adotado, Q6 é a primeira variante a comparar; nenhum arquivo GGUF fica armazenado sem ser utilizável.
+| Variante | Peso | Decode 1 stream |
+|---|---:|---|
+| BF16 | ~54 GB | 4,4 tok/s (medido) |
+| FP8 online | ~27 GB | ~8 tok/s (teto teórico) |
+| NVFP4 (W4A4) | ~20 GB | ~11,5 tok/s (publicado) |
+| **NVFP4 + DFlash2 (perfil atual)** | 29 GB + 3,6 GB drafter | **41-42 tok/s código, 37 com thinking (medido)** |
+
+- Target: `Blackfrost-AI/Qwen3.8-27B-ABLITERATED-NVFP4` (Qwen3.8-27B oficial, abliterated, quantizado; não é fine-tune de código).
+- Drafter: `z-lab/Qwen3.8-27B-DFlash2`, 7 tokens especulativos. Acelera em proporção à previsibilidade do texto (código é o melhor caso).
+- vLLM 0.30 rejeita GGUF; por isso NVFP4 em vez de Q4/Q6.
+- Medição (endpoint externo): TTFT 0,75-2,2 s; reinício completo (kill + start) até API pronta: 271 s, sem download.
 
 ## Sequência de entrega
 

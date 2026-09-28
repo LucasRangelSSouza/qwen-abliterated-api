@@ -4,24 +4,24 @@
    "spoken": "Qual é a capital do Brasil e quantos estados o país tem?",
    "transcript": "Qual é a capital do Brasil e quantos estados o país tem?",
    "answer": "Brasília; 26 estados e 1 distrito federal.",
-   "stt_s": 3.77,
-   "llm_s": 1.84,
+   "stt_s": 3.3,
+   "llm_s": 4.5,
    "pass": true
   },
   {
    "spoken": "Quanto é quinze vezes quatro?",
    "transcript": "Quanto é 15 vezes 4?",
    "answer": "60",
-   "stt_s": 2.62,
-   "llm_s": 1.69,
+   "stt_s": 1.76,
+   "llm_s": 0.99,
    "pass": true
   },
   {
    "spoken": "Escreva uma função em Python que soma dois números.",
    "transcript": "Escreva uma função em Python que soma dois números.",
    "answer": "```python\ndef soma(a, b):\n    return a + b\n```",
-   "stt_s": 2.97,
-   "llm_s": 2.25,
+   "stt_s": 1.25,
+   "llm_s": 2.09,
    "pass": true
   }
  ],

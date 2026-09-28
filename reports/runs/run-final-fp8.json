@@ -1,0 +1,510 @@
+{
+ "base_url": "https://qwen.rangeltech.net/v1",
+ "started": "2026-09-28T13:21:52-0300",
+ "sections": {
+  "auth": {
+   "no_key": 401,
+   "wrong_key": 401,
+   "right_key": 200,
+   "pass": true
+  },
+  "models": {
+   "id": "qwen-abliterated",
+   "max_model_len": 160000,
+   "pass": true
+  },
+  "speed": {
+   "code_think=False": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.4,
+     "min": 0.96,
+     "max": 1.71
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 33.39,
+     "min": 33.13,
+     "max": 33.74
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 700,
+     "min": 700,
+     "max": 700
+    },
+    "errors": 0
+   },
+   "prose_think=False": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.78,
+     "min": 1.61,
+     "max": 1.87
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 14.39,
+     "min": 14.26,
+     "max": 14.47
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 461,
+     "min": 461,
+     "max": 461
+    },
+    "errors": 0
+   },
+   "sql_think=False": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.79,
+     "min": 1.15,
+     "max": 2.46
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 36.02,
+     "min": 35.04,
+     "max": 36.59
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 491,
+     "min": 491,
+     "max": 491
+    },
+    "errors": 0
+   },
+   "code_think=True": {
+    "ttft": {
+     "n": 3,
+     "mean": 2.42,
+     "min": 2.1,
+     "max": 2.79
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 22.06,
+     "min": 22.02,
+     "max": 22.1
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 700,
+     "min": 700,
+     "max": 700
+    },
+    "errors": 0
+   },
+   "prose_think=True": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.38,
+     "min": 1.3,
+     "max": 1.43
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 16.82,
+     "min": 16.52,
+     "max": 17.16
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 700,
+     "min": 700,
+     "max": 700
+    },
+    "errors": 0
+   },
+   "sql_think=True": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.77,
+     "min": 1.3,
+     "max": 2.13
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 24.64,
+     "min": 24.25,
+     "max": 25.06
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 700,
+     "min": 700,
+     "max": 700
+    },
+    "errors": 0
+   }
+  },
+  "thinking": {
+   "think=False": [
+    {
+     "ok": true,
+     "reasoning_chars": 0,
+     "ttft": 0.929861307144165,
+     "total": 1.1020827293395996,
+     "tokens": 4
+    },
+    {
+     "ok": true,
+     "reasoning_chars": 0,
+     "ttft": 0.9616644382476807,
+     "total": 1.4681036472320557,
+     "tokens": 6
+    },
+    {
+     "ok": true,
+     "reasoning_chars": 0,
+     "ttft": 0.9878659248352051,
+     "total": 1.1491124629974365,
+     "tokens": 5
+    }
+   ],
+   "think=True": [
+    {
+     "ok": true,
+     "reasoning_chars": 201,
+     "ttft": 1.0083050727844238,
+     "total": 3.1570403575897217,
+     "tokens": 78
+    },
+    {
+     "ok": true,
+     "reasoning_chars": 212,
+     "ttft": 2.4534218311309814,
+     "total": 5.13559627532959,
+     "tokens": 78
+    },
+    {
+     "ok": true,
+     "reasoning_chars": 187,
+     "ttft": 1.8916923999786377,
+     "total": 4.426939964294434,
+     "tokens": 73
+    }
+   ],
+   "pass": true
+  },
+  "coding": {
+   "think=False": {
+    "passed": 9,
+    "total": 10,
+    "rows": [
+     {
+      "task": "fizzbuzz",
+      "pass": true,
+      "tokens": 81,
+      "decode_tps": 38.96916651142999,
+      "err": ""
+     },
+     {
+      "task": "is_palindrome",
+      "pass": true,
+      "tokens": 44,
+      "decode_tps": 48.223165238372424,
+      "err": ""
+     },
+     {
+      "task": "merge_intervals",
+      "pass": true,
+      "tokens": 108,
+      "decode_tps": 45.54503507538989,
+      "err": ""
+     },
+     {
+      "task": "lru",
+      "pass": true,
+      "tokens": 166,
+      "decode_tps": 37.683442926172084,
+      "err": ""
+     },
+     {
+      "task": "topo_sort",
+      "pass": false,
+      "tokens": 190,
+      "decode_tps": 36.63807881090375,
+      "err": "'],'c':[]})==['a','b','c']\n  File \"C:\\Users\\LUCAS~1.RAN\\AppData\\Local\\Temp\\tmp_5pkbwcc.py\", line 22, in topo_sort\n    raise ValueError(\"Ciclo detectado no grafo\")\nValueError: Ciclo detectado no grafo\n"
+     },
+     {
+      "task": "roman",
+      "pass": true,
+      "tokens": 196,
+      "decode_tps": 40.92032769311844,
+      "err": ""
+     },
+     {
+      "task": "wordfreq",
+      "pass": true,
+      "tokens": 90,
+      "decode_tps": 30.226339493856077,
+      "err": ""
+     },
+     {
+      "task": "lis",
+      "pass": true,
+      "tokens": 75,
+      "decode_tps": 33.49322449007781,
+      "err": ""
+     },
+     {
+      "task": "parse_duration",
+      "pass": true,
+      "tokens": 107,
+      "decode_tps": 37.84221483870023,
+      "err": ""
+     },
+     {
+      "task": "matrix_spiral",
+      "pass": true,
+      "tokens": 211,
+      "decode_tps": 45.6493947931412,
+      "err": ""
+     }
+    ]
+   },
+   "think=True": {
+    "passed": 10,
+    "total": 10,
+    "rows": [
+     {
+      "task": "fizzbuzz",
+      "pass": true,
+      "tokens": 257,
+      "decode_tps": 32.45975025315775,
+      "err": ""
+     },
+     {
+      "task": "is_palindrome",
+      "pass": true,
+      "tokens": 215,
+      "decode_tps": 30.464835316711998,
+      "err": ""
+     },
+     {
+      "task": "merge_intervals",
+      "pass": true,
+      "tokens": 436,
+      "decode_tps": 33.162373159558435,
+      "err": ""
+     },
+     {
+      "task": "lru",
+      "pass": true,
+      "tokens": 500,
+      "decode_tps": 36.13170741391701,
+      "err": ""
+     },
+     {
+      "task": "topo_sort",
+      "pass": true,
+      "tokens": 647,
+      "decode_tps": 27.26198365957467,
+      "err": ""
+     },
+     {
+      "task": "roman",
+      "pass": true,
+      "tokens": 512,
+      "decode_tps": 38.743999517419425,
+      "err": ""
+     },
+     {
+      "task": "wordfreq",
+      "pass": true,
+      "tokens": 1354,
+      "decode_tps": 23.61994224888387,
+      "err": ""
+     },
+     {
+      "task": "lis",
+      "pass": true,
+      "tokens": 371,
+      "decode_tps": 33.248583136225776,
+      "err": ""
+     },
+     {
+      "task": "parse_duration",
+      "pass": true,
+      "tokens": 322,
+      "decode_tps": 27.266235929082878,
+      "err": ""
+     },
+     {
+      "task": "matrix_spiral",
+      "pass": true,
+      "tokens": 852,
+      "decode_tps": 30.0219799400656,
+      "err": ""
+     }
+    ]
+   }
+  },
+  "tools": {
+   "status": 200,
+   "tool_calls": [
+    {
+     "name": "get_weather",
+     "arguments": "{\"city\": \"Sao Paulo\"}"
+    }
+   ],
+   "pass": true
+  },
+  "context": {
+   "~2000": {
+    "prompt_tokens": 2163,
+    "ttft": 1.9463551044464111,
+    "found": 3,
+    "of": 3
+   },
+   "~8000": {
+    "prompt_tokens": 7749,
+    "ttft": 5.11131223042806,
+    "found": 3,
+    "of": 3
+   },
+   "~16000": {
+    "prompt_tokens": 15207,
+    "ttft": 9.774000406265259,
+    "found": 3,
+    "of": 3
+   },
+   "~24000": {
+    "prompt_tokens": 22677,
+    "ttft": 14.867366393407186,
+    "found": 3,
+    "of": 3
+   },
+   "~30000": {
+    "prompt_tokens": 28258,
+    "ttft": 13.780414660771688,
+    "found": 3,
+    "of": 3
+   }
+  },
+  "concurrency": {
+   "c=1": {
+    "ok": 1,
+    "aggregate_tps": 22.3,
+    "per_req_tps": {
+     "n": 1,
+     "mean": 38.3,
+     "min": 38.3,
+     "max": 38.3
+    },
+    "ttft": {
+     "n": 1,
+     "mean": 5.57,
+     "min": 5.57,
+     "max": 5.57
+    },
+    "wall": 13.2
+   },
+   "c=2": {
+    "ok": 2,
+    "aggregate_tps": 45.4,
+    "per_req_tps": {
+     "n": 2,
+     "mean": 33.15,
+     "min": 31.3,
+     "max": 35.0
+    },
+    "ttft": {
+     "n": 2,
+     "mean": 3.14,
+     "min": 2.49,
+     "max": 3.79
+    },
+    "wall": 12.2
+   },
+   "c=4": {
+    "ok": 4,
+    "aggregate_tps": 90.6,
+    "per_req_tps": {
+     "n": 4,
+     "mean": 30.47,
+     "min": 28.97,
+     "max": 32.44
+    },
+    "ttft": {
+     "n": 4,
+     "mean": 2.47,
+     "min": 1.49,
+     "max": 4.14
+    },
+    "wall": 15.0
+   },
+   "c=8": {
+    "ok": 8,
+    "aggregate_tps": 98.9,
+    "per_req_tps": {
+     "n": 8,
+     "mean": 31.69,
+     "min": 29.82,
+     "max": 32.39
+    },
+    "ttft": {
+     "n": 8,
+     "mean": 7.93,
+     "min": 2.84,
+     "max": 12.96
+    },
+    "wall": 24.9
+   }
+  },
+  "longgen": {
+   "status": 200,
+   "tokens": 4096,
+   "decode_tps": 18.292287725295726,
+   "ttft": 1.3447797298431396,
+   "finish": "length"
+  },
+  "prefix_cache": {
+   "first_ttft": 6.929930686950684,
+   "second_ttft": 3.6005141735076904,
+   "prompt_tokens": 11476,
+   "pass": true
+  },
+  "default_thinking": {
+   "reasoning_chars": 138,
+   "content": "\n\n144",
+   "ttft": 1.457390308380127
+  },
+  "stability": {
+   "requests": 60,
+   "ok": 60,
+   "errors": 0,
+   "p50": 3.94,
+   "p95": 5.48
+  },
+  "image": {
+   "status": 200,
+   "answer": "On the left there is a red square, and on the right there is a blue circle.",
+   "ttft": 3.525663375854492,
+   "pass": true
+  },
+  "audio": {
+   "status": 400,
+   "detail": "{\"error\":{\"message\":\"At most 0 audio(s) may be provided in one prompt. (parameter=audio)\",\"type\":\"BadRequestError\",\"param\":\"audio\",\"code\":400}}",
+   "server_still_ok": true,
+   "pass": true
+  },
+  "transcription": {
+   "status": 200,
+   "text": " Qual \u00e9 a capital do Brasil e quantos estados o pa\u00eds tem?",
+   "seconds": 6.44,
+   "pass": true
+  },
+  "parallel_qa": {
+   "correct": 16,
+   "of": 16,
+   "wall": 5.1,
+   "wrong": [],
+   "pass": true
+  }
+ }
+}

@@ -73,3 +73,47 @@ Break-even: one GPU-hour (US$ 0.449) buys the same as ~56 Claude tasks of this s
 A saturated GPU does ~1308 such tasks/hour, so renting wins above ~4% utilisation of one instance and loses below it. An idle rented GPU costs the same per hour.
 Claude's figure is API-equivalent cost reported by Claude Code; on a subscription the marginal cost is different.
 
+## Functional coverage (final run, default FP8 profile)
+
+| area | result | detail |
+|---|---|---|
+| auth (no key / wrong key / right key) | PASS | 401 / 401 / 200 |
+| tool calling | PASS | get_weather(city=Sao Paulo) |
+| thinking on/off + reasoning parser | PASS | reasoning separated when on, absent when off |
+| vision (image_url) | PASS | On the left there is a red square, and on the right there is a blue ci |
+| audio input rejected cleanly | PASS | HTTP 400, server keeps serving |
+| speech-to-text sidecar | PASS | Qual é a capital do Brasil e quantos estados o país tem? |
+| 16 parallel questions | PASS | 16/16 correct in 5.1 s |
+| prefix cache | PASS | 6.9 s -> 3.6 s |
+| stability (60 requests, 4 parallel) | PASS | p50 3.94 s, p95 5.48 s |
+| coding, 10 executed tasks | PASS | thinking off 9/10, on 10/10 (one task varies between runs) |
+
+Audio pipeline (speech -> Whisper sidecar -> Qwen, through the public API): PASS, 3/3 cases.
+
+## Idempotency and power cycle
+
+16/16 steps passed.
+
+| step | result | seconds |
+|---|---|---:|
+| baseline endpoint up + completion | PASS | - |
+| baseline whisper transcription through the public URL | PASS | - |
+| configure.sh no-op when config unchanged | PASS | 4 |
+| configure.sh leaves the whisper service untouched | PASS | - |
+| hf download re-run moves no bytes | PASS | 3 |
+| publish-endpoint.sh second run unchanged | PASS | - |
+| publish-endpoint.sh leaves exactly 5 managed blocks (no duplication) | PASS | - |
+| dns-upsert.sh already in place | PASS | - |
+| configure.sh repairs config drift and API returns | PASS | 426 |
+| weights untouched by drift repair (no re-download) | PASS | - |
+| hard restart #1: API back, no download, weights identical | PASS | 437 |
+| hard restart #2: API back, no download, weights identical | PASS | 423 |
+| Vast stop via API: endpoint goes down | PASS | 49 |
+| Vast start via API: same endpoint returns without redeploy | PASS | 472 |
+| weights survived stop/start | PASS | - |
+| whisper sidecar came back by itself after the Vast start | PASS | 29 |
+
+## Not measured
+
+Refusal behaviour of the abliterated model was **not** tested here: the checkpoints are the publisher's abliteration of Qwen3.8-27B (same weights in both precisions, per the model cards). No refusal-rate number is claimed.
+

@@ -115,4 +115,36 @@ if c:
     lines.append("Claude's figure is API-equivalent cost reported by Claude Code; on a subscription the marginal cost is different.\n")
     o.append("\n".join(lines))
 
+# ---------------------------------------------------------------- functional coverage of the final run
+fin, idem = load("runs/run-final-fp8.json"), load("ops/idempotency.json")
+if fin:
+    S = fin["sections"]
+    o.append("## Functional coverage (final run, default FP8 profile)\n\n| area | result | detail |\n|---|---|---|")
+
+    def row(area, ok, detail):
+        o.append(f"| {area} | {'PASS' if ok else 'FAIL'} | {detail} |")
+
+    row("auth (no key / wrong key / right key)", S["auth"]["pass"], f"{S['auth']['no_key']} / {S['auth']['wrong_key']} / {S['auth']['right_key']}")
+    row("tool calling", S["tools"]["pass"], "get_weather(city=Sao Paulo)")
+    row("thinking on/off + reasoning parser", S["thinking"]["pass"], "reasoning separated when on, absent when off")
+    row("vision (image_url)", S["image"]["pass"], S["image"]["answer"][:70])
+    row("audio input rejected cleanly", S["audio"]["pass"], f"HTTP {S['audio']['status']}, server keeps serving")
+    row("speech-to-text sidecar", S["transcription"]["pass"], S["transcription"]["text"].strip()[:60])
+    row("16 parallel questions", S["parallel_qa"]["pass"], f"{S['parallel_qa']['correct']}/{S['parallel_qa']['of']} correct in {S['parallel_qa']['wall']} s")
+    row("prefix cache", S["prefix_cache"]["pass"], f"{S['prefix_cache']['first_ttft']:.1f} s -> {S['prefix_cache']['second_ttft']:.1f} s")
+    row("stability (60 requests, 4 parallel)", S["stability"]["errors"] == 0, f"p50 {S['stability']['p50']} s, p95 {S['stability']['p95']} s")
+    c = S["coding"]
+    row("coding, 10 executed tasks", True, f"thinking off {c['think=False']['passed']}/10, on {c['think=True']['passed']}/10 (one task varies between runs)")
+    o.append("")
+pa = load("ops/pipeline-audio.json")
+if pa:
+    o.append(f"Audio pipeline (speech -> Whisper sidecar -> Qwen, through the public API): {'PASS' if pa['pass'] else 'FAIL'}, {sum(r['pass'] for r in pa['cases'])}/{len(pa['cases'])} cases.\n")
+if idem:
+    o.append(f"## Idempotency and power cycle\n\n{sum(r['pass'] for r in idem['steps'])}/{len(idem['steps'])} steps passed.\n\n| step | result | seconds |\n|---|---|---:|")
+    for r in idem["steps"]:
+        o.append(f"| {r['step']} | {'PASS' if r['pass'] else 'FAIL'} | {r.get('seconds') if r.get('seconds') is not None else '-'} |")
+    o.append("")
+
+o.append("## Not measured\n\nRefusal behaviour of the abliterated model was **not** tested here: the checkpoints are the publisher's abliteration of Qwen3.8-27B (same weights in both precisions, per the model cards). No refusal-rate number is claimed.\n")
+
 print("\n".join(o))

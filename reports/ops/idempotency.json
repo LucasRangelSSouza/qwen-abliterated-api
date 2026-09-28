@@ -4,13 +4,25 @@
    "step": "baseline endpoint up + completion",
    "pass": true,
    "seconds": null,
-   "detail": "pid=26034\nWelcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.\nHave fun!\n /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)"
+   "detail": "pid=2784"
+  },
+  {
+   "step": "baseline whisper transcription through the public URL",
+   "pass": true,
+   "seconds": null,
+   "detail": ""
   },
   {
    "step": "configure.sh no-op when config unchanged",
    "pass": true,
    "seconds": 4,
-   "detail": "rc=0 nothing_to_do=True pid 26034\nWelcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.\nHave fun!\n /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)->26034\nWelcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.\nHave fun!\n /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.) weights_same=True"
+   "detail": "rc=0 nothing_to_do=True pid 2784->2784 weights_same=True"
+  },
+  {
+   "step": "configure.sh leaves the whisper service untouched",
+   "pass": true,
+   "seconds": null,
+   "detail": "whisper: service unchanged"
   },
   {
    "step": "hf download re-run moves no bytes",
@@ -25,10 +37,10 @@
    "detail": "edge: dynamic.yml unchanged"
   },
   {
-   "step": "publish-endpoint.sh leaves exactly 3 managed blocks (no duplication)",
+   "step": "publish-endpoint.sh leaves exactly 5 managed blocks (no duplication)",
    "pass": true,
    "seconds": null,
-   "detail": "blocks=3"
+   "detail": "blocks=5"
   },
   {
    "step": "dns-upsert.sh already in place",
@@ -39,7 +51,7 @@
   {
    "step": "configure.sh repairs config drift and API returns",
    "pass": true,
-   "seconds": 423,
+   "seconds": 426,
    "detail": "max_model_len restored=True"
   },
   {
@@ -51,31 +63,37 @@
   {
    "step": "hard restart #1: API back, no download, weights identical",
    "pass": true,
-   "seconds": 416,
-   "detail": "ready=416s downloads=0 weights_same=True"
+   "seconds": 437,
+   "detail": ""
   },
   {
    "step": "hard restart #2: API back, no download, weights identical",
    "pass": true,
-   "seconds": 448,
-   "detail": "ready=448s downloads=0 weights_same=True"
+   "seconds": 423,
+   "detail": ""
   },
   {
    "step": "Vast stop via API: endpoint goes down",
    "pass": true,
-   "seconds": 48,
+   "seconds": 49,
    "detail": "{\"success\": true}"
   },
   {
    "step": "Vast start via API: same endpoint returns without redeploy",
    "pass": true,
-   "seconds": 478,
+   "seconds": 472,
    "detail": "{\"success\": true}"
   },
   {
    "step": "weights survived stop/start",
    "pass": true,
    "seconds": null,
+   "detail": ""
+  },
+  {
+   "step": "whisper sidecar came back by itself after the Vast start",
+   "pass": true,
+   "seconds": 29,
    "detail": ""
   }
  ]

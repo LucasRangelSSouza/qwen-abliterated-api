@@ -46,6 +46,6 @@ Audience: engineers who self-host LLMs or are deciding between paying per token 
 
 ## Claims that need care
 
-- "Same abliterated weights" is true by lineage (the NVFP4 card names the BF16 as its base; FP8 is online quantisation of that BF16); refusal behaviour was spot-checked, not benchmarked.
+- "Same abliterated weights" is true by lineage (the NVFP4 card names the BF16 as its base; FP8 is online quantisation of that BF16); refusal behaviour was neither benchmarked nor spot-checked: say so, and cite the publisher's card only.
 - The Sonnet 5 numbers come from a plain completion without tools; they are a yardstick for these two tasks, not a general ranking.
 - Cost per task for the GPU assumes it is busy; an idle rented GPU costs the same per hour.

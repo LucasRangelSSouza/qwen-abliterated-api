@@ -17,7 +17,7 @@ Terraform owns the replacement-safe machine configuration. Change `ssh_host`, `s
 - A Hostinger A record for `api.example.com` pointing to the VM public IP, with ports 80 and 443 directly reachable.
 - A private SSH key with a passwordless-sudo user.
 
-The low-cost Vast offer is a **container**, not a full Ubuntu VM. It cannot run this Docker/Caddy topology. For that managed image use `scripts/configure-vast-vllm.sh`: it configures its built-in Supervisor/vLLM server without Docker-in-Docker. It places a Q4 GGUF model on the instance disk and uses a Vast local volume only for the persistent workspace configuration.
+The low-cost Vast offer is a **container**, not a full Ubuntu VM. It cannot run this Docker/Caddy topology. For that managed image use `scripts/configure-vast-vllm.sh`: it configures its built-in Supervisor/vLLM server without Docker-in-Docker. The current Vast vLLM image rejects GGUF, so the script downloads only the native BF16 shards and required metadata to the instance disk.
 
 ## First deploy
 
@@ -67,7 +67,7 @@ The benchmark reports actual API timing and generated-token usage, so tokens/s i
 
 ## Vast vLLM container profile
 
-The command below is for Vast's current vLLM template after an 80 GB-or-larger disk has been selected. It starts the OpenAI API at the template's internal `http://127.0.0.1:18000/v1`; Vast maps it to the public port advertised in `vast-capabilities`. It is intentionally a quantized `Q4_K_M` deployment to fit within an economical container disk.
+The command below is for Vast's current vLLM template after an 80 GB-or-larger disk has been selected. It starts the OpenAI API at the template's internal `http://127.0.0.1:18000/v1`; Vast maps it to the public port advertised in `vast-capabilities`. It uses the native BF16 checkpoint because the installed vLLM 0.30 loader does not support GGUF.
 
 ```bash
 MODEL_CACHE_DIR=/root/model-cache \

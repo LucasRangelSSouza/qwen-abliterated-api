@@ -43,12 +43,12 @@ secrets de conexão     ->  compose pull/up               ->  vLLM + Caddy
 
 | Variante | Tamanho aproximado | Uso recomendado na GB10 119 GB |
 |---|---:|---|
-| Q4_K_M | 16 GB | ponto de partida, maior margem e concorrência |
-| Q5_K_M | 19–21 GB | melhor equilíbrio qualidade/custo; primeira promoção |
-| Q6_K | 22–25 GB | recomendado se benchmark confirmar latência aceitável |
-| Q8_0 | 30–32 GB | possível em VRAM, porém maior custo de memória/latência |
+| Q4_K_M | 16 GB | somente em runtime com loader GGUF |
+| Q5_K_M | 19–21 GB | somente em runtime com loader GGUF |
+| Q6_K | 22–25 GB | somente em runtime com loader GGUF |
+| BF16 nativo | ~56 GB | perfil selecionado; máxima fidelidade e suportado pelo vLLM atual |
 
-A GB10 de 119 GB comporta Q6 confortavelmente e provavelmente Q8. A decisão não será por estimativa: o deploy mede Q4, Q6 e, se houver folga, Q8 com o mesmo prompt, contexto e concorrência; só promove a variante que atender o limite de latência definido no benchmark.
+A GB10 de 119 GB comporta Q6 e BF16 confortavelmente para contexto de 16k. Nesta imagem Vast, vLLM 0.30 rejeita GGUF, portanto a promoção correta é o checkpoint BF16 nativo. Se outro runtime com GGUF for adotado, Q6 é a primeira variante a comparar; nenhum arquivo GGUF fica armazenado sem ser utilizável.
 
 ## Sequência de entrega
 

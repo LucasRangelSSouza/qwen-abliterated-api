@@ -34,7 +34,7 @@ o.append("")
 # ---------------------------------------------------------------- speed
 r_nv, r_fp = load("run-2.json"), load("run-fp8-160k.json")
 if r_nv and r_fp:
-    o.append("## Speed (through the public HTTPS endpoint)\n\n| workload | thinking | NVFP4 tok/s | FP8 tok/s |\n|---|---|---:|---:|")
+    o.append("## Speed (through the public HTTPS endpoint)\n\nNVFP4 was measured at max_model_len 32 768 (run-2), FP8 at 160 000 (run-fp8-160k); single runs per cell, so differences of a few tok/s are within noise (the FP8 2-client aggregate of 22 tok/s is a warm-up outlier).\n\n| workload | thinking | NVFP4 tok/s | FP8 tok/s |\n|---|---|---:|---:|")
     for k, v in r_nv["sections"]["speed"].items():
         w = r_fp["sections"]["speed"].get(k)
         name, think = k.split("_think=")
@@ -73,6 +73,14 @@ for name in ("FP8", "NVFP4"):
         n = d["humaneval"]["total"] + d["gsm8k"]["total"]
         cost = d["seconds"] * GPU_USD_H / 3600
         o.append(f"| Qwen {name} (busy GPU) | {n} | US$ {cost:.2f} | US$ {1000 * cost / n:.2f} |")
-o.append("\nAn idle rented GPU costs the same per hour; the Qwen figure is the best case (saturated). Break-even: at ~US$ 8 per 1000 tasks, Claude costs the same as roughly 18 GPU-hours of Qwen, so the GPU only wins when it stays busy.\n")
+if c:
+    per_task_claude = c["usage"]["cost"] / (c["humaneval"]["total"] + c["gsm8k"]["total"])
+    f8 = q["Qwen3.8-27B abliterated FP8 + DFlash2"]
+    lines = ["", f"Break-even: one GPU-hour (US$ {GPU_USD_H}) buys the same as ~{GPU_USD_H / per_task_claude:.0f} Claude tasks of this size."]
+    if f8:
+        tph = 3600 * (f8["humaneval"]["total"] + f8["gsm8k"]["total"]) / f8["seconds"]
+        lines.append(f"A saturated GPU does ~{tph:.0f} such tasks/hour, so renting wins above ~{GPU_USD_H / per_task_claude / tph * 100:.0f}% utilisation of one instance and loses below it. An idle rented GPU costs the same per hour.")
+    lines.append("Claude's figure is API-equivalent cost reported by Claude Code; on a subscription the marginal cost is different.\n")
+    o.append("\n".join(lines))
 
 print("\n".join(o))

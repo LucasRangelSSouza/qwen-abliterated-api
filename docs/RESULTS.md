@@ -14,6 +14,8 @@ HumanEval: 164 problems, pass@1, greedy, code executed locally. GSM8K: first 200
 
 ## Speed (through the public HTTPS endpoint)
 
+NVFP4 was measured at max_model_len 32 768 (run-2), FP8 at 160 000 (run-fp8-160k); single runs per cell, so differences of a few tok/s are within noise (the FP8 2-client aggregate of 22 tok/s is a warm-up outlier).
+
 | workload | thinking | NVFP4 tok/s | FP8 tok/s |
 |---|---|---:|---:|
 | code | off | 34.9 | 34.81 |
@@ -50,5 +52,7 @@ GPU: US$ 0.449/h rented, 4 parallel requests, cost = run seconds x price. Claude
 | Sonnet 5 medium | 364 | US$ 2.90 | US$ 7.97 |
 | Qwen FP8 (busy GPU) | 364 | US$ 0.12 | US$ 0.34 |
 
-An idle rented GPU costs the same per hour; the Qwen figure is the best case (saturated). Break-even: at ~US$ 8 per 1000 tasks, Claude costs the same as roughly 18 GPU-hours of Qwen, so the GPU only wins when it stays busy.
+Break-even: one GPU-hour (US$ 0.449) buys the same as ~56 Claude tasks of this size.
+A saturated GPU does ~1308 such tasks/hour, so renting wins above ~4% utilisation of one instance and loses below it. An idle rented GPU costs the same per hour.
+Claude's figure is API-equivalent cost reported by Claude Code; on a subscription the marginal cost is different.
 

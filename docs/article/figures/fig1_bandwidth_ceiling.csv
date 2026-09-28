@@ -1,0 +1,4 @@
+format,ceiling_tok_s,plain_tok_s,speculative_tok_s,note
+BF16,5.055555555555555,4.4,,"ceiling = 273 GB/s / 54 GB; measured 4.4 tok/s (reports/runs/run-1.log era, BF16 checkpoint)"
+FP8,10.11111111111111,,33.39,"plain FP8 not measured; with DFlash2 = final run, code"
+NVFP4,13.65,11.5,34.9,"plain 11.5 tok/s is PUBLISHED (NVIDIA forum), not measured here; with DFlash2 = run-2, code"

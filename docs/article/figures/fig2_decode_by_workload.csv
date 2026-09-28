@@ -1,0 +1,7 @@
+workload,fp8_tok_s,nvfp4_tok_s
+code thinking=False,33.39,34.9
+sql thinking=False,36.02,34.94
+prose thinking=False,14.39,12.98
+code thinking=True,22.06,24.7
+sql thinking=True,24.64,22.53
+prose thinking=True,16.82,17.55

@@ -1,0 +1,98 @@
+[
+ {
+  "target": 16000,
+  "seed": 1,
+  "prompt_tokens": 15207,
+  "ttft": 10.654770851135254,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40049"
+ },
+ {
+  "target": 16000,
+  "seed": 2,
+  "prompt_tokens": 15195,
+  "ttft": 9.236540079116821,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40050"
+ },
+ {
+  "target": 16000,
+  "seed": 3,
+  "prompt_tokens": 15309,
+  "ttft": 9.995682001113892,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40051"
+ },
+ {
+  "target": 22000,
+  "seed": 1,
+  "prompt_tokens": 20790,
+  "ttft": 13.992076873779297,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40067"
+ },
+ {
+  "target": 22000,
+  "seed": 2,
+  "prompt_tokens": 20820,
+  "ttft": 18.185258150100708,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40068"
+ },
+ {
+  "target": 22000,
+  "seed": 3,
+  "prompt_tokens": 20853,
+  "ttft": 16.69033408164978,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40069"
+ },
+ {
+  "target": 26000,
+  "seed": 1,
+  "prompt_tokens": 24522,
+  "ttft": 13.518145561218262,
+  "ok": false,
+  "head": "duct Register Register Register Register"
+ },
+ {
+  "target": 26000,
+  "seed": 2,
+  "prompt_tokens": 24527,
+  "ttft": 12.493578910827637,
+  "ok": false,
+  "head": "duct Register Register Register Register"
+ },
+ {
+  "target": 26000,
+  "seed": 3,
+  "prompt_tokens": 24573,
+  "ttft": 12.479515552520752,
+  "ok": false,
+  "head": "duct Register Register Register Register"
+ },
+ {
+  "target": 30000,
+  "seed": 1,
+  "prompt_tokens": 28258,
+  "ttft": 15.587752103805542,
+  "ok": false,
+  "head": "duct Register Register Register Register"
+ },
+ {
+  "target": 30000,
+  "seed": 2,
+  "prompt_tokens": 28288,
+  "ttft": 16.13913869857788,
+  "ok": false,
+  "head": "duct Register Register Register Register"
+ },
+ {
+  "target": 30000,
+  "seed": 3,
+  "prompt_tokens": 28287,
+  "ttft": 15.091336250305176,
+  "ok": false,
+  "head": "duct Register Register Register Register"
+ }
+]

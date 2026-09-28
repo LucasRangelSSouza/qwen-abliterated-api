@@ -89,7 +89,16 @@ if all(lc.values()):
             cells += [f"{sum(r['ok'] for r in rows)}/{len(rows)}", f"{sum(r['ttft'] for r in rows) / len(rows):.0f} s"]
         pt = round(sum(r["prompt_tokens"] for r in lc["FP8"] if r["target"] == s) / max(1, len([r for r in lc["FP8"] if r["target"] == s])) / 1000)
         o.append(f"| ~{pt}k | " + " | ".join(cells) + " |")
-    o.append("\nWith the fp8 KV cache instead, needles were lost from ~22k tokens (12 of 36 attempts, garbage output). See `reports/longctx/longctx-kv-auto.json` and `reports/runs/run-1.log`.\n")
+    kv = load("longctx/longctx-fp8kv-experiment.json")
+    if kv:
+        o.append("\n### KV cache dtype experiment (same needle series, 3 seeds per size)\n\n| prompt tokens (approx.) | fp8 KV: needle found | bf16 KV: needle found |\n|---|---:|---:|")
+        auto = load("longctx/longctx-kv-auto.json") or []
+        for s_ in sorted({r["target"] for r in kv}):
+            a_ = [r for r in kv if r["target"] == s_]; b_ = [r for r in auto if r["target"] == s_]
+            o.append(f"| ~{round(sum(r['prompt_tokens'] for r in a_) / len(a_) / 1000)}k | {sum(r['ok'] for r in a_)}/{len(a_)} | {(str(sum(r['ok'] for r in b_)) + '/' + str(len(b_))) if b_ else '-'} |")
+        o.append(f"\nFailures with the fp8 KV cache: {sum(not r['ok'] for r in kv)} of {len(kv)} attempts (failed answers start with e.g. `{next((r['head'] for r in kv if not r['ok']), '')[:24]}`). Raw data: `reports/longctx/longctx-fp8kv-experiment.json`, `longctx-kv-auto.json`.\n")
+    else:
+        o.append("\nThe fp8-KV-cache experiment has not been run yet (`tests/queue_kv_experiment.py`).\n")
 
 # ---------------------------------------------------------------- cost
 c = q["Sonnet 5 medium (yardstick, no tools)"]

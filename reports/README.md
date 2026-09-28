@@ -16,4 +16,4 @@ Run names
 - `run-fp8-160k`: FP8 profile, 160k context.
 - `run-new-sections`, `run-audio-check`: partial runs of the vision / audio / parallel / transcription sections while they were added.
 - `run-final-*`: full run of the final default profile (see `docs/RESULTS.md`).
-- `quality-nvfp4-harness-v1.json`: NVFP4 quality with the first grader, kept on purpose: the grader had bugs (missing helper functions, 1024-token cap) that understated the model. Do not compare it with the other files.
+- `quality-nvfp4-harness-v1.json`: NVFP4 quality with the first grader, kept on purpose: the grader had bugs (missing helper functions, 1024-token cap). Do not compare it with the other files.

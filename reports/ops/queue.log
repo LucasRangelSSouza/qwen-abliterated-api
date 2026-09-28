@@ -96,3 +96,36 @@ mean common-prefix share: 0.14
 mean similarity ratio:    0.35
 
 12:01:17 QUALITY QUEUE DONE
+14:20:48 == kv experiment: fp8 KV cache
+14:20:48 == deploy fp8kv-experiment {'KV_DTYPE': 'fp8_e4m3'}
+14:29:13 deploy fp8kv-experiment: AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.) ready_after=492s total=502s
+(EngineCore pid=3020) INFO 09-28 17:35:24 [model_runner.py:428] Model loading took 31.83 GiB memory and 391.647039 seconds
+(EngineCore pid=3020) INFO 09-28 17:36:29 [gpu_worker.py:640] Available KV cache memory: 34.74 GiB
+(EngineCore pid=3020) INFO 09-28 17:36:29 [kv_cache_utils.py:2395] GPU KV cache size: 610,708 tokens, Maximum concurrency for 160,000 tokens per request: 3.82x
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+14:29:13 run C:\Users\lucas.rangel\AppData\Local\Programs\Python\Python310\python.exe -u tests/longctx.py 16000 22000 26000 30000
+14:32:41 16000 1 15207 10.7 OK
+16000 2 15195 9.2 OK
+16000 3 15309 10.0 OK
+22000 1 20790 14.0 OK
+22000 2 20820 18.2 OK
+22000 3 20853 16.7 OK
+26000 1 24522 13.5 FAIL 'duct Register Register Register Register'
+26000 2 24527 12.5 FAIL 'duct Register Register Register Register'
+26000 3 24573 12.5 FAIL 'duct Register Register Register Register'
+30000 1 28258 15.6 FAIL 'duct Register Register Register Register'
+30000 2 28288 16.1 FAIL 'duct Register Register Register Register'
+30000 3 28287 15.1 FAIL 'duct Register Register Register Register'
+
+14:32:41 == kv experiment: restoring default (bf16 KV)
+14:32:41 == deploy default-restore {}
+14:39:33 deploy default-restore: AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.) ready_after=397s total=408s
+(EngineCore pid=4938) INFO 09-28 17:46:24 [model_runner.py:428] Model loading took 31.83 GiB memory and 339.059188 seconds
+(EngineCore pid=4938) INFO 09-28 17:46:47 [gpu_worker.py:640] Available KV cache memory: 36.02 GiB
+(EngineCore pid=4938) INFO 09-28 17:46:47 [kv_cache_utils.py:2395] GPU KV cache size: 416,808 tokens, Maximum concurrency for 160,000 tokens per request: 2.61x
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+14:39:33 KV EXPERIMENT DONE

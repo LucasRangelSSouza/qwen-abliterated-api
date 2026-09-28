@@ -27,8 +27,8 @@ SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-qwen-abliterated}"
 NSPEC="${NSPEC:-7}"
 MAX_LEN="${MAX_LEN:-160000}"
 GPU_UTIL="${GPU_UTIL:-0.60}"            # leave headroom for other GPU workloads on the same card
-# KV cache dtype: "auto" (bf16). fp8_e4m3 corrupted generations past ~20k tokens (tests/longctx.py:
-# 12/36 needle failures with fp8, 0/12 with auto); the KV cache holds ~400k tokens in bf16.
+# KV cache dtype: "auto" (bf16). fp8_e4m3 corrupted generations on long prompts (tests/longctx.py:
+# needle tests failed with degenerate output with fp8, none with auto; see reports/longctx/); the KV cache holds ~400k tokens in bf16.
 KV_DTYPE="${KV_DTYPE:-auto}"
 PRUNE_UNUSED="${PRUNE_UNUSED:-0}"       # 1 = delete the other profile's weights (billed disk should not hold unused files)
 TARGET_DIR="${TARGET_DIR:-$MODELS_DIR/$TARGET_SUBDIR}"

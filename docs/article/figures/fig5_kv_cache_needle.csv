@@ -1,0 +1,14 @@
+series,prompt_k_tokens,needle_found_pct
+fp8 KV cache (FP8 weights),15.2,100.0
+fp8 KV cache (FP8 weights),20.8,100.0
+fp8 KV cache (FP8 weights),24.5,0.0
+fp8 KV cache (FP8 weights),28.3,0.0
+"bf16 KV cache (NVFP4 weights, same series)",15.0,100.0
+"bf16 KV cache (NVFP4 weights, same series)",20.6,100.0
+"bf16 KV cache (NVFP4 weights, same series)",24.3,100.0
+"bf16 KV cache (NVFP4 weights, same series)",28.0,100.0
+"bf16 KV cache (FP8 weights, final suite)",2.2,100.0
+"bf16 KV cache (FP8 weights, final suite)",7.7,100.0
+"bf16 KV cache (FP8 weights, final suite)",15.2,100.0
+"bf16 KV cache (FP8 weights, final suite)",22.7,100.0
+"bf16 KV cache (FP8 weights, final suite)",28.3,100.0

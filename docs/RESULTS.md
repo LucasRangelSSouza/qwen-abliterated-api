@@ -10,7 +10,23 @@ HumanEval: 164 problems, pass@1, greedy, code executed locally. GSM8K: first 200
 |---|---:|---:|---:|
 | Sonnet 5 medium (yardstick, no tools) | 164/164 (100.0%) | 197/200 (98.5%) | 612 s |
 | Qwen3.8-27B abliterated FP8 + DFlash2 | 158/164 (96.3%) | 192/200 (96.0%) | 1002 s |
-| Qwen3.8-27B abliterated NVFP4 + DFlash2 | pending | pending | |
+| Qwen3.8-27B abliterated NVFP4 + DFlash2 | 154/164 (93.9%) | 194/200 (97.0%) | 1075 s |
+
+### Is the difference real?
+
+95% Wilson intervals and exact paired McNemar tests (same problems, per-problem pass/fail). p < 0.05 means the gap is unlikely to be chance.
+
+| model | HumanEval 95% CI | GSM8K 95% CI |
+|---|---|---|
+| Sonnet 5 medium (yardstick, no tools) | 98-100% | 96-99% |
+| Qwen3.8-27B abliterated FP8 + DFlash2 | 92-98% | 92-98% |
+| Qwen3.8-27B abliterated NVFP4 + DFlash2 | 89-97% | 94-99% |
+
+| comparison | HumanEval (wins A / wins B, p) | GSM8K (wins A / wins B, p) |
+|---|---|---|
+| Sonnet 5 medium (A) vs Qwen FP8 (B) | 6 / 0, p=0.031 | 6 / 1, p=0.125 |
+| Sonnet 5 medium (A) vs Qwen NVFP4 (B) | 10 / 0, p=0.002 | 5 / 2, p=0.453 |
+| Qwen FP8 (A) vs Qwen NVFP4 (B) | 4 / 0, p=0.125 | 2 / 4, p=0.688 |
 
 ## Speed (through the public HTTPS endpoint)
 
@@ -51,6 +67,7 @@ GPU: US$ 0.449/h rented, 4 parallel requests, cost = run seconds x price. Claude
 |---|---:|---:|---:|
 | Sonnet 5 medium | 364 | US$ 2.90 | US$ 7.97 |
 | Qwen FP8 (busy GPU) | 364 | US$ 0.12 | US$ 0.34 |
+| Qwen NVFP4 (busy GPU) | 364 | US$ 0.13 | US$ 0.37 |
 
 Break-even: one GPU-hour (US$ 0.449) buys the same as ~56 Claude tasks of this size.
 A saturated GPU does ~1308 such tasks/hour, so renting wins above ~4% utilisation of one instance and loses below it. An idle rented GPU costs the same per hour.

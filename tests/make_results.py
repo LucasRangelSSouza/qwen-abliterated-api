@@ -31,6 +31,38 @@ for name, d in q.items():
         o.append(f"| {name} | pending | pending | |")
 o.append("")
 
+# paired significance (exact McNemar) and Wilson 95% intervals
+import math
+
+
+def mcnemar(a, b):
+    x = sum(1 for p, r in zip(a, b) if p and not r); y = sum(1 for p, r in zip(a, b) if r and not p); k = x + y
+    return x, y, (min(1.0, 2 * sum(math.comb(k, i) for i in range(min(x, y) + 1)) / 2 ** k) if k else 1.0)
+
+
+def wilson(k, n, z=1.96):
+    p = k / n; d = 1 + z * z / n; ctr = (p + z * z / (2 * n)) / d; h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
+    return f"{100 * (ctr - h):.0f}-{100 * (ctr + h):.0f}%"
+
+
+names = list(q)
+short = ["Sonnet 5 medium", "Qwen FP8", "Qwen NVFP4"]
+if all(q.values()):
+    o.append("### Is the difference real?\n\n95% Wilson intervals and exact paired McNemar tests (same problems, per-problem pass/fail). p < 0.05 means the gap is unlikely to be chance.\n")
+    o.append("| model | HumanEval 95% CI | GSM8K 95% CI |\n|---|---|---|")
+    for nm in names:
+        d = q[nm]
+        o.append(f"| {nm} | {wilson(d['humaneval']['passed'], d['humaneval']['total'])} | {wilson(d['gsm8k']['passed'], d['gsm8k']['total'])} |")
+    o.append("\n| comparison | HumanEval (wins A / wins B, p) | GSM8K (wins A / wins B, p) |\n|---|---|---|")
+    for i, j in ((0, 1), (0, 2), (1, 2)):
+        cells = []
+        for bench in ("humaneval", "gsm8k"):
+            a = [r["pass"] for r in q[names[i]][bench]["rows"]]; b = [r["pass"] for r in q[names[j]][bench]["rows"]]
+            x, y, p = mcnemar(a, b)
+            cells.append(f"{x} / {y}, p={p:.3f}")
+        o.append(f"| {short[i]} (A) vs {short[j]} (B) | " + " | ".join(cells) + " |")
+    o.append("")
+
 # ---------------------------------------------------------------- speed
 r_nv, r_fp = load("run-2.json"), load("run-fp8-160k.json")
 if r_nv and r_fp:

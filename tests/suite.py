@@ -260,6 +260,8 @@ def t_default_thinking():
 
 SECTIONS = {"auth": t_auth, "models": t_models, "speed": t_speed, "thinking": t_thinking, "coding": t_coding, "tools": t_tools,
             "context": t_context, "concurrency": t_concurrency, "longgen": t_longgen, "prefix_cache": t_prefix_cache, "default_thinking": t_default_thinking, "stability": t_stability}
+import extra_sections  # noqa: E402  (vision, audio contract, parallel Q&A)
+SECTIONS.update(extra_sections.make(call))
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(); ap.add_argument("--out", default="reports/run.json"); ap.add_argument("--only", default="")

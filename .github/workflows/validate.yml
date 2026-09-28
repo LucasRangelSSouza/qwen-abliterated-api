@@ -16,6 +16,9 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
       - run: terraform -chdir=infra/terraform init -backend=false
       - run: terraform -chdir=infra/terraform validate
+      - run: terraform -chdir=infra/terraform-vast init -backend=false
+      - run: terraform -chdir=infra/terraform-vast fmt -check
+      - run: terraform -chdir=infra/terraform-vast validate
       - run: docker compose --env-file .env.example -f compose.yaml config --quiet
       - run: bash -n scripts/*.sh
 

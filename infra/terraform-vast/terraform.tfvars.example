@@ -1,0 +1,9 @@
+vast_ssh_host        = "203.0.113.10"   # PUBLIC_IPADDR
+vast_ssh_port        = 40022            # VAST_TCP_PORT_22
+vast_api_port        = 40058            # VAST_TCP_PORT_8000
+vast_instance_id     = "12345678"       # CONTAINER_ID
+ssh_private_key_path = "~/.ssh/deploy_ed25519"
+vllm_api_key         = "sk-..."         # stable client key
+hostinger_api_key    = "..."
+edge_ssh_key_path    = "~/.ssh/edge_ed25519"
+# profile = "fp8" (default) | "nvfp4"

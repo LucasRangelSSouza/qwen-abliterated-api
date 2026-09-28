@@ -24,6 +24,11 @@ on:
       edge_ip:
         description: Edge VPS IPv4 that Traefik listens on
         default: 66.94.101.153
+      profile:
+        description: fp8 (default; BF16 checkpoint quantised at load) or nvfp4
+        default: fp8
+        type: choice
+        options: [fp8, nvfp4]
 
 permissions:
   contents: read
@@ -44,7 +49,7 @@ jobs:
       - name: Configure vLLM on the instance (idempotent, no re-download)
         run: |
           $SSH "cat > /root/configure.sh && chmod +x /root/configure.sh" < scripts/configure-vast-vllm.sh
-          $SSH "VLLM_API_KEY='${{ secrets.VLLM_API_KEY }}' /root/configure.sh"
+          $SSH "PROFILE=${{ inputs.profile }} PRUNE_UNUSED=1 VLLM_API_KEY='${{ secrets.VLLM_API_KEY }}' /root/configure.sh"
       - name: Publish behind Traefik + DNS
         env:
           HOSTINGER_API_KEY: ${{ secrets.HOSTINGER_API_KEY }}

@@ -9,7 +9,7 @@ models=$(curl --fail --silent --show-error --max-time 30 \
   -H "Authorization: Bearer $API_KEY" "$BASE_URL/v1/models")
 printf '%s' "$models" | grep -Fq "\"$MODEL\""
 
-payload=$(printf '{"model":"%s","temperature":0,"max_tokens":96,"messages":[{"role":"user","content":"Return exactly: API_OK"}]}' "$MODEL")
+payload=$(printf '{"model":"%s","temperature":0,"max_tokens":96,"chat_template_kwargs":{"enable_thinking":false},"messages":[{"role":"user","content":"Return exactly: API_OK"}]}' "$MODEL")
 response=$(curl --fail --silent --show-error --max-time 180 \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer $API_KEY" \

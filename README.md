@@ -1,86 +1,78 @@
 # Qwen Abliterated API
 
-Production-shaped, OpenAI-compatible vLLM deployment for `nasmtrcs/Qwen3.8-27B-OBLITERATED`. It exposes `/v1/models`, `/v1/chat/completions`, and the vLLM Responses API through HTTPS with a bearer key.
-
-## Architecture
+An OpenAI-compatible endpoint for an abliterated Qwen3.8-27B (thinking + coding + tool calling) running on a rented NVIDIA GB10, published at a stable HTTPS URL on your own domain, and rebuildable on any other machine by changing only its address.
 
 ```text
-Hostinger DNS A record -> Ubuntu GPU VM :443 -> Caddy TLS -> vLLM :8000 -> Qwen 3.8 27B
+client (OpenAI SDK / curl)
+   │  https://qwen.rangeltech.net/v1     Authorization: Bearer <VLLM_API_KEY>
+   ▼
+Traefik on the edge VPS  (TLS: Let's Encrypt, DNS: Hostinger A record)
+   │  injects the Vast edge cookie, streams responses (flushInterval 1ms)
+   ▼
+Vast.ai container (GB10, 119 GB unified memory)
+   Caddy edge :8000 ─► vLLM 0.30 :18000
+                        ├─ target : Qwen3.8-27B abliterated, NVFP4 (W4A4)        29 GB
+                        └─ drafter: DFlash2 block-diffusion speculative decoder   3.6 GB
 ```
 
-Terraform owns the replacement-safe machine configuration. Change `ssh_host`, `ssh_port` and `ssh_private_key_path`, then run `terraform apply`; it uploads the versioned deployment, bootstraps Docker/NVIDIA validation, starts the stack, and recreates the API.
+## Measured result
 
-## Prerequisites
+| metric | value |
+|---|---|
+| time to first token | 0.7 – 2.2 s |
+| decode, code, thinking off | ~41 tok/s |
+| decode, thinking on | ~37 tok/s |
+| context | 32 768 tokens |
+| restart (kill → healthy), no download | ~4.5 min |
 
-- A genuine Ubuntu GPU VM with NVIDIA driver and Docker NVIDIA runtime available.
-- At least 250 GB of instance disk. The selected 27B checkpoint and Hugging Face cache need significant headroom.
-- A Hostinger A record for `api.example.com` pointing to the VM public IP, with ports 80 and 443 directly reachable.
-- A private SSH key with a passwordless-sudo user.
+Full numbers, methodology and per-test tables: [reports/REPORT.md](reports/REPORT.md). Why these numbers are what they are: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-The low-cost Vast offer is a **container**, not a full Ubuntu VM. It cannot run this Docker/Caddy topology. For that managed image use `scripts/configure-vast-vllm.sh`: it configures its built-in Supervisor/vLLM server without Docker-in-Docker. The current Vast vLLM image rejects GGUF, so the script downloads only the native BF16 shards and required metadata to the instance disk.
-
-## First deploy
-
-```bash
-cp .env.example .env
-# set API_DOMAIN and a random VLLM_API_KEY; never commit .env
-terraform -chdir=infra/terraform init
-terraform -chdir=infra/terraform apply -var-file=terraform.tfvars
-```
-
-`infra/terraform/terraform.tfvars.example` contains the required variables. Sensitive values still appear in Terraform state when provisioners are used: keep state local and encrypted, or configure a protected remote state backend before team use.
-
-## DNS with Hostinger
-
-Create an A record named `api` (or your selected hostname) pointing to the VM public IPv4. The Hostinger API authenticates using a bearer token created in hPanel → API. This repository deliberately does not embed that token or automatically mutate DNS; actions use only `DEPLOY_SSH_PRIVATE_KEY` and `VLLM_API_KEY`.
-
-## API and client setup
+## Use it
 
 ```bash
-export OPENAI_BASE_URL=https://api.example.com/v1
-export OPENAI_API_KEY='your-vllm-key'
-curl "$OPENAI_BASE_URL/models" -H "Authorization: Bearer $OPENAI_API_KEY"
+export OPENAI_BASE_URL=https://qwen.rangeltech.net/v1
+export OPENAI_API_KEY=...            # secrets/qwen-api.env in personal-skills, or the VLLM_API_KEY repo secret
+curl "$OPENAI_BASE_URL/chat/completions" -H "Authorization: Bearer $OPENAI_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"model":"qwen-abliterated","messages":[{"role":"user","content":"Write a retry decorator."}],
+       "chat_template_kwargs":{"enable_thinking":false}}'
 ```
 
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="https://api.example.com/v1", api_key="your-vllm-key")
-reply = client.chat.completions.create(
-    model="qwen-abliterated",
-    temperature=0,
-    max_tokens=2048,
-    messages=[{"role": "user", "content": "Write a robust Python retry helper."}],
-)
-print(reply.choices[0].message.content)
+c = OpenAI(base_url="https://qwen.rangeltech.net/v1", api_key="...")
+r = c.chat.completions.create(model="qwen-abliterated", temperature=0, max_tokens=2048,
+      messages=[{"role": "user", "content": "Write a robust Python retry helper."}],
+      extra_body={"chat_template_kwargs": {"enable_thinking": True}})   # reasoning arrives in message.reasoning
 ```
 
-The selected model card recommends deterministic requests (`temperature=0`), `repetition_penalty=1.15`, at least 2048 new tokens for complex code, and thinking disabled because it can reintroduce refusal behavior. vLLM's Qwen reasoning parser remains enabled for clients that need the Responses API.
+- `enable_thinking: true` returns the chain of thought separately in `reasoning`, the answer in `content`.
+- Tool calling works with `tool_choice: "auto"` (`qwen3_xml` parser).
+- The model card recommends `temperature=0`, and thinking off for the abliterated behaviour to hold.
 
-## Verification
+## Repository map
 
-```bash
-scripts/smoke-test.sh https://api.example.com "$VLLM_API_KEY"
-scripts/benchmark.sh https://api.example.com "$VLLM_API_KEY"
-```
+| path | what |
+|---|---|
+| `SPEC_OPERACIONAL.md` | the operating contract (access, persistence, idempotency, API, acceptance) |
+| `scripts/configure-vast-vllm.sh` | idempotent instance configuration: weights, drafter, vLLM args, restart only on drift |
+| `scripts/publish-endpoint.sh` | idempotent Traefik route + auth-cookie injection on the edge VPS |
+| `scripts/dns-upsert.sh` | idempotent Hostinger A record (touches only the named record) |
+| `scripts/vast-power.sh` | start / stop / status of the Vast instance through its API |
+| `scripts/smoke-test.sh`, `benchmark.sh` | quick checks |
+| `tests/suite.py` | end-to-end test + benchmark suite (auth, speed, thinking on/off, heavy context, coding with executed asserts, tools, concurrency, stability) |
+| `tests/idempotency.py` | idempotency and restart tests |
+| `tests/make_report.py` | JSON → Markdown report |
+| `.github/workflows/deploy-vast.yml` | one-click rebuild on any Vast container with sshd |
+| `.github/workflows/deploy.yml` + `infra/terraform` | the same for a genuine Ubuntu GPU VM (Docker + Caddy + Terraform) |
+| `docs/` | architecture, runbook, article notes |
+| `reports/` | raw JSON and rendered reports of every test run |
 
-The benchmark reports actual API timing and generated-token usage, so tokens/s is computed from a live response rather than estimated.
+## Rebuild on another machine
 
-## Vast vLLM container profile
+1. Rent a GPU (Blackwell for NVFP4) whose template ships `sshd`; add the public half of `DEPLOY_SSH_PRIVATE_KEY` to the account.
+2. Run **Actions → Deploy to Vast instance** with `ssh_host`, `ssh_port`, `api_port`, `instance_id`.
+3. The workflow downloads weights (skipped if present), writes the vLLM config, publishes the route, upserts DNS, waits for `/v1/models` and smoke-tests a completion.
 
-The command below is for Vast's current vLLM template after an 80 GB-or-larger disk has been selected. It starts the OpenAI API at the template's internal `http://127.0.0.1:18000/v1`; Vast maps it to the public port advertised in `vast-capabilities`. It uses the native BF16 checkpoint because the installed vLLM 0.30 loader does not support GGUF.
+Repository secrets: `DEPLOY_SSH_PRIVATE_KEY`, `VLLM_API_KEY`, `HOSTINGER_API_KEY`, `EDGE_SSH_PRIVATE_KEY`. The same values live in the private personal-skills vault (`secrets/qwen-api.env`).
 
-```bash
-MODEL_CACHE_DIR=/root/model-cache \
-scripts/configure-vast-vllm.sh
-```
-
-The container's external port is protected by Vast's edge bearer token. For a stable Hostinger hostname, use a real Ubuntu VM with the Compose/Caddy topology above, or place a managed tunnel/reverse proxy in front of the container. A Hostinger A record cannot directly target Vast's changing high ports with standard HTTPS.
-
-## GitHub Actions
-
-`Validate` checks Terraform, Compose interpolation, and shell syntax. `Deploy GPU API` is manually dispatched and needs these repository environment secrets:
-
-- `DEPLOY_SSH_PRIVATE_KEY`
-- `VLLM_API_KEY`
-
-For a replacement VM, launch the workflow with its new IP and the same Hostinger hostname after changing the A record. The workflow runs `terraform apply` using only ephemeral files.
+Turning the machine on and off: [docs/RUNBOOK.md](docs/RUNBOOK.md).

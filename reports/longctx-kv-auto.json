@@ -1,0 +1,98 @@
+[
+ {
+  "target": 16000,
+  "seed": 1,
+  "prompt_tokens": 14937,
+  "ttft": 9.5519278049469,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40049"
+ },
+ {
+  "target": 16000,
+  "seed": 2,
+  "prompt_tokens": 14925,
+  "ttft": 9.507694721221924,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40050"
+ },
+ {
+  "target": 16000,
+  "seed": 3,
+  "prompt_tokens": 15039,
+  "ttft": 8.343690156936646,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40051"
+ },
+ {
+  "target": 22000,
+  "seed": 1,
+  "prompt_tokens": 20520,
+  "ttft": 14.680060148239136,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40067"
+ },
+ {
+  "target": 22000,
+  "seed": 2,
+  "prompt_tokens": 20550,
+  "ttft": 11.182682752609253,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40068"
+ },
+ {
+  "target": 22000,
+  "seed": 3,
+  "prompt_tokens": 20583,
+  "ttft": 11.80651307106018,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40069"
+ },
+ {
+  "target": 26000,
+  "seed": 1,
+  "prompt_tokens": 24252,
+  "ttft": 11.119365453720093,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40079"
+ },
+ {
+  "target": 26000,
+  "seed": 2,
+  "prompt_tokens": 24257,
+  "ttft": 13.1330087184906,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40080"
+ },
+ {
+  "target": 26000,
+  "seed": 3,
+  "prompt_tokens": 24303,
+  "ttft": 11.474001169204712,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40081"
+ },
+ {
+  "target": 30000,
+  "seed": 1,
+  "prompt_tokens": 27988,
+  "ttft": 12.228604555130005,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40091"
+ },
+ {
+  "target": 30000,
+  "seed": 2,
+  "prompt_tokens": 28018,
+  "ttft": 11.361347913742065,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40092"
+ },
+ {
+  "target": 30000,
+  "seed": 3,
+  "prompt_tokens": 28017,
+  "ttft": 12.92307162284851,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40093"
+ }
+]

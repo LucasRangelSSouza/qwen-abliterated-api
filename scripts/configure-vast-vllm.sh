@@ -14,6 +14,9 @@ MODELS_DIR="${MODELS_DIR:-/root/models}"
 SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-qwen-abliterated}"
 NSPEC="${NSPEC:-7}"
 MAX_LEN="${MAX_LEN:-32768}"
+# KV cache dtype: "auto" (bf16). fp8_e4m3 corrupted generations at >~20k tokens of context (tests/longctx.py:
+# 12/36 needle failures with fp8, 0/12 with auto); memory is plentiful (270k tokens of KV in bf16).
+KV_DTYPE="${KV_DTYPE:-auto}"
 
 command -v hf >/dev/null || { echo "Hugging Face CLI (hf) is required" >&2; exit 2; }
 command -v supervisorctl >/dev/null || { echo "Vast vLLM image is required" >&2; exit 3; }
@@ -28,15 +31,28 @@ test -s "$MODELS_DIR/target/model.safetensors.index.json"
 # /workspace/.env is sourced by the image's Supervisor scripts.
 ENV_FILE="${WORKSPACE:-/workspace}/.env"
 touch "$ENV_FILE"
-sed -i '/^VLLM_MODEL=/d;/^VLLM_ARGS=/d;/^MAX_JOBS=/d' "$ENV_FILE"
-# The image's supervisor script eval()s VLLM_ARGS, so the JSON must be wrapped in
-# single quotes inside a double-quoted env value.
+# Build the desired env block, compare with the current one and touch nothing when equal.
+# The block is delimited by markers so unrelated lines in .env survive.
 SPEC="{\\\"method\\\":\\\"dflash\\\",\\\"model\\\":\\\"$MODELS_DIR/drafter\\\",\\\"num_speculative_tokens\\\":$NSPEC}"
-{
-  echo "MAX_JOBS=4"
-  echo "VLLM_MODEL='$MODELS_DIR/target'"
-  echo "VLLM_ARGS=\"--served-model-name $SERVED_MODEL_NAME --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.60 --max-model-len $MAX_LEN --max-num-seqs 4 --kv-cache-dtype fp8_e4m3 --trust-remote-code --enable-auto-tool-choice --tool-call-parser qwen3_xml --reasoning-parser qwen3 --speculative-config '$SPEC'\""
-} >>"$ENV_FILE"
+DESIRED=$(cat <<BLOCK
+# BEGIN qwen-abliterated-api (managed)
+MAX_JOBS=4
+VLLM_MODEL='$MODELS_DIR/target'
+VLLM_ARGS="--served-model-name $SERVED_MODEL_NAME --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.60 --max-model-len $MAX_LEN --max-num-seqs 4 --kv-cache-dtype $KV_DTYPE --trust-remote-code --enable-auto-tool-choice --tool-call-parser qwen3_xml --reasoning-parser qwen3 --speculative-config '$SPEC'"
+${VLLM_API_KEY:+VLLM_API_KEY='$VLLM_API_KEY'}
+# END qwen-abliterated-api (managed)
+BLOCK
+)
+CURRENT=$(sed -n '/^# BEGIN qwen-abliterated-api/,/^# END qwen-abliterated-api/p' "$ENV_FILE")
+healthy() { curl -sf -m 5 http://127.0.0.1:18000/health >/dev/null; }
+if [ "$CURRENT" = "$DESIRED" ] && supervisorctl status vllm | grep -q RUNNING && healthy; then
+  echo "configure: env unchanged and vLLM healthy, nothing to do"
+  exit 0
+fi
+# drop the managed block plus legacy unmanaged lines from earlier revisions
+sed -i '/^# BEGIN qwen-abliterated-api/,/^# END qwen-abliterated-api/d;/^VLLM_MODEL=/d;/^VLLM_ARGS=/d;/^MAX_JOBS=/d;/^VLLM_API_KEY=/d' "$ENV_FILE"
+printf '%s
+' "$DESIRED" >>"$ENV_FILE"
 
 supervisorctl stop vllm || true
 # supervisor's stop leaves the vLLM API server/engine children holding :18000 and

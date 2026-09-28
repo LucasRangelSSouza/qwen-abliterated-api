@@ -1,0 +1,13 @@
+[auth] 4s {"no_key": 401, "wrong_key": 401, "right_key": 200, "pass": true}
+[models] 3s {"id": "qwen-abliterated", "max_model_len": 32768, "pass": true}
+[speed] 529s {"code_think=False": {"ttft": {"n": 3, "mean": 1.51, "min": 1.14, "max": 1.87}, "decode_tps": {"n": 3, "mean": 34.9, "min": 34.22, "max": 35.42}, "tokens": {"n": 3, "mean": 700, "min": 700, "max": 700}, "errors": 0}, "prose_think=False": {"ttft": {"n": 3, "mean": 2.54, "min": 2.18, "max": 2.88}, "de
+[thinking] 29s {"think=False": [{"ok": true, "reasoning_chars": 0, "ttft": 1.9249467849731445, "total": 1.975975751876831, "tokens": 4}, {"ok": true, "reasoning_chars": 0, "ttft": 1.542374610900879, "total": 8.731386423110962, "tokens": 177}, {"ok": true, "reasoning_chars": 0, "ttft": 2.6920933723449707, "total": 
+[coding] 351s {"think=False": {"passed": 10, "total": 10, "rows": [{"task": "fizzbuzz", "pass": true, "tokens": 101, "decode_tps": 48.94666110873307, "err": ""}, {"task": "is_palindrome", "pass": true, "tokens": 39, "decode_tps": 39.26111334724939, "err": ""}, {"task": "merge_intervals", "pass": true, "tokens": 1
+[tools] 5s {"status": 200, "tool_calls": [{"name": "get_weather", "arguments": "{\"city\": \"Sao Paulo\"}"}], "pass": true}
+[context] 127s {"~2000": {"prompt_tokens": 1893, "ttft": 2.5037941137949624, "found": 3, "of": 3}, "~8000": {"prompt_tokens": 7479, "ttft": 5.526654640833537, "found": 3, "of": 3}, "~16000": {"prompt_tokens": 14937, "ttft": 7.381768306096395, "found": 3, "of": 3}, "~24000": {"prompt_tokens": 22407, "ttft": 9.75194
+[concurrency] 90s {"c=1": {"ok": 1, "aggregate_tps": 22.5, "per_req_tps": {"n": 1, "mean": 30.27, "min": 30.27, "max": 30.27}, "ttft": {"n": 1, "mean": 4.61, "min": 4.61, "max": 4.61}, "wall": 17.8}, "c=2": {"ok": 2, "aggregate_tps": 47.5, "per_req_tps": {"n": 2, "mean": 28.67, "min": 27.63, "max": 29.71}, "ttft": {"
+[longgen] 180s {"status": 200, "tokens": 4096, "decode_tps": 22.864467658205328, "ttft": 1.1517739295959473, "finish": "length"}
+[prefix_cache] 13s {"first_ttft": 7.845854759216309, "second_ttft": 2.395798444747925, "prompt_tokens": 11206, "pass": true}
+[default_thinking] 5s {"reasoning_chars": 208, "content": "\n\n144", "ttft": 2.034954309463501}
+[stability] 76s {"requests": 60, "ok": 60, "errors": 0, "p50": 4.69, "p95": 6.6}
+saved reports/run-2.json

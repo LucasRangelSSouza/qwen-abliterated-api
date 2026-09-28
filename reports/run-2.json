@@ -1,0 +1,485 @@
+{
+ "base_url": "https://qwen.rangeltech.net/v1",
+ "started": "2026-09-28T09:09:34-0300",
+ "sections": {
+  "auth": {
+   "no_key": 401,
+   "wrong_key": 401,
+   "right_key": 200,
+   "pass": true
+  },
+  "models": {
+   "id": "qwen-abliterated",
+   "max_model_len": 32768,
+   "pass": true
+  },
+  "speed": {
+   "code_think=False": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.51,
+     "min": 1.14,
+     "max": 1.87
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 34.9,
+     "min": 34.22,
+     "max": 35.42
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 700,
+     "min": 700,
+     "max": 700
+    },
+    "errors": 0
+   },
+   "prose_think=False": {
+    "ttft": {
+     "n": 3,
+     "mean": 2.54,
+     "min": 2.18,
+     "max": 2.88
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 12.98,
+     "min": 12.95,
+     "max": 13.02
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 425,
+     "min": 425,
+     "max": 425
+    },
+    "errors": 0
+   },
+   "sql_think=False": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.9,
+     "min": 1.13,
+     "max": 2.37
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 34.94,
+     "min": 34.72,
+     "max": 35.25
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 600,
+     "min": 600,
+     "max": 600
+    },
+    "errors": 0
+   },
+   "code_think=True": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.29,
+     "min": 1.27,
+     "max": 1.31
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 24.7,
+     "min": 24.59,
+     "max": 24.8
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 700,
+     "min": 700,
+     "max": 700
+    },
+    "errors": 0
+   },
+   "prose_think=True": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.53,
+     "min": 1.29,
+     "max": 1.92
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 17.55,
+     "min": 17.32,
+     "max": 17.9
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 643,
+     "min": 643,
+     "max": 643
+    },
+    "errors": 0
+   },
+   "sql_think=True": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.94,
+     "min": 1.48,
+     "max": 2.85
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 22.53,
+     "min": 22.29,
+     "max": 22.74
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 700,
+     "min": 700,
+     "max": 700
+    },
+    "errors": 0
+   }
+  },
+  "thinking": {
+   "think=False": [
+    {
+     "ok": true,
+     "reasoning_chars": 0,
+     "ttft": 1.9249467849731445,
+     "total": 1.975975751876831,
+     "tokens": 4
+    },
+    {
+     "ok": true,
+     "reasoning_chars": 0,
+     "ttft": 1.542374610900879,
+     "total": 8.731386423110962,
+     "tokens": 177
+    },
+    {
+     "ok": true,
+     "reasoning_chars": 0,
+     "ttft": 2.6920933723449707,
+     "total": 2.6940982341766357,
+     "tokens": 5
+    }
+   ],
+   "think=True": [
+    {
+     "ok": true,
+     "reasoning_chars": 194,
+     "ttft": 1.5976836681365967,
+     "total": 3.572559356689453,
+     "tokens": 72
+    },
+    {
+     "ok": true,
+     "reasoning_chars": 489,
+     "ttft": 2.476202964782715,
+     "total": 9.057963848114014,
+     "tokens": 229
+    },
+    {
+     "ok": true,
+     "reasoning_chars": 188,
+     "ttft": 1.039717674255371,
+     "total": 3.263211965560913,
+     "tokens": 73
+    }
+   ],
+   "pass": true
+  },
+  "coding": {
+   "think=False": {
+    "passed": 10,
+    "total": 10,
+    "rows": [
+     {
+      "task": "fizzbuzz",
+      "pass": true,
+      "tokens": 101,
+      "decode_tps": 48.94666110873307,
+      "err": ""
+     },
+     {
+      "task": "is_palindrome",
+      "pass": true,
+      "tokens": 39,
+      "decode_tps": 39.26111334724939,
+      "err": ""
+     },
+     {
+      "task": "merge_intervals",
+      "pass": true,
+      "tokens": 108,
+      "decode_tps": 50.908306850170334,
+      "err": ""
+     },
+     {
+      "task": "lru",
+      "pass": true,
+      "tokens": 159,
+      "decode_tps": 38.77824666275666,
+      "err": ""
+     },
+     {
+      "task": "topo_sort",
+      "pass": true,
+      "tokens": 174,
+      "decode_tps": 38.29434587120735,
+      "err": ""
+     },
+     {
+      "task": "roman",
+      "pass": true,
+      "tokens": 196,
+      "decode_tps": 50.33789919265051,
+      "err": ""
+     },
+     {
+      "task": "wordfreq",
+      "pass": true,
+      "tokens": 90,
+      "decode_tps": 45.27915744509694,
+      "err": ""
+     },
+     {
+      "task": "lis",
+      "pass": true,
+      "tokens": 75,
+      "decode_tps": 39.335470404471174,
+      "err": ""
+     },
+     {
+      "task": "parse_duration",
+      "pass": true,
+      "tokens": 136,
+      "decode_tps": 37.98247253951366,
+      "err": ""
+     },
+     {
+      "task": "matrix_spiral",
+      "pass": true,
+      "tokens": 211,
+      "decode_tps": 50.669060512389215,
+      "err": ""
+     }
+    ]
+   },
+   "think=True": {
+    "passed": 10,
+    "total": 10,
+    "rows": [
+     {
+      "task": "fizzbuzz",
+      "pass": true,
+      "tokens": 305,
+      "decode_tps": 32.75930672796893,
+      "err": ""
+     },
+     {
+      "task": "is_palindrome",
+      "pass": true,
+      "tokens": 203,
+      "decode_tps": 29.536851662602565,
+      "err": ""
+     },
+     {
+      "task": "merge_intervals",
+      "pass": true,
+      "tokens": 432,
+      "decode_tps": 27.957182917156146,
+      "err": ""
+     },
+     {
+      "task": "lru",
+      "pass": true,
+      "tokens": 1203,
+      "decode_tps": 24.317754022043484,
+      "err": ""
+     },
+     {
+      "task": "topo_sort",
+      "pass": true,
+      "tokens": 1317,
+      "decode_tps": 24.503912292635125,
+      "err": ""
+     },
+     {
+      "task": "roman",
+      "pass": true,
+      "tokens": 998,
+      "decode_tps": 33.30900642969628,
+      "err": ""
+     },
+     {
+      "task": "wordfreq",
+      "pass": true,
+      "tokens": 946,
+      "decode_tps": 22.144892186618723,
+      "err": ""
+     },
+     {
+      "task": "lis",
+      "pass": true,
+      "tokens": 309,
+      "decode_tps": 35.87451217885281,
+      "err": ""
+     },
+     {
+      "task": "parse_duration",
+      "pass": true,
+      "tokens": 699,
+      "decode_tps": 20.056056419996384,
+      "err": ""
+     },
+     {
+      "task": "matrix_spiral",
+      "pass": true,
+      "tokens": 1039,
+      "decode_tps": 35.70244255936853,
+      "err": ""
+     }
+    ]
+   }
+  },
+  "tools": {
+   "status": 200,
+   "tool_calls": [
+    {
+     "name": "get_weather",
+     "arguments": "{\"city\": \"Sao Paulo\"}"
+    }
+   ],
+   "pass": true
+  },
+  "context": {
+   "~2000": {
+    "prompt_tokens": 1893,
+    "ttft": 2.5037941137949624,
+    "found": 3,
+    "of": 3
+   },
+   "~8000": {
+    "prompt_tokens": 7479,
+    "ttft": 5.526654640833537,
+    "found": 3,
+    "of": 3
+   },
+   "~16000": {
+    "prompt_tokens": 14937,
+    "ttft": 7.381768306096395,
+    "found": 3,
+    "of": 3
+   },
+   "~24000": {
+    "prompt_tokens": 22407,
+    "ttft": 9.751943349838257,
+    "found": 3,
+    "of": 3
+   },
+   "~30000": {
+    "prompt_tokens": 27988,
+    "ttft": 12.376761039098104,
+    "found": 3,
+    "of": 3
+   }
+  },
+  "concurrency": {
+   "c=1": {
+    "ok": 1,
+    "aggregate_tps": 22.5,
+    "per_req_tps": {
+     "n": 1,
+     "mean": 30.27,
+     "min": 30.27,
+     "max": 30.27
+    },
+    "ttft": {
+     "n": 1,
+     "mean": 4.61,
+     "min": 4.61,
+     "max": 4.61
+    },
+    "wall": 17.8
+   },
+   "c=2": {
+    "ok": 2,
+    "aggregate_tps": 47.5,
+    "per_req_tps": {
+     "n": 2,
+     "mean": 28.67,
+     "min": 27.63,
+     "max": 29.71
+    },
+    "ttft": {
+     "n": 2,
+     "mean": 2.4,
+     "min": 2.39,
+     "max": 2.4
+    },
+    "wall": 16.8
+   },
+   "c=4": {
+    "ok": 4,
+    "aggregate_tps": 78.5,
+    "per_req_tps": {
+     "n": 4,
+     "mean": 23.36,
+     "min": 22.65,
+     "max": 23.78
+    },
+    "ttft": {
+     "n": 4,
+     "mean": 2.38,
+     "min": 2.02,
+     "max": 2.75
+    },
+    "wall": 20.4
+   },
+   "c=8": {
+    "ok": 8,
+    "aggregate_tps": 90.5,
+    "per_req_tps": {
+     "n": 8,
+     "mean": 24.24,
+     "min": 23.28,
+     "max": 25.44
+    },
+    "ttft": {
+     "n": 8,
+     "mean": 9.89,
+     "min": 1.15,
+     "max": 18.52
+    },
+    "wall": 35.3
+   }
+  },
+  "longgen": {
+   "status": 200,
+   "tokens": 4096,
+   "decode_tps": 22.864467658205328,
+   "ttft": 1.1517739295959473,
+   "finish": "length"
+  },
+  "prefix_cache": {
+   "first_ttft": 7.845854759216309,
+   "second_ttft": 2.395798444747925,
+   "prompt_tokens": 11206,
+   "pass": true
+  },
+  "default_thinking": {
+   "reasoning_chars": 208,
+   "content": "\n\n144",
+   "ttft": 2.034954309463501
+  },
+  "stability": {
+   "requests": 60,
+   "ok": 60,
+   "errors": 0,
+   "p50": 4.69,
+   "p95": 6.6
+  }
+ }
+}

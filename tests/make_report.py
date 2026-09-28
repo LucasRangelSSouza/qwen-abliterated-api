@@ -60,17 +60,11 @@ if "longgen" in S:
 
 if "prefix_cache" in S:
     p = S["prefix_cache"]
-    o.append(f"## Prefix cache
-
-Same {p['prompt_tokens']}-token prompt twice: TTFT {f(p['first_ttft'], 2)} s → {f(p['second_ttft'], 2)} s: **{'PASS' if p['pass'] else 'no speed-up'}**
-")
+    o.append(f"## Prefix cache\n\nSame {p['prompt_tokens']}-token prompt twice: TTFT {f(p['first_ttft'], 2)} s → {f(p['second_ttft'], 2)} s: **{'PASS' if p['pass'] else 'no speed-up'}**\n")
 
 if "default_thinking" in S:
     d = S["default_thinking"]
-    o.append(f"## Default thinking (client sends nothing)
-
-reasoning present: **{'yes' if d['reasoning_chars'] else 'no'}** ({d['reasoning_chars']} chars), TTFT {f(d['ttft'], 2)} s, content starts `{d['content']!r}`
-")
+    o.append(f"## Default thinking (client sends nothing)\n\nreasoning present: **{'yes' if d['reasoning_chars'] else 'no'}** ({d['reasoning_chars']} chars), TTFT {f(d['ttft'], 2)} s, content starts `{d['content']!r}`\n")
 
 if "stability" in S:
     s = S["stability"]

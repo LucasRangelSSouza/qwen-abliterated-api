@@ -17,6 +17,7 @@ resource "terraform_data" "configure" {
     profile = var.profile
     max_len = var.max_model_len
     prune   = var.prune_unused
+    whisper = var.whisper_enabled
     key     = sha256(var.vllm_api_key)
   }
   provisioner "local-exec" {
@@ -27,7 +28,7 @@ resource "terraform_data" "configure" {
     command = <<-EOT
       set -euo pipefail
       tr -d '\r' < ${local.scripts}/configure-vast-vllm.sh | ${local.ssh} "cat > /root/configure.sh && chmod +x /root/configure.sh"
-      ${local.ssh} "PROFILE=${var.profile} MAX_LEN=${var.max_model_len} PRUNE_UNUSED=${var.prune_unused ? 1 : 0} VLLM_API_KEY='$VLLM_API_KEY' /root/configure.sh"
+      ${local.ssh} "WHISPER=${var.whisper_enabled ? 1 : 0} PROFILE=${var.profile} MAX_LEN=${var.max_model_len} PRUNE_UNUSED=${var.prune_unused ? 1 : 0} VLLM_API_KEY='$VLLM_API_KEY' /root/configure.sh"
     EOT
   }
 }
@@ -37,6 +38,7 @@ resource "terraform_data" "publish" {
   depends_on = [terraform_data.configure]
   triggers_replace = {
     target  = "${var.vast_ssh_host}:${var.vast_api_port}"
+    whisper = var.whisper_enabled ? var.vast_whisper_port : 0
     label   = var.vast_instance_id
     host    = var.public_host
     script  = filesha256("${local.scripts}/publish-endpoint.sh")
@@ -45,12 +47,13 @@ resource "terraform_data" "publish" {
   provisioner "local-exec" {
     interpreter = ["bash", "-c"]
     environment = {
-      EDGE_SSH    = var.edge_ssh
-      EDGE_KEY    = var.edge_ssh_key_path
-      PUBLIC_HOST = var.public_host
-      VAST_IP     = var.vast_ssh_host
-      VAST_PORT   = tostring(var.vast_api_port)
-      VAST_LABEL  = "C.${var.vast_instance_id}"
+      EDGE_SSH     = var.edge_ssh
+      EDGE_KEY     = var.edge_ssh_key_path
+      PUBLIC_HOST  = var.public_host
+      VAST_IP      = var.vast_ssh_host
+      VAST_PORT    = tostring(var.vast_api_port)
+      VAST_LABEL   = "C.${var.vast_instance_id}"
+      WHISPER_PORT = var.whisper_enabled ? tostring(var.vast_whisper_port) : ""
     }
     command = <<-EOT
       set -euo pipefail

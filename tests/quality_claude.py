@@ -4,7 +4,7 @@
 usage: python tests/quality_claude.py [--model claude-sonnet-5] [--effort medium] [--n-gsm 200] [--workers 4]
 Identical prompts, identical local graders (HumanEval executed with timeouts, GSM8K exact match).
 Tools are disabled and settings/CLAUDE.md are not loaded, so it is a plain single-shot completion.
-Writes reports/quality-claude-<model>-<effort>.json and reports/claude-cost-<...>.json
+Writes reports/quality/quality-<model>-<effort>.json and reports/claude-cost-<...>.json
 """
 import argparse, concurrent.futures as cf, gzip, json, os, subprocess, sys, tempfile, time
 
@@ -50,8 +50,8 @@ with cf.ThreadPoolExecutor(a.workers) as ex:
     print(f"humaneval {sum(r['pass'] for r in he_res)}/{len(he_res)}  ({time.time() - t0:.0f}s)", flush=True)
     gsm_res = list(ex.map(lambda i: quality.run_gsm(i, None), gsm))
     print(f"gsm8k {sum(r['pass'] for r in gsm_res)}/{len(gsm_res)}  ({time.time() - t0:.0f}s)", flush=True)
-os.makedirs("reports", exist_ok=True)
+os.makedirs("reports/quality", exist_ok=True)
 json.dump({"variant": TAG, "humaneval": {"passed": sum(r["pass"] for r in he_res), "total": len(he_res), "rows": he_res},
            "gsm8k": {"passed": sum(r["pass"] for r in gsm_res), "total": len(gsm_res), "rows": gsm_res}, "seconds": round(time.time() - t0), "usage": stats},
-          open(f"reports/quality-{TAG}.json", "w"), indent=1)
+          open(f"reports/quality/quality-{TAG}.json", "w"), indent=1)
 print("saved", TAG, stats)

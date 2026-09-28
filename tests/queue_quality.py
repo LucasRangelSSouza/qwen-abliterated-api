@@ -13,5 +13,5 @@ for i, v in enumerate(order):
     if i > 0 and not q.deploy(*VARIANTS[v]):
         q.log(f"!! could not deploy {v}"); continue
     q.run([sys.executable, "-u", "tests/quality.py", v])
-q.run([sys.executable, "tests/fidelity_diff.py", "reports/fidelity-nvfp4.json", "reports/fidelity-fp8.json"])
+q.run([sys.executable, "tests/fidelity_diff.py", "reports/quality/fidelity-nvfp4.json", "reports/quality/fidelity-fp8.json"])
 q.log("QUALITY QUEUE DONE")

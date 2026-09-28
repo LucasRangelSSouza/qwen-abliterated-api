@@ -2,9 +2,9 @@
 """End-to-end test + benchmark suite for the OpenAI-compatible Qwen endpoint.
 
 stdlib only. Usage:
-  BASE_URL=https://qwen.rangeltech.net/v1 API_KEY=sk-... python tests/suite.py [--out reports/run.json] [--only auth,speed,...]
+  BASE_URL=https://qwen.rangeltech.net/v1 API_KEY=sk-... python tests/suite.py [--out reports/runs/run.json] [--only auth,speed,...]
 
-Every section records raw numbers into a JSON file; scripts/make-report.py turns it into Markdown.
+Every section records raw numbers into a JSON file; tests/make_report.py turns it into Markdown.
 """
 import argparse, concurrent.futures as cf, json, os, random, re, statistics, subprocess, sys, tempfile, textwrap, time, urllib.error, urllib.request
 
@@ -264,7 +264,7 @@ import extra_sections  # noqa: E402  (vision, audio contract, parallel Q&A)
 SECTIONS.update(extra_sections.make(call))
 
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(); ap.add_argument("--out", default="reports/run.json"); ap.add_argument("--only", default="")
+    ap = argparse.ArgumentParser(); ap.add_argument("--out", default="reports/runs/run.json"); ap.add_argument("--only", default="")
     a = ap.parse_args()
     if not KEY:
         sys.exit("set API_KEY")

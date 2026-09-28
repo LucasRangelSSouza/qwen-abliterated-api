@@ -51,6 +51,35 @@ def make(call):
         return {"status": r["status"], "detail": (r.get("error") or r.get("text") or "")[:200],
                 "server_still_ok": "API_OK" in (alive.get("text") or ""), "pass": r["status"] in (400, 422) and "API_OK" in (alive.get("text") or "")}
 
+    def t_transcription():
+        """Speech-to-text sidecar: OpenAI-style multipart POST /v1/audio/transcriptions with a Portuguese fixture."""
+        import json
+        import os
+        import urllib.error
+        import urllib.request
+        base, key = call.__globals__["BASE"], call.__globals__["KEY"]
+        path = os.path.join(os.path.dirname(__file__), "fixtures", "speech-pt.wav")
+        boundary = "----qwenbench" + str(int(time.time()))
+        crlf = b"\r\n"
+        parts = []
+        for name, val in (("model", "whisper"), ("language", "pt"), ("response_format", "json")):
+            parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{val}\r\n'.encode())
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="speech-pt.wav"\r\nContent-Type: audio/wav\r\n\r\n'.encode())
+        parts.append(open(path, "rb").read())
+        parts.append(crlf + f"--{boundary}--".encode() + crlf)
+        req = urllib.request.Request(base + "/audio/transcriptions", b"".join(parts),
+                                     {"Authorization": "Bearer " + key, "Content-Type": "multipart/form-data; boundary=" + boundary})
+        t0 = time.time()
+        try:
+            text = json.load(urllib.request.urlopen(req, timeout=120)).get("text", "")
+            status = 200
+        except urllib.error.HTTPError as e:
+            text, status = e.read()[:200].decode("utf-8", "replace"), e.code
+        t = unicodedata.normalize("NFKD", text.lower())
+        t = "".join(ch for ch in t if not unicodedata.combining(ch))
+        return {"status": status, "text": text, "seconds": round(time.time() - t0, 2),
+                "pass": status == 200 and "capital" in t and "brasil" in t}
+
     def t_parallel_qa():
         """16 different questions with known answers sent at once: no cross-talk, every answer correct."""
         qs = [("Quanto e 12*12? Responda so o numero.", "144"), ("Capital da Franca? Responda so a cidade.", "paris"),
@@ -76,4 +105,4 @@ def make(call):
         return {"correct": sum(r["ok"] for r in rows), "of": len(rows), "wall": round(time.time() - t0, 1),
                 "wrong": [r for r in rows if not r["ok"]], "pass": all(r["ok"] for r in rows)}
 
-    return {"image": t_image, "audio": t_audio, "parallel_qa": t_parallel_qa}
+    return {"image": t_image, "audio": t_audio, "transcription": t_transcription, "parallel_qa": t_parallel_qa}

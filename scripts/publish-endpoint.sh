@@ -11,8 +11,10 @@ set -Eeuo pipefail
 EDGE_KEY="${EDGE_KEY:-$HOME/.ssh/id_ed25519}"
 DYN="${TRAEFIK_DYNAMIC:-/opt/platform/configs/traefik/dynamic.yml}"
 
+WHISPER_PORT="${WHISPER_PORT:-}"   # optional: Vast mapped port of the speech-to-text sidecar (container port 3000)
+
 ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new -i "$EDGE_KEY" "$EDGE_SSH" \
-  "PUBLIC_HOST='$PUBLIC_HOST' VAST_IP='$VAST_IP' VAST_PORT='$VAST_PORT' VAST_LABEL='$VAST_LABEL' VAST_TOKEN='$VAST_TOKEN' DYN='$DYN' python3 -" <<'PY'
+  "PUBLIC_HOST='$PUBLIC_HOST' VAST_IP='$VAST_IP' VAST_PORT='$VAST_PORT' VAST_LABEL='$VAST_LABEL' VAST_TOKEN='$VAST_TOKEN' WHISPER_PORT='$WHISPER_PORT' DYN='$DYN' python3 -" <<'PY'
 import os, re, shutil, time
 e = os.environ
 p = e["DYN"]
@@ -52,7 +54,33 @@ def upsert(s, section, name, block):
     n = re.search(r"^(?:  \S|\S)", s[m.end():], re.M)
     end = m.end() + (n.start() if n else len(s) - m.end())
     return s[:end] + block + s[end:]
+def remove(s, name):
+    return re.sub(rf"^    {name}:  # managed by qwen-abliterated-api.*?(?=^    \S|^  \S|^\S|\Z)", "", s, flags=re.S | re.M)
+
+
+# speech-to-text sidecar: /v1/audio/* goes straight to its port (vLLM enforces the same bearer key there)
+wrouter = f'''    qwen-whisper-router:  # managed by qwen-abliterated-api/publish-endpoint.sh
+      rule: "Host(`{e['PUBLIC_HOST']}`) && PathPrefix(`/v1/audio`)"
+      entryPoints:
+        - websecure
+      tls:
+        certResolver: letsencrypt
+      priority: 200
+      service: qwen-whisper
+      middlewares:
+        - security-headers
+'''
+wsvc = f'''    qwen-whisper:  # managed by qwen-abliterated-api/publish-endpoint.sh
+      loadBalancer:
+        passHostHeader: false
+        servers:
+          - url: "http://{e['VAST_IP']}:{e['WHISPER_PORT']}"
+'''
 new = upsert(upsert(upsert(s, "routers", "qwen-vast-router", router), "middlewares", "qwen-vast-auth", mw), "services", "qwen-vast", svc)
+if e.get("WHISPER_PORT"):
+    new = upsert(upsert(new, "routers", "qwen-whisper-router", wrouter), "services", "qwen-whisper", wsvc)
+else:
+    new = remove(remove(new, "qwen-whisper-router"), "qwen-whisper")
 if new == s:
     print("edge: dynamic.yml unchanged")
 else:

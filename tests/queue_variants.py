@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sequential experiment queue: deploy a variant on the instance, run the same benchmarks, keep raw JSON per variant.
 
-env: SSH_TARGET, BASE_URL, API_KEY (see tests/idempotency.py). Runs unattended; progress in reports/queue.log.
+env: SSH_TARGET, BASE_URL, API_KEY (see tests/idempotency.py). Runs unattended; progress in reports/ops/queue.log.
 Variants are dicts of configure-vast-vllm.sh env vars.
 """
 import json, os, shlex, subprocess, sys, time, urllib.request, urllib.error
@@ -10,7 +10,7 @@ E = os.environ
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SSH = ["ssh", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no"] + shlex.split(E["SSH_TARGET"])
 BASE = E["BASE_URL"].rstrip("/"); KEY = E["API_KEY"]
-LOG = open(os.path.join(ROOT, "reports", "queue.log"), "a", buffering=1)
+LOG = open(os.path.join(ROOT, "reports", "ops", "queue.log"), "a", buffering=1)
 
 
 def log(*a):
@@ -69,8 +69,8 @@ def variant(name, env, sizes, seeds="2", full_suite=True):
     if not deploy(name, env):
         log(f"!! {name} did not become ready, skipping"); return
     if full_suite:
-        run([sys.executable, "-u", "tests/suite.py", "--out", f"reports/run-{name}.json"])
-    run([sys.executable, "-u", "tests/longctx.py", *[str(s) for s in sizes]], {"OUT": f"reports/longctx-{name}.json", "SEEDS": seeds})
+        run([sys.executable, "-u", "tests/suite.py", "--out", f"reports/runs/run-{name}.json"])
+    run([sys.executable, "-u", "tests/longctx.py", *[str(s) for s in sizes]], {"OUT": f"reports/longctx/longctx-{name}.json", "SEEDS": seeds})
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@
   fidelity  (fixed prompts, greedy) - saved outputs to compare variants token-by-token (tests/fidelity_diff.py)
 
 usage: BASE_URL API_KEY python tests/quality.py <variant-name> [--n-gsm 200] [--think]
-writes reports/quality-<variant>.json (+ reports/fidelity-<variant>.json)
+writes reports/quality/quality-<variant>.json (+ reports/quality/fidelity-<variant>.json)
 """
 import argparse, concurrent.futures as cf, gzip, io, json, os, re, subprocess, sys, tempfile, time, urllib.request
 
@@ -102,9 +102,9 @@ if __name__ == "__main__":
         print(f"humaneval {sum(r['pass'] for r in he_res)}/{len(he_res)}  ({time.time() - t0:.0f}s)", flush=True)
         gsm_res = list(ex.map(lambda i: run_gsm(i, a.think), gsm))
         print(f"gsm8k {sum(r['pass'] for r in gsm_res)}/{len(gsm_res)}  ({time.time() - t0:.0f}s)", flush=True)
-    os.makedirs("reports", exist_ok=True)
+    os.makedirs("reports/quality", exist_ok=True)
     json.dump({"variant": a.variant, "think": a.think, "humaneval": {"passed": sum(r["pass"] for r in he_res), "total": len(he_res), "rows": he_res},
                "gsm8k": {"passed": sum(r["pass"] for r in gsm_res), "total": len(gsm_res), "rows": gsm_res}, "seconds": round(time.time() - t0)},
-              open(f"reports/quality-{a.variant}.json", "w"), indent=1)
-    json.dump(fidelity(a.think), open(f"reports/fidelity-{a.variant}.json", "w"), indent=1, ensure_ascii=False)
+              open(f"reports/quality/quality-{a.variant}.json", "w"), indent=1)
+    json.dump(fidelity(a.think), open(f"reports/quality/fidelity-{a.variant}.json", "w"), indent=1, ensure_ascii=False)
     print("saved quality + fidelity for", a.variant)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Hard-restart cycles: kill the whole vLLM tree, let Supervisor start it again, and check that the API comes back,
 no download process ran, and the weights are byte-for-byte the same files. Results replace the matching
-'hard restart' rows in reports/idempotency.json.
+'hard restart' rows in reports/ops/idempotency.json.
 
 env: SSH_TARGET, BASE_URL, API_KEY. usage: python tests/restart_cycles.py [cycles=2]
 """
@@ -59,7 +59,7 @@ for i in range(1, int(sys.argv[1]) + 1 if len(sys.argv) > 1 else 3):
                  "detail": f"ready={ready}s downloads={downloads} weights_same={same}"})
     print("PASS" if ok else "FAIL", rows[-1], flush=True)
 
-path = os.path.join(ROOT, "reports", "idempotency.json")
+path = os.path.join(ROOT, "reports", "ops", "idempotency.json")
 d = json.load(open(path))
 d["steps"] = [r for r in d["steps"] if not r["step"].startswith("hard restart")] + rows
 # keep logical order: hard restarts right before the Vast power cycle

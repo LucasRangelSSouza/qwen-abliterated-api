@@ -57,7 +57,7 @@ NVFP4 was measured at max_model_len 32 768 (run-2), FP8 at 160 000 (run-fp8-160k
 | ~93k | 2/2 | 75 s | 2/2 | 60 s |
 | ~140k | 2/2 | 121 s | 2/2 | 99 s |
 
-With the fp8 KV cache instead, needles were lost from ~22k tokens (12 of 36 attempts, garbage output). See `reports/longctx-kv-auto.json` and the run-1 log.
+With the fp8 KV cache instead, needles were lost from ~22k tokens (12 of 36 attempts, garbage output). See `reports/longctx/longctx-kv-auto.json` and `reports/runs/run-1.log`.
 
 ## Cost per task
 

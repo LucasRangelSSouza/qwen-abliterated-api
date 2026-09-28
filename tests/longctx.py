@@ -14,4 +14,4 @@ for t in sizes:
         ok = needle in (r.get("text") or "")
         rows.append({"target": t, "seed": seed, "prompt_tokens": r.get("prompt_tokens"), "ttft": r.get("ttft"), "ok": ok, "head": (r.get("text") or "")[:40]})
         print(t, seed, r.get("prompt_tokens"), round(r.get("ttft") or 0, 1), "OK" if ok else "FAIL " + repr((r.get("text") or "")[:40]), flush=True)
-json.dump(rows, open(os.environ.get("OUT", "reports/longctx.json"), "w"), indent=1)
+json.dump(rows, open(os.environ.get("OUT", "reports/longctx/longctx.json"), "w"), indent=1)

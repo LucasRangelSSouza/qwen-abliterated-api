@@ -1,0 +1,17 @@
+{
+ "base_url": "https://qwen.rangeltech.net/v1",
+ "started": "2026-09-28T13:19:45-0300",
+ "sections": {
+  "models": {
+   "id": "qwen-abliterated",
+   "max_model_len": 160000,
+   "pass": true
+  },
+  "transcription": {
+   "status": 200,
+   "text": " Qual \u00e9 a capital do Brasil e quantos estados o pa\u00eds tem?",
+   "seconds": 3.35,
+   "pass": true
+  }
+ }
+}

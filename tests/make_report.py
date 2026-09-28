@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Turn tests/suite.py JSON output (+ optional idempotency JSON) into a Markdown report.
-usage: python tests/make_report.py reports/run.json [reports/idempotency.json] > reports/REPORT.md
+usage: python tests/make_report.py reports/runs/run.json [reports/ops/idempotency.json] > reports/runs/REPORT.md
 """
 import json, sys
 
@@ -65,6 +65,19 @@ if "prefix_cache" in S:
 if "default_thinking" in S:
     d = S["default_thinking"]
     o.append(f"## Default thinking (client sends nothing)\n\nreasoning present: **{'yes' if d['reasoning_chars'] else 'no'}** ({d['reasoning_chars']} chars), TTFT {f(d['ttft'], 2)} s, content starts `{d['content']!r}`\n")
+
+if any(k in S for k in ("image", "audio", "transcription", "parallel_qa")):
+    o.append("## Vision, audio and parallel questions\n\n| check | result | detail |\n|---|---|---|")
+    if "image" in S:
+        o.append(f"| image_url (red square left, blue circle right) | {'PASS' if S['image']['pass'] else 'FAIL'} | {S['image']['answer'][:90]} |")
+    if "audio" in S:
+        o.append(f"| audio input rejected cleanly, server keeps serving | {'PASS' if S['audio']['pass'] else 'FAIL'} | HTTP {S['audio']['status']} |")
+    if "transcription" in S:
+        o.append(f"| speech-to-text sidecar `/v1/audio/transcriptions` (pt-BR fixture) | {'PASS' if S['transcription']['pass'] else 'FAIL'} | {S['transcription']['text'].strip()[:80]} ({S['transcription']['seconds']} s) |")
+    if "parallel_qa" in S:
+        p = S["parallel_qa"]
+        o.append(f"| 16 different questions at once, no cross-talk | {'PASS' if p['pass'] else 'FAIL'} | {p['correct']}/{p['of']} correct in {p['wall']} s |")
+    o.append("")
 
 if "stability" in S:
     s = S["stability"]

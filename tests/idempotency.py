@@ -3,7 +3,7 @@
 
 env: SSH_TARGET ("-i KEY -p PORT root@HOST"), BASE_URL, API_KEY, HOSTINGER_API_KEY,
      EDGE_SSH, EDGE_KEY, VAST_IP, VAST_PORT, VAST_LABEL, VAST_TOKEN, (optional) VAST_API_KEY + VAST_INSTANCE_ID
-Writes reports/idempotency.json.
+Writes reports/ops/idempotency.json.
 """
 import json, os, shlex, subprocess, sys, time, urllib.request, urllib.error
 
@@ -19,8 +19,7 @@ def sh(cmd, timeout=900):
     p = subprocess.run(SSH + [cmd], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout)
     text = p.stdout + p.stderr
     keep = [l for l in text.splitlines() if not l.startswith(("Welcome to vast.ai", "Have fun", "AI agents:", " /etc/vast-agents", ">>>"))]
-    return p.returncode, "
-".join(keep).strip()
+    return p.returncode, "\n".join(keep).strip()
 
 
 def local(cmd, env=None, timeout=300):
@@ -70,10 +69,32 @@ def vllm_pid():
     return sh("pgrep -f '[v]llm serve' | head -1")[1]
 
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import suite  # noqa: E402  (reuses the transcription check)
+
+
+def whisper_ok():
+    try:
+        return bool(suite.SECTIONS["transcription"]()["pass"])
+    except Exception:
+        return False
+
+
+def wait_whisper(limit=600):
+    t0 = time.time()
+    while time.time() - t0 < limit:
+        if whisper_ok():
+            return round(time.time() - t0)
+        time.sleep(10)
+    return None
+
+
 # 0. baseline
 assert public_status() == 200, "endpoint must be up before idempotency tests"
 fp0 = weights_fingerprint(); pid0 = vllm_pid()
 rec("baseline endpoint up + completion", completion_ok(), detail=f"pid={pid0}")
+if E.get("WHISPER_PORT"):
+    rec("baseline whisper transcription through the public URL", whisper_ok())
 
 # 1. configure re-run when nothing changed: no download, no restart
 with open(os.path.join(ROOT, "scripts", "configure-vast-vllm.sh"), "rb") as fh:
@@ -83,6 +104,8 @@ t0 = time.time(); rc, out = sh(f"VLLM_API_KEY='{KEY}' /root/configure.sh"); dt =
 pid1 = vllm_pid(); fp_same = weights_fingerprint() == fp0
 rec("configure.sh no-op when config unchanged", rc == 0 and "nothing to do" in out and pid1 == pid0 and fp_same, dt,
     f"rc={rc} nothing_to_do={'nothing to do' in out} pid {pid0}->{pid1} weights_same={fp_same}")
+if E.get("WHISPER_PORT"):
+    rec("configure.sh leaves the whisper service untouched", "whisper: service unchanged" in out and whisper_ok(), detail=[l for l in out.splitlines() if l.startswith("whisper:")][-1:] and [l for l in out.splitlines() if l.startswith("whisper:")][-1])
 
 # 2. hf download re-run is a no-op (no bytes moved)
 t0 = time.time(); rc, out = sh("hf download Blackfrost-AI/Qwen3.8-27B-ABLITERATED-BF16 --local-dir /root/models/bf16 >/dev/null 2>&1; echo rc=$?"); dt = round(time.time() - t0)
@@ -90,12 +113,13 @@ rec("hf download re-run moves no bytes", "rc=0" in out and weights_fingerprint()
 
 # 3. publish-endpoint twice: second is unchanged
 env = {"EDGE_SSH": E["EDGE_SSH"], "EDGE_KEY": E["EDGE_KEY"], "PUBLIC_HOST": E.get("PUBLIC_HOST", "qwen.rangeltech.net"), "VAST_IP": E["VAST_IP"],
-       "VAST_PORT": E["VAST_PORT"], "VAST_LABEL": E["VAST_LABEL"], "VAST_TOKEN": E["VAST_TOKEN"]}
+       "VAST_PORT": E["VAST_PORT"], "VAST_LABEL": E["VAST_LABEL"], "VAST_TOKEN": E["VAST_TOKEN"], "WHISPER_PORT": E.get("WHISPER_PORT", "")}
 local([BASH, os.path.join(ROOT, "scripts", "publish-endpoint.sh")], env)
 rc, out = local([BASH, os.path.join(ROOT, "scripts", "publish-endpoint.sh")], env)
 rec("publish-endpoint.sh second run unchanged", rc == 0 and "unchanged" in out, detail=out.splitlines()[-1] if out else "")
 n = subprocess.run(["ssh", "-o", "BatchMode=yes", "-i", E["EDGE_KEY"], E["EDGE_SSH"], "grep -c 'managed by qwen-abliterated-api' /opt/platform/configs/traefik/dynamic.yml"], capture_output=True, text=True, encoding='utf-8', errors='replace').stdout.strip()
-rec("publish-endpoint.sh leaves exactly 3 managed blocks (no duplication)", n == "3", detail=f"blocks={n}")
+expected_blocks = "5" if E.get("WHISPER_PORT") else "3"
+rec(f"publish-endpoint.sh leaves exactly {expected_blocks} managed blocks (no duplication)", n == expected_blocks, detail=f"blocks={n}")
 
 # 4. dns-upsert twice
 rc, out = local([BASH, os.path.join(ROOT, "scripts", "dns-upsert.sh"), "rangeltech.net", "qwen", "66.94.101.153"], {"HOSTINGER_API_KEY": E["HOSTINGER_API_KEY"]})
@@ -139,9 +163,12 @@ if E.get("VAST_API_KEY") and E.get("VAST_INSTANCE_ID"):
         up = wait_public(900)
     rec("Vast start via API: same endpoint returns without redeploy", rc == 0 and up is not None and completion_ok(), round(time.time() - t0), out[-100:])
     rec("weights survived stop/start", weights_fingerprint() == fp0)
+    if E.get("WHISPER_PORT"):
+        w = wait_whisper(600)
+        rec("whisper sidecar came back by itself after the Vast start", w is not None, w)
 else:
     rec("Vast stop/start via API", False, detail="SKIPPED: VAST_API_KEY not provided")
 
-os.makedirs(os.path.join(ROOT, "reports"), exist_ok=True)
-json.dump({"steps": steps}, open(os.path.join(ROOT, "reports", "idempotency.json"), "w"), indent=1)
-print("saved reports/idempotency.json")
+os.makedirs(os.path.join(ROOT, "reports", "ops"), exist_ok=True)
+json.dump({"steps": steps}, open(os.path.join(ROOT, "reports", "ops", "idempotency.json"), "w"), indent=1)
+print("saved reports/ops/idempotency.json")

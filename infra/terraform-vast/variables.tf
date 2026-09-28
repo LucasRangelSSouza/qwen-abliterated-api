@@ -65,3 +65,17 @@ variable "prune_unused" {
   type        = bool
   default     = true
 }
+variable "whisper_enabled" {
+  description = "Deploy the speech-to-text sidecar (vLLM serving openai/whisper-large-v3-turbo) and route /v1/audio/* to it"
+  type        = bool
+  default     = true
+}
+variable "vast_whisper_port" {
+  description = "Vast mapped port for container port 3000 (VAST_TCP_PORT_3000), where the whisper sidecar listens"
+  type        = number
+  default     = 0
+  validation {
+    condition     = var.vast_whisper_port >= 0
+    error_message = "vast_whisper_port must be a port number (0 when whisper is disabled)."
+  }
+}

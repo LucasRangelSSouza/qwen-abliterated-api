@@ -15,6 +15,9 @@ on:
       api_port:
         description: Vast mapped API port (VAST_TCP_PORT_8000)
         required: true
+      whisper_port:
+        description: Vast mapped port for container port 3000 (VAST_TCP_PORT_3000), speech-to-text sidecar; empty disables it
+        default: ''
       instance_id:
         description: Vast instance id (CONTAINER_ID), e.g. 53155573
         required: true
@@ -49,7 +52,7 @@ jobs:
       - name: Configure vLLM on the instance (idempotent, no re-download)
         run: |
           $SSH "cat > /root/configure.sh && chmod +x /root/configure.sh" < scripts/configure-vast-vllm.sh
-          $SSH "PROFILE=${{ inputs.profile }} PRUNE_UNUSED=1 VLLM_API_KEY='${{ secrets.VLLM_API_KEY }}' /root/configure.sh"
+          $SSH "WHISPER=${{ inputs.whisper_port != '' && '1' || '0' }} PROFILE=${{ inputs.profile }} PRUNE_UNUSED=1 VLLM_API_KEY='${{ secrets.VLLM_API_KEY }}' /root/configure.sh"
       - name: Publish behind Traefik + DNS
         env:
           HOSTINGER_API_KEY: ${{ secrets.HOSTINGER_API_KEY }}
@@ -57,7 +60,7 @@ jobs:
           PUBLIC_HOST=${{ inputs.public_host }}
           TOKEN=$($SSH 'echo $OPEN_BUTTON_TOKEN')
           EDGE_SSH=root@${{ inputs.edge_ip }} EDGE_KEY=~/.ssh/edge PUBLIC_HOST=$PUBLIC_HOST \
-            VAST_IP=${{ inputs.ssh_host }} VAST_PORT=${{ inputs.api_port }} VAST_LABEL=C.${{ inputs.instance_id }} VAST_TOKEN="$TOKEN" \
+            VAST_IP=${{ inputs.ssh_host }} VAST_PORT=${{ inputs.api_port }} VAST_LABEL=C.${{ inputs.instance_id }} VAST_TOKEN="$TOKEN" WHISPER_PORT="${{ inputs.whisper_port }}" \
             scripts/publish-endpoint.sh
           scripts/dns-upsert.sh "${PUBLIC_HOST#*.}" "${PUBLIC_HOST%%.*}" ${{ inputs.edge_ip }}
         shell: bash

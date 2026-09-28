@@ -6,4 +6,5 @@ ssh_private_key_path = "~/.ssh/deploy_ed25519"
 vllm_api_key         = "sk-..."         # stable client key
 hostinger_api_key    = "..."
 edge_ssh_key_path    = "~/.ssh/edge_ed25519"
+vast_whisper_port    = 40033          # VAST_TCP_PORT_3000 (whisper sidecar); whisper_enabled = false to skip
 # profile = "fp8" (default) | "nvfp4"

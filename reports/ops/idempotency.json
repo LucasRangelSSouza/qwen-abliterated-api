@@ -50,15 +50,15 @@
   },
   {
    "step": "hard restart #1: API back, no download, weights identical",
-   "pass": false,
-   "seconds": 418,
-   "detail": ""
+   "pass": true,
+   "seconds": 416,
+   "detail": "ready=416s downloads=0 weights_same=True"
   },
   {
    "step": "hard restart #2: API back, no download, weights identical",
-   "pass": false,
-   "seconds": 421,
-   "detail": ""
+   "pass": true,
+   "seconds": 448,
+   "detail": "ready=448s downloads=0 weights_same=True"
   },
   {
    "step": "Vast stop via API: endpoint goes down",

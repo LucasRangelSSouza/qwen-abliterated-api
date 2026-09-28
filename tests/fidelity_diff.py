@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Compare greedy outputs of two variants: exact match, common-prefix share, similarity ratio.
-usage: python tests/fidelity_diff.py reports/fidelity-A.json reports/fidelity-B.json"""
+usage: python tests/fidelity_diff.py reports/quality/fidelity-A.json reports/quality/fidelity-B.json"""
 import difflib, json, sys
 
 a, b = (json.load(open(p, encoding="utf-8")) for p in sys.argv[1:3])

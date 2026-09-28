@@ -27,7 +27,7 @@ touch "$ENV_FILE"
 sed -i '/^VLLM_MODEL=/d;/^VLLM_ARGS=/d' "$ENV_FILE"
 cat >>"$ENV_FILE" <<EOF
 VLLM_MODEL="$MODEL_PATH"
-VLLM_ARGS="--load-format gguf --tokenizer $TOKENIZER_REPO --served-model-name $SERVED_MODEL_NAME --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.90 --max-model-len 16384 --max-num-seqs 4 --trust-remote-code --enable-reasoning --reasoning-parser qwen3"
+VLLM_ARGS="--load-format gguf --tokenizer $TOKENIZER_REPO --served-model-name $SERVED_MODEL_NAME --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.90 --max-model-len 16384 --max-num-seqs 4 --trust-remote-code --reasoning-parser qwen3"
 EOF
 
 supervisorctl restart vllm

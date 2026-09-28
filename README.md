@@ -17,7 +17,7 @@ Terraform owns the replacement-safe machine configuration. Change `ssh_host` and
 - A Hostinger A record for `api.example.com` pointing to the VM public IP, with ports 80 and 443 directly reachable.
 - A private SSH key with a passwordless-sudo user.
 
-The low-cost Vast offer currently available is a **container**, not a full Ubuntu VM. It cannot run this Docker/Caddy topology reliably. Use it only to validate raw vLLM inference; use a VM for the public TLS deployment.
+The low-cost Vast offer is a **container**, not a full Ubuntu VM. It cannot run this Docker/Caddy topology. For that managed image use `scripts/configure-vast-vllm.sh`: it configures its built-in Supervisor/vLLM server without Docker-in-Docker. It places a Q4 GGUF model on the instance disk and uses a Vast local volume only for the persistent workspace configuration.
 
 ## First deploy
 
@@ -65,6 +65,17 @@ scripts/benchmark.sh https://api.example.com "$VLLM_API_KEY"
 
 The benchmark reports actual API timing and generated-token usage, so tokens/s is computed from a live response rather than estimated.
 
+## Vast vLLM container profile
+
+The command below is for Vast's current vLLM template after an 80 GB-or-larger disk has been selected. It starts the OpenAI API at the template's internal `http://127.0.0.1:18000/v1`; Vast maps it to the public port advertised in `vast-capabilities`. It is intentionally a quantized `Q4_K_M` deployment to fit within an economical container disk.
+
+```bash
+MODEL_CACHE_DIR=/root/model-cache \
+scripts/configure-vast-vllm.sh
+```
+
+The container's external port is protected by Vast's edge bearer token. For a stable Hostinger hostname, use a real Ubuntu VM with the Compose/Caddy topology above, or place a managed tunnel/reverse proxy in front of the container. A Hostinger A record cannot directly target Vast's changing high ports with standard HTTPS.
+
 ## GitHub Actions
 
 `Validate` checks Terraform, Compose interpolation, and shell syntax. `Deploy GPU API` is manually dispatched and needs these repository environment secrets:
@@ -73,4 +84,3 @@ The benchmark reports actual API timing and generated-token usage, so tokens/s i
 - `VLLM_API_KEY`
 
 For a replacement VM, launch the workflow with its new IP and the same Hostinger hostname after changing the A record. The workflow runs `terraform apply` using only ephemeral files.
-

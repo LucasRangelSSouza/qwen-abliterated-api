@@ -31,6 +31,7 @@ resource "terraform_data" "vm_deploy" {
   connection {
     type        = "ssh"
     host        = var.ssh_host
+    port        = var.ssh_port
     user        = var.ssh_user
     private_key = file(var.ssh_private_key_path)
   }

@@ -11,6 +11,11 @@ on:
         description: Fully-qualified Hostinger subdomain, e.g. api.example.com
         required: true
         type: string
+      ssh_port:
+        description: Public SSH port of the target VM
+        required: true
+        default: "22"
+        type: string
 
 permissions:
   contents: read
@@ -42,6 +47,7 @@ jobs:
           chmod 600 "$HOME/.ssh/id_ed25519"
           cat > infra/terraform/ci.auto.tfvars <<EOF
           ssh_host = "$HOST"
+          ssh_port = ${{ inputs.ssh_port }}
           ssh_private_key_path = "$HOME/.ssh/id_ed25519"
           api_domain = "$DOMAIN"
           vllm_api_key = "$API_KEY"
@@ -50,4 +56,3 @@ jobs:
         run: |
           terraform -chdir=infra/terraform init -backend=false
           terraform -chdir=infra/terraform apply -auto-approve
-

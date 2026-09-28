@@ -8,7 +8,7 @@ Production-shaped, OpenAI-compatible vLLM deployment for `nasmtrcs/Qwen3.8-27B-O
 Hostinger DNS A record -> Ubuntu GPU VM :443 -> Caddy TLS -> vLLM :8000 -> Qwen 3.8 27B
 ```
 
-Terraform owns the replacement-safe machine configuration. Change `ssh_host` and `ssh_private_key_path`, then run `terraform apply`; it uploads the versioned deployment, bootstraps Docker/NVIDIA validation, starts the stack, and recreates the API.
+Terraform owns the replacement-safe machine configuration. Change `ssh_host`, `ssh_port` and `ssh_private_key_path`, then run `terraform apply`; it uploads the versioned deployment, bootstraps Docker/NVIDIA validation, starts the stack, and recreates the API.
 
 ## Prerequisites
 

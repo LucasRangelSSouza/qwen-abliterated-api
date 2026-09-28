@@ -9,6 +9,12 @@ variable "ssh_user" {
   default     = "root"
 }
 
+variable "ssh_port" {
+  description = "Public SSH port of the target VM. Use 22 for a conventional VM."
+  type        = number
+  default     = 22
+}
+
 variable "ssh_private_key_path" {
   description = "Absolute path to the private SSH key; never commit this file."
   type        = string
@@ -40,4 +46,3 @@ variable "vllm_image" {
   type    = string
   default = "vllm/vllm-openai:latest"
 }
-

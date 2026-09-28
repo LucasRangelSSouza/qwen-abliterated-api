@@ -1,0 +1,70 @@
+services:
+  vllm:
+    image: ${VLLM_IMAGE}
+    restart: unless-stopped
+    ipc: host
+    environment:
+      HF_HOME: ${HF_HOME}
+      HUGGING_FACE_HUB_TOKEN: ${HUGGING_FACE_HUB_TOKEN:-}
+    volumes:
+      - ${HF_HOME}:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command:
+      - --model
+      - ${MODEL_ID}
+      - --served-model-name
+      - ${SERVED_MODEL_NAME}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --api-key
+      - ${VLLM_API_KEY}
+      - --gpu-memory-utilization
+      - ${GPU_MEMORY_UTILIZATION}
+      - --max-model-len
+      - ${MAX_MODEL_LEN}
+      - --max-num-seqs
+      - ${MAX_NUM_SEQS}
+      - --trust-remote-code
+      - --enable-reasoning
+      - --reasoning-parser
+      - qwen3
+      - --enable-auto-tool-choice
+      - --tool-call-parser
+      - hermes
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)\""]
+      interval: 15s
+      timeout: 8s
+      retries: 40
+      start_period: 10m
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on:
+      vllm:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
+

@@ -1,0 +1,53 @@
+name: Deploy GPU API
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: Public SSH IP/DNS of the new Ubuntu GPU VM
+        required: true
+        type: string
+      domain:
+        description: Fully-qualified Hostinger subdomain, e.g. api.example.com
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require deploy secrets
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          API_KEY: ${{ secrets.VLLM_API_KEY }}
+        run: |
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$API_KEY"
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v3
+      - name: Write ephemeral Terraform variables
+        env:
+          HOST: ${{ inputs.host }}
+          DOMAIN: ${{ inputs.domain }}
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          API_KEY: ${{ secrets.VLLM_API_KEY }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          cat > infra/terraform/ci.auto.tfvars <<EOF
+          ssh_host = "$HOST"
+          ssh_private_key_path = "$HOME/.ssh/id_ed25519"
+          api_domain = "$DOMAIN"
+          vllm_api_key = "$API_KEY"
+          EOF
+      - name: Deploy reproducibly through Terraform
+        run: |
+          terraform -chdir=infra/terraform init -backend=false
+          terraform -chdir=infra/terraform apply -auto-approve
+

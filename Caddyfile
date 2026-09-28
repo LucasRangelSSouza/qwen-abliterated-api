@@ -1,0 +1,5 @@
+{$API_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy vllm:8000
+}
+

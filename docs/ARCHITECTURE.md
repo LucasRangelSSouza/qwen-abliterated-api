@@ -13,9 +13,10 @@ The NVIDIA GB10 has 119 GB of unified memory at ~273 GB/s. For a dense 27B model
 | format | weights | ceiling | observed |
 |---|---:|---:|---|
 | BF16 | ~54 GB | ~5 tok/s | **4.4 tok/s** (measured here) |
-| FP8 | ~27 GB | ~10 tok/s | not deployed |
+| FP8 | ~27 GB | ~10 tok/s | not measured without the drafter |
 | NVFP4 W4A4 | ~20 GB (29 GB with vision + FP8 layers on disk) | ~13–17 tok/s | 11.5 tok/s (published) |
-| NVFP4 + speculative decoding | same | ×3–5 on predictable text | **41 tok/s** (measured, code) |
+| NVFP4 + speculative decoding | same | ×3–5 on predictable text | **35–41 tok/s** (measured, code) |
+| **FP8 + speculative decoding (default)** | ~27 GB | same order | **35–38 tok/s** code/SQL, ~99 tok/s aggregate at 4 clients (measured) |
 
 Two consequences:
 
@@ -36,7 +37,7 @@ The original deployment ran BF16 and looked "broken" at 4 tok/s. It was not brok
 
 vLLM 0.30 on this image rejects GGUF at the loader, so llama.cpp-style Q4/Q6 was not an option without changing runtime. NVFP4 is the format Blackwell accelerates natively.
 
-Chosen checkpoint: `Blackfrost-AI/Qwen3.8-27B-ABLITERATED-NVFP4`, an official-Qwen abliteration (refusal direction removed) quantised with ModelOpt. It retains the base model's thinking, tool calling and coding; it is *not* a coding fine-tune. Its "coding-retention" evaluation is still marked in-progress by the publisher, which is why this repo runs its own executable coding checks (see the test report).
+Chosen checkpoints: the Blackfrost abliteration of the official Qwen3.8-27B, in two precisions of the *same weights*: `Blackfrost-AI/Qwen3.8-27B-ABLITERATED-BF16` quantised to FP8 by vLLM at load time (**default**), and `Blackfrost-AI/Qwen3.8-27B-ABLITERATED-NVFP4` (`PROFILE=nvfp4`). It keeps the base model's thinking, tool calling and coding and is *not* a coding fine-tune. Measured on HumanEval and GSM8K the two precisions are statistically indistinguishable (docs/RESULTS.md); FP8 wins on prefill and aggregate throughput, which is why it is the default. The publisher still marks its own coding-retention evaluation as in progress, which is why this repo runs its own executable checks.
 
 ## 3. Speculative decoding (DFlash2)
 
@@ -53,18 +54,27 @@ client ──HTTPS──► Traefik (edge VPS, Let's Encrypt) ──HTTP──�
 - **Why a proxy at all.** A DNS A record cannot carry a port, and Vast maps container ports to random high numbers that change on recreation. The edge VPS already runs Traefik for `*.rangeltech.net`, so the route is one file provider block; the DNS record points at the VPS, not at the GPU.
 - **Two token layers, one stable key.** The Vast Caddy edge requires the instance token (which changes per instance). Instead of handing that token to clients, Traefik injects it as the `C.<id>_auth_token` cookie (Caddy accepts bearer, query and cookie), leaving `Authorization: Bearer` free for vLLM's own `--api-key`. Clients only ever hold the stable `VLLM_API_KEY`.
 - **Streaming.** `responseForwarding.flushInterval: 1ms` keeps SSE token streaming smooth through the proxy.
-- **Replacement.** A new instance changes IP, port, label and token; `scripts/publish-endpoint.sh` rewrites exactly three managed blocks in the Traefik file (router, middleware, service) and `scripts/dns-upsert.sh` makes sure the record exists. Both are idempotent and tested for it.
+- **Replacement.** A new instance changes IP, port, label and token; `scripts/publish-endpoint.sh` rewrites exactly three managed blocks in the Traefik file (router, middleware, service; five when the speech sidecar route is enabled) and `scripts/dns-upsert.sh` makes sure the record exists. Both are idempotent and tested for it.
 
 ## 5. Persistence contract
 
 | what | where | survives stop/start | survives destroy/recreate |
 |---|---|---|---|
-| weights + drafter | `/root/models` (instance disk) | yes | no (re-downloaded by the bootstrap) |
+| weights + drafter + whisper | `/root/models` (instance disk: BF16 52 GB, drafter 3.6 GB, whisper 1.6 GB) | yes | no (re-downloaded by the bootstrap, ~10 min) |
 | vLLM config | `/workspace/.env` managed block | yes | rebuilt by `configure-vast-vllm.sh` |
 | route + DNS | edge VPS + Hostinger | n/a | rebuilt by `publish-endpoint.sh` / `dns-upsert.sh` |
 | keys | GitHub secrets + personal-skills vault | n/a | n/a |
 
 Nothing unusable is kept on the billed disk: the BF16 checkpoint and the GGUF tried earlier were deleted; `configure-vast-vllm.sh` deliberately downloads only the two model directories it serves.
+
+## 5b. Speech-to-text sidecar
+
+The chat model is a vision-language model: images yes, audio no (vLLM answers `At most 0 audio(s) may be provided` with a 400). Rather than leave audio unsupported, a second vLLM process serves `openai/whisper-large-v3-turbo` behind the same public host. Design choices:
+
+- **Same GPU, small slice**: `--gpu-memory-utilization 0.10` (the LLM uses 0.60), leaving headroom for other workloads. The two servers share memory bandwidth, so heavy simultaneous use slows both.
+- **Ordered start**: the Supervisor script waits for the LLM's `/health` before launching, because two vLLM processes profiling GPU memory at the same moment miscount each other's usage.
+- **Routing**: Traefik sends `/v1/audio/*` (priority 200) directly to the sidecar's mapped port; the chat route keeps the Caddy cookie injection. vLLM enforces the same `VLLM_API_KEY` on both.
+- **Result**: a 5 s Portuguese sentence transcribes in ~2 s with exact punctuation; the round trip speech → Whisper → Qwen is a test (`tests/pipeline_audio.py`).
 
 ## 6. Why the Vast container is a transition, not the end state
 

@@ -15,13 +15,15 @@ Audience: engineers who self-host LLMs or are deciding between paying per token 
 5. **The silent killer.** fp8 KV cache corrupted generations past ~20k tokens (garbage such as "Register Register …", 12/36 needle failures) while short benchmarks all passed. bf16 KV: 0 failures up to 140k tokens. Lesson: a benchmark suite that only uses short prompts certifies a broken deployment.
 6. **Measuring quality honestly.** Three of my own harness bugs made the model look worse than it is (helper functions from the prompt not prepended; a 1024-token cap that truncated chain-of-thought; a wrong expected value I had written myself). After fixing them the numbers moved by ~3 points. Lesson: grade the grader before you grade the model.
 7. **A yardstick.** Same prompts, same local grader, run through Claude Code (`claude -p`, Sonnet 5 medium, tools off): 164/164 HumanEval and 197/200 GSM8K for US$ 2.90. Cost per task vs the rented GPU.
-8. **Ops as code.** Idempotent scripts (config, edge route, DNS, power), a one-click workflow that rebuilds on any container by changing only its address, and the tests that prove idempotency.
-9. **Honest limits.** A dense 27B at 4 bits is not Sonnet-class for agentic work; prose is 13 tok/s because the drafter accepts fewer tokens on free text; long prompts cost minutes of prefill; a GPU shared with a real-time workload will lose throughput.
+8. **Ops as code.** Idempotent scripts (config, edge route, DNS, power), a Terraform module whose `plan` after `apply` is empty, a one-click workflow that rebuilds on any container by changing only its address, and the tests that prove idempotency: re-runs change nothing, deliberate config drift is repaired, forced kills recover without downloads, and a real stop/start through the Vast API comes back on the same address. Found by those tests: a `configure` that restarted a server still loading its weights.
+9. **Completing the modalities.** Vision worked out of the box; audio did not (the model has no audio input and says so with a clean 400). The fix was architectural, not a workaround: a Whisper sidecar on the same GPU, started after the LLM, routed by path on the same domain and protected by the same key, provisioned by the same script/Terraform/workflow. Two vLLM processes on one unified-memory GPU is a nice small lesson in start-up ordering.
+10. **Honest limits.** A dense 27B at 4 bits is not Sonnet-class for agentic work; prose is 13 tok/s because the drafter accepts fewer tokens on free text; long prompts cost minutes of prefill; a GPU shared with a real-time workload will lose throughput.
 
 ## Facts and numbers to cite (all in this repo)
 
 - Hardware: NVIDIA GB10, 119 GB unified memory, ~273 GB/s; Vast.ai, US$ 0.449/h running, ~US$ 0.007/h stopped.
 - Stack: vLLM 0.30, `Blackfrost-AI/Qwen3.8-27B-ABLITERATED-NVFP4` and the same lineage's BF16 with online FP8, `z-lab/Qwen3.8-27B-DFlash2` drafter (7 speculative tokens).
+- Speech-to-text: `openai/whisper-large-v3-turbo` served by vLLM as a sidecar (0.10 of GPU memory), `/v1/audio/transcriptions`.
 - Edge: Traefik + Let's Encrypt on a small VPS, Hostinger DNS API, cookie injection so clients hold one stable key.
 - Speed, context, quality, cost: docs/RESULTS.md (generated from reports/*.json, reproducible with `tests/`).
 

@@ -72,9 +72,34 @@ nvidia-smi
 | `Address already in use` in vllm.log | old engine still holds :18000 | `pkill -f "[v]llm serve"; pkill -f "[V]LLM::EngineCor"` then start |
 | 401 from the public URL | wrong `VLLM_API_KEY` | key is in the vault |
 | 401 only after an instance recreate | Traefik still injects the previous Vast token | re-run `publish-endpoint.sh` |
-| 4 tok/s | wrong checkpoint (BF16) or drafter missing | check `VLLM_ARGS` in `/workspace/.env` |
+| 4 tok/s | `--quantization fp8` or the speculative drafter missing from the config | check `VLLM_ARGS` in `/workspace/.env`; re-run `configure-vast-vllm.sh` |
+| `/v1/audio/*` 404 or 502 | whisper sidecar not running or route missing | `supervisorctl status whisper`; `supervisorctl start whisper`; re-run `publish-endpoint.sh` with `WHISPER_PORT` |
 | TLS not issued for a new hostname | no DNS A record yet | `dns-upsert.sh`, then `docker restart traefik` on the edge |
 
 ## Cost discipline
 
 Running ≈ US$ 0.45/h; stopped ≈ US$ 0.007/h. Stop the instance whenever nothing needs it. Never leave test instances alive: listing them is `vastai show instances`.
+
+## Speech-to-text sidecar
+
+A second vLLM process (`whisper` in Supervisor) serves `openai/whisper-large-v3-turbo` on container port 3000 with 10 % of GPU memory. It starts only after the LLM is healthy, so the two servers never profile GPU memory at the same time. Traefik sends `/v1/audio/*` to the mapped port (`VAST_TCP_PORT_3000`); vLLM enforces the same bearer key there.
+
+```bash
+supervisorctl status whisper
+tail -f /var/log/portal/whisper.log
+curl -s https://qwen.rangeltech.net/v1/audio/transcriptions -H "Authorization: Bearer $VLLM_API_KEY" \
+  -F model=whisper -F language=pt -F file=@tests/fixtures/speech-pt.wav
+```
+
+Disable with `WHISPER=0` (script) or `whisper_enabled = false` (Terraform). It survives a Vast stop/start on its own (Supervisor `autostart`).
+
+## Terraform
+
+```bash
+cd infra/terraform-vast
+cp terraform.tfvars.example terraform.tfvars   # fill: instance address, ports, keys (git-ignored)
+terraform init -backend=false && terraform apply
+terraform plan -detailed-exitcode              # exit 0 = nothing to change
+```
+
+Changing only the instance address (host, ports, id) re-runs configure, route and DNS; everything else is a no-op.

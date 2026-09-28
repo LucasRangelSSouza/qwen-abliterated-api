@@ -15,12 +15,12 @@ steps = []
 
 
 def sh(cmd, timeout=900):
-    p = subprocess.run(SSH + [cmd], capture_output=True, text=True, timeout=timeout)
+    p = subprocess.run(SSH + [cmd], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout)
     return p.returncode, (p.stdout + p.stderr).replace("AI agents: READ", "").strip()
 
 
 def local(cmd, env=None, timeout=300):
-    p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env={**os.environ, **(env or {})}, shell=isinstance(cmd, str))
+    p = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=timeout, env={**os.environ, **(env or {})}, shell=isinstance(cmd, str))
     return p.returncode, (p.stdout + p.stderr).strip()
 
 
@@ -88,7 +88,7 @@ env = {"EDGE_SSH": E["EDGE_SSH"], "EDGE_KEY": E["EDGE_KEY"], "PUBLIC_HOST": E.ge
 local(["bash", os.path.join(ROOT, "scripts", "publish-endpoint.sh")], env)
 rc, out = local(["bash", os.path.join(ROOT, "scripts", "publish-endpoint.sh")], env)
 rec("publish-endpoint.sh second run unchanged", rc == 0 and "unchanged" in out, detail=out.splitlines()[-1] if out else "")
-n = subprocess.run(["ssh", "-o", "BatchMode=yes", "-i", E["EDGE_KEY"], E["EDGE_SSH"], "grep -c 'managed by qwen-abliterated-api' /opt/platform/configs/traefik/dynamic.yml"], capture_output=True, text=True).stdout.strip()
+n = subprocess.run(["ssh", "-o", "BatchMode=yes", "-i", E["EDGE_KEY"], E["EDGE_SSH"], "grep -c 'managed by qwen-abliterated-api' /opt/platform/configs/traefik/dynamic.yml"], capture_output=True, text=True, encoding='utf-8', errors='replace').stdout.strip()
 rec("publish-endpoint.sh leaves exactly 3 managed blocks (no duplication)", n == "3", detail=f"blocks={n}")
 
 # 4. dns-upsert twice

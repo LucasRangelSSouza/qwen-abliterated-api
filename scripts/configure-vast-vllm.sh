@@ -17,6 +17,11 @@ MAX_LEN="${MAX_LEN:-32768}"
 # KV cache dtype: "auto" (bf16). fp8_e4m3 corrupted generations at >~20k tokens of context (tests/longctx.py:
 # 12/36 needle failures with fp8, 0/12 with auto); memory is plentiful (270k tokens of KV in bf16).
 KV_DTYPE="${KV_DTYPE:-auto}"
+# Variants for experiments: TARGET_DIR (already-present weights, skips the target download), QUANT (e.g. fp8 = online
+# quantisation of a BF16 checkpoint), GPU_UTIL (leave headroom for other GPU workloads).
+TARGET_DIR="${TARGET_DIR:-}"
+QUANT="${QUANT:-}"
+GPU_UTIL="${GPU_UTIL:-0.60}"
 
 command -v hf >/dev/null || { echo "Hugging Face CLI (hf) is required" >&2; exit 2; }
 command -v supervisorctl >/dev/null || { echo "Vast vLLM image is required" >&2; exit 3; }
@@ -24,9 +29,12 @@ command -v supervisorctl >/dev/null || { echo "Vast vLLM image is required" >&2;
 mkdir -p "$MODELS_DIR"
 # Idempotent: hf download is a no-op when files are already complete, so a
 # stop/start (or rerun) never re-downloads the weights.
-hf download "$TARGET_REPO" --local-dir "$MODELS_DIR/target"
+if [ -z "$TARGET_DIR" ]; then
+  hf download "$TARGET_REPO" --local-dir "$MODELS_DIR/target"
+  TARGET_DIR="$MODELS_DIR/target"
+fi
 hf download "$DRAFTER_REPO" --local-dir "$MODELS_DIR/drafter"
-test -s "$MODELS_DIR/target/model.safetensors.index.json"
+test -s "$TARGET_DIR/model.safetensors.index.json"
 
 # /workspace/.env is sourced by the image's Supervisor scripts.
 ENV_FILE="${WORKSPACE:-/workspace}/.env"
@@ -37,8 +45,8 @@ SPEC="{\\\"method\\\":\\\"dflash\\\",\\\"model\\\":\\\"$MODELS_DIR/drafter\\\",\
 DESIRED=$(cat <<BLOCK
 # BEGIN qwen-abliterated-api (managed)
 MAX_JOBS=4
-VLLM_MODEL='$MODELS_DIR/target'
-VLLM_ARGS="--served-model-name $SERVED_MODEL_NAME --host 127.0.0.1 --port 18000 --gpu-memory-utilization 0.60 --max-model-len $MAX_LEN --max-num-seqs 4 --kv-cache-dtype $KV_DTYPE --trust-remote-code --enable-auto-tool-choice --tool-call-parser qwen3_xml --reasoning-parser qwen3 --speculative-config '$SPEC'"
+VLLM_MODEL='$TARGET_DIR'
+VLLM_ARGS="--served-model-name $SERVED_MODEL_NAME --host 127.0.0.1 --port 18000 --gpu-memory-utilization $GPU_UTIL --max-model-len $MAX_LEN --max-num-seqs 4 --kv-cache-dtype $KV_DTYPE ${QUANT:+--quantization $QUANT} --trust-remote-code --enable-auto-tool-choice --tool-call-parser qwen3_xml --reasoning-parser qwen3 --speculative-config '$SPEC'"
 ${VLLM_API_KEY:+VLLM_API_KEY='$VLLM_API_KEY'}
 # END qwen-abliterated-api (managed)
 BLOCK

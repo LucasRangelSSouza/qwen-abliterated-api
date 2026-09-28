@@ -1,0 +1,2207 @@
+{
+ "variant": "claude-sonnet-5-medium",
+ "humaneval": {
+  "passed": 164,
+  "total": 164,
+  "rows": [
+   {
+    "id": "HumanEval/0",
+    "pass": true,
+    "err": "",
+    "tokens": 226
+   },
+   {
+    "id": "HumanEval/1",
+    "pass": true,
+    "err": "",
+    "tokens": 288
+   },
+   {
+    "id": "HumanEval/2",
+    "pass": true,
+    "err": "",
+    "tokens": 126
+   },
+   {
+    "id": "HumanEval/3",
+    "pass": true,
+    "err": "",
+    "tokens": 199
+   },
+   {
+    "id": "HumanEval/4",
+    "pass": true,
+    "err": "",
+    "tokens": 223
+   },
+   {
+    "id": "HumanEval/5",
+    "pass": true,
+    "err": "",
+    "tokens": 184
+   },
+   {
+    "id": "HumanEval/6",
+    "pass": true,
+    "err": "",
+    "tokens": 276
+   },
+   {
+    "id": "HumanEval/7",
+    "pass": true,
+    "err": "",
+    "tokens": 158
+   },
+   {
+    "id": "HumanEval/8",
+    "pass": true,
+    "err": "",
+    "tokens": 214
+   },
+   {
+    "id": "HumanEval/9",
+    "pass": true,
+    "err": "",
+    "tokens": 192
+   },
+   {
+    "id": "HumanEval/10",
+    "pass": true,
+    "err": "",
+    "tokens": 281
+   },
+   {
+    "id": "HumanEval/11",
+    "pass": true,
+    "err": "",
+    "tokens": 133
+   },
+   {
+    "id": "HumanEval/12",
+    "pass": true,
+    "err": "",
+    "tokens": 178
+   },
+   {
+    "id": "HumanEval/13",
+    "pass": true,
+    "err": "",
+    "tokens": 124
+   },
+   {
+    "id": "HumanEval/14",
+    "pass": true,
+    "err": "",
+    "tokens": 115
+   },
+   {
+    "id": "HumanEval/15",
+    "pass": true,
+    "err": "",
+    "tokens": 126
+   },
+   {
+    "id": "HumanEval/16",
+    "pass": true,
+    "err": "",
+    "tokens": 118
+   },
+   {
+    "id": "HumanEval/17",
+    "pass": true,
+    "err": "",
+    "tokens": 266
+   },
+   {
+    "id": "HumanEval/18",
+    "pass": true,
+    "err": "",
+    "tokens": 181
+   },
+   {
+    "id": "HumanEval/19",
+    "pass": true,
+    "err": "",
+    "tokens": 288
+   },
+   {
+    "id": "HumanEval/20",
+    "pass": true,
+    "err": "",
+    "tokens": 396
+   },
+   {
+    "id": "HumanEval/21",
+    "pass": true,
+    "err": "",
+    "tokens": 218
+   },
+   {
+    "id": "HumanEval/22",
+    "pass": true,
+    "err": "",
+    "tokens": 157
+   },
+   {
+    "id": "HumanEval/23",
+    "pass": true,
+    "err": "",
+    "tokens": 68
+   },
+   {
+    "id": "HumanEval/24",
+    "pass": true,
+    "err": "",
+    "tokens": 108
+   },
+   {
+    "id": "HumanEval/25",
+    "pass": true,
+    "err": "",
+    "tokens": 259
+   },
+   {
+    "id": "HumanEval/26",
+    "pass": true,
+    "err": "",
+    "tokens": 177
+   },
+   {
+    "id": "HumanEval/27",
+    "pass": true,
+    "err": "",
+    "tokens": 89
+   },
+   {
+    "id": "HumanEval/28",
+    "pass": true,
+    "err": "",
+    "tokens": 105
+   },
+   {
+    "id": "HumanEval/29",
+    "pass": true,
+    "err": "",
+    "tokens": 165
+   },
+   {
+    "id": "HumanEval/30",
+    "pass": true,
+    "err": "",
+    "tokens": 151
+   },
+   {
+    "id": "HumanEval/31",
+    "pass": true,
+    "err": "",
+    "tokens": 228
+   },
+   {
+    "id": "HumanEval/32",
+    "pass": true,
+    "err": "",
+    "tokens": 563
+   },
+   {
+    "id": "HumanEval/33",
+    "pass": true,
+    "err": "",
+    "tokens": 259
+   },
+   {
+    "id": "HumanEval/34",
+    "pass": true,
+    "err": "",
+    "tokens": 98
+   },
+   {
+    "id": "HumanEval/35",
+    "pass": true,
+    "err": "",
+    "tokens": 135
+   },
+   {
+    "id": "HumanEval/36",
+    "pass": true,
+    "err": "",
+    "tokens": 166
+   },
+   {
+    "id": "HumanEval/37",
+    "pass": true,
+    "err": "",
+    "tokens": 187
+   },
+   {
+    "id": "HumanEval/38",
+    "pass": true,
+    "err": "",
+    "tokens": 321
+   },
+   {
+    "id": "HumanEval/39",
+    "pass": true,
+    "err": "",
+    "tokens": 294
+   },
+   {
+    "id": "HumanEval/40",
+    "pass": true,
+    "err": "",
+    "tokens": 371
+   },
+   {
+    "id": "HumanEval/41",
+    "pass": true,
+    "err": "",
+    "tokens": 214
+   },
+   {
+    "id": "HumanEval/42",
+    "pass": true,
+    "err": "",
+    "tokens": 144
+   },
+   {
+    "id": "HumanEval/43",
+    "pass": true,
+    "err": "",
+    "tokens": 278
+   },
+   {
+    "id": "HumanEval/44",
+    "pass": true,
+    "err": "",
+    "tokens": 183
+   },
+   {
+    "id": "HumanEval/45",
+    "pass": true,
+    "err": "",
+    "tokens": 70
+   },
+   {
+    "id": "HumanEval/46",
+    "pass": true,
+    "err": "",
+    "tokens": 335
+   },
+   {
+    "id": "HumanEval/47",
+    "pass": true,
+    "err": "",
+    "tokens": 159
+   },
+   {
+    "id": "HumanEval/48",
+    "pass": true,
+    "err": "",
+    "tokens": 125
+   },
+   {
+    "id": "HumanEval/49",
+    "pass": true,
+    "err": "",
+    "tokens": 157
+   },
+   {
+    "id": "HumanEval/50",
+    "pass": true,
+    "err": "",
+    "tokens": 183
+   },
+   {
+    "id": "HumanEval/51",
+    "pass": true,
+    "err": "",
+    "tokens": 224
+   },
+   {
+    "id": "HumanEval/52",
+    "pass": true,
+    "err": "",
+    "tokens": 116
+   },
+   {
+    "id": "HumanEval/53",
+    "pass": true,
+    "err": "",
+    "tokens": 69
+   },
+   {
+    "id": "HumanEval/54",
+    "pass": true,
+    "err": "",
+    "tokens": 238
+   },
+   {
+    "id": "HumanEval/55",
+    "pass": true,
+    "err": "",
+    "tokens": 109
+   },
+   {
+    "id": "HumanEval/56",
+    "pass": true,
+    "err": "",
+    "tokens": 214
+   },
+   {
+    "id": "HumanEval/57",
+    "pass": true,
+    "err": "",
+    "tokens": 182
+   },
+   {
+    "id": "HumanEval/58",
+    "pass": true,
+    "err": "",
+    "tokens": 150
+   },
+   {
+    "id": "HumanEval/59",
+    "pass": true,
+    "err": "",
+    "tokens": 178
+   },
+   {
+    "id": "HumanEval/60",
+    "pass": true,
+    "err": "",
+    "tokens": 147
+   },
+   {
+    "id": "HumanEval/61",
+    "pass": true,
+    "err": "",
+    "tokens": 211
+   },
+   {
+    "id": "HumanEval/62",
+    "pass": true,
+    "err": "",
+    "tokens": 172
+   },
+   {
+    "id": "HumanEval/63",
+    "pass": true,
+    "err": "",
+    "tokens": 301
+   },
+   {
+    "id": "HumanEval/64",
+    "pass": true,
+    "err": "",
+    "tokens": 376
+   },
+   {
+    "id": "HumanEval/65",
+    "pass": true,
+    "err": "",
+    "tokens": 187
+   },
+   {
+    "id": "HumanEval/66",
+    "pass": true,
+    "err": "",
+    "tokens": 37
+   },
+   {
+    "id": "HumanEval/67",
+    "pass": true,
+    "err": "",
+    "tokens": 352
+   },
+   {
+    "id": "HumanEval/68",
+    "pass": true,
+    "err": "",
+    "tokens": 140
+   },
+   {
+    "id": "HumanEval/69",
+    "pass": true,
+    "err": "",
+    "tokens": 290
+   },
+   {
+    "id": "HumanEval/70",
+    "pass": true,
+    "err": "",
+    "tokens": 260
+   },
+   {
+    "id": "HumanEval/71",
+    "pass": true,
+    "err": "",
+    "tokens": 255
+   },
+   {
+    "id": "HumanEval/72",
+    "pass": true,
+    "err": "",
+    "tokens": 39
+   },
+   {
+    "id": "HumanEval/73",
+    "pass": true,
+    "err": "",
+    "tokens": 258
+   },
+   {
+    "id": "HumanEval/74",
+    "pass": true,
+    "err": "",
+    "tokens": 351
+   },
+   {
+    "id": "HumanEval/75",
+    "pass": true,
+    "err": "",
+    "tokens": 263
+   },
+   {
+    "id": "HumanEval/76",
+    "pass": true,
+    "err": "",
+    "tokens": 68
+   },
+   {
+    "id": "HumanEval/77",
+    "pass": true,
+    "err": "",
+    "tokens": 218
+   },
+   {
+    "id": "HumanEval/78",
+    "pass": true,
+    "err": "",
+    "tokens": 45
+   },
+   {
+    "id": "HumanEval/79",
+    "pass": true,
+    "err": "",
+    "tokens": 207
+   },
+   {
+    "id": "HumanEval/80",
+    "pass": true,
+    "err": "",
+    "tokens": 213
+   },
+   {
+    "id": "HumanEval/81",
+    "pass": true,
+    "err": "",
+    "tokens": 682
+   },
+   {
+    "id": "HumanEval/82",
+    "pass": true,
+    "err": "",
+    "tokens": 170
+   },
+   {
+    "id": "HumanEval/83",
+    "pass": true,
+    "err": "",
+    "tokens": 93
+   },
+   {
+    "id": "HumanEval/84",
+    "pass": true,
+    "err": "",
+    "tokens": 215
+   },
+   {
+    "id": "HumanEval/85",
+    "pass": true,
+    "err": "",
+    "tokens": 114
+   },
+   {
+    "id": "HumanEval/86",
+    "pass": true,
+    "err": "",
+    "tokens": 48
+   },
+   {
+    "id": "HumanEval/87",
+    "pass": true,
+    "err": "",
+    "tokens": 93
+   },
+   {
+    "id": "HumanEval/88",
+    "pass": true,
+    "err": "",
+    "tokens": 304
+   },
+   {
+    "id": "HumanEval/89",
+    "pass": true,
+    "err": "",
+    "tokens": 267
+   },
+   {
+    "id": "HumanEval/90",
+    "pass": true,
+    "err": "",
+    "tokens": 194
+   },
+   {
+    "id": "HumanEval/91",
+    "pass": true,
+    "err": "",
+    "tokens": 224
+   },
+   {
+    "id": "HumanEval/92",
+    "pass": true,
+    "err": "",
+    "tokens": 244
+   },
+   {
+    "id": "HumanEval/93",
+    "pass": true,
+    "err": "",
+    "tokens": 148
+   },
+   {
+    "id": "HumanEval/94",
+    "pass": true,
+    "err": "",
+    "tokens": 415
+   },
+   {
+    "id": "HumanEval/95",
+    "pass": true,
+    "err": "",
+    "tokens": 349
+   },
+   {
+    "id": "HumanEval/96",
+    "pass": true,
+    "err": "",
+    "tokens": 272
+   },
+   {
+    "id": "HumanEval/97",
+    "pass": true,
+    "err": "",
+    "tokens": 156
+   },
+   {
+    "id": "HumanEval/98",
+    "pass": true,
+    "err": "",
+    "tokens": 148
+   },
+   {
+    "id": "HumanEval/99",
+    "pass": true,
+    "err": "",
+    "tokens": 250
+   },
+   {
+    "id": "HumanEval/100",
+    "pass": true,
+    "err": "",
+    "tokens": 186
+   },
+   {
+    "id": "HumanEval/101",
+    "pass": true,
+    "err": "",
+    "tokens": 172
+   },
+   {
+    "id": "HumanEval/102",
+    "pass": true,
+    "err": "",
+    "tokens": 169
+   },
+   {
+    "id": "HumanEval/103",
+    "pass": true,
+    "err": "",
+    "tokens": 55
+   },
+   {
+    "id": "HumanEval/104",
+    "pass": true,
+    "err": "",
+    "tokens": 178
+   },
+   {
+    "id": "HumanEval/105",
+    "pass": true,
+    "err": "",
+    "tokens": 149
+   },
+   {
+    "id": "HumanEval/106",
+    "pass": true,
+    "err": "",
+    "tokens": 122
+   },
+   {
+    "id": "HumanEval/107",
+    "pass": true,
+    "err": "",
+    "tokens": 371
+   },
+   {
+    "id": "HumanEval/108",
+    "pass": true,
+    "err": "",
+    "tokens": 283
+   },
+   {
+    "id": "HumanEval/109",
+    "pass": true,
+    "err": "",
+    "tokens": 109
+   },
+   {
+    "id": "HumanEval/110",
+    "pass": true,
+    "err": "",
+    "tokens": 355
+   },
+   {
+    "id": "HumanEval/111",
+    "pass": true,
+    "err": "",
+    "tokens": 297
+   },
+   {
+    "id": "HumanEval/112",
+    "pass": true,
+    "err": "",
+    "tokens": 248
+   },
+   {
+    "id": "HumanEval/113",
+    "pass": true,
+    "err": "",
+    "tokens": 308
+   },
+   {
+    "id": "HumanEval/114",
+    "pass": true,
+    "err": "",
+    "tokens": 210
+   },
+   {
+    "id": "HumanEval/115",
+    "pass": true,
+    "err": "",
+    "tokens": 52
+   },
+   {
+    "id": "HumanEval/116",
+    "pass": true,
+    "err": "",
+    "tokens": 46
+   },
+   {
+    "id": "HumanEval/117",
+    "pass": true,
+    "err": "",
+    "tokens": 105
+   },
+   {
+    "id": "HumanEval/118",
+    "pass": true,
+    "err": "",
+    "tokens": 308
+   },
+   {
+    "id": "HumanEval/119",
+    "pass": true,
+    "err": "",
+    "tokens": 347
+   },
+   {
+    "id": "HumanEval/120",
+    "pass": true,
+    "err": "",
+    "tokens": 288
+   },
+   {
+    "id": "HumanEval/121",
+    "pass": true,
+    "err": "",
+    "tokens": 166
+   },
+   {
+    "id": "HumanEval/122",
+    "pass": true,
+    "err": "",
+    "tokens": 196
+   },
+   {
+    "id": "HumanEval/123",
+    "pass": true,
+    "err": "",
+    "tokens": 410
+   },
+   {
+    "id": "HumanEval/124",
+    "pass": true,
+    "err": "",
+    "tokens": 545
+   },
+   {
+    "id": "HumanEval/125",
+    "pass": true,
+    "err": "",
+    "tokens": 283
+   },
+   {
+    "id": "HumanEval/126",
+    "pass": true,
+    "err": "",
+    "tokens": 422
+   },
+   {
+    "id": "HumanEval/127",
+    "pass": true,
+    "err": "",
+    "tokens": 460
+   },
+   {
+    "id": "HumanEval/128",
+    "pass": true,
+    "err": "",
+    "tokens": 241
+   },
+   {
+    "id": "HumanEval/129",
+    "pass": true,
+    "err": "",
+    "tokens": 475
+   },
+   {
+    "id": "HumanEval/130",
+    "pass": true,
+    "err": "",
+    "tokens": 391
+   },
+   {
+    "id": "HumanEval/131",
+    "pass": true,
+    "err": "",
+    "tokens": 160
+   },
+   {
+    "id": "HumanEval/132",
+    "pass": true,
+    "err": "",
+    "tokens": 573
+   },
+   {
+    "id": "HumanEval/133",
+    "pass": true,
+    "err": "",
+    "tokens": 215
+   },
+   {
+    "id": "HumanEval/134",
+    "pass": true,
+    "err": "",
+    "tokens": 79
+   },
+   {
+    "id": "HumanEval/135",
+    "pass": true,
+    "err": "",
+    "tokens": 181
+   },
+   {
+    "id": "HumanEval/136",
+    "pass": true,
+    "err": "",
+    "tokens": 263
+   },
+   {
+    "id": "HumanEval/137",
+    "pass": true,
+    "err": "",
+    "tokens": 105
+   },
+   {
+    "id": "HumanEval/138",
+    "pass": true,
+    "err": "",
+    "tokens": 135
+   },
+   {
+    "id": "HumanEval/139",
+    "pass": true,
+    "err": "",
+    "tokens": 173
+   },
+   {
+    "id": "HumanEval/140",
+    "pass": true,
+    "err": "",
+    "tokens": 215
+   },
+   {
+    "id": "HumanEval/141",
+    "pass": true,
+    "err": "",
+    "tokens": 433
+   },
+   {
+    "id": "HumanEval/142",
+    "pass": true,
+    "err": "",
+    "tokens": 306
+   },
+   {
+    "id": "HumanEval/143",
+    "pass": true,
+    "err": "",
+    "tokens": 112
+   },
+   {
+    "id": "HumanEval/144",
+    "pass": true,
+    "err": "",
+    "tokens": 97
+   },
+   {
+    "id": "HumanEval/145",
+    "pass": true,
+    "err": "",
+    "tokens": 249
+   },
+   {
+    "id": "HumanEval/146",
+    "pass": true,
+    "err": "",
+    "tokens": 108
+   },
+   {
+    "id": "HumanEval/147",
+    "pass": true,
+    "err": "",
+    "tokens": 1056
+   },
+   {
+    "id": "HumanEval/148",
+    "pass": true,
+    "err": "",
+    "tokens": 171
+   },
+   {
+    "id": "HumanEval/149",
+    "pass": true,
+    "err": "",
+    "tokens": 69
+   },
+   {
+    "id": "HumanEval/150",
+    "pass": true,
+    "err": "",
+    "tokens": 73
+   },
+   {
+    "id": "HumanEval/151",
+    "pass": true,
+    "err": "",
+    "tokens": 231
+   },
+   {
+    "id": "HumanEval/152",
+    "pass": true,
+    "err": "",
+    "tokens": 41
+   },
+   {
+    "id": "HumanEval/153",
+    "pass": true,
+    "err": "",
+    "tokens": 540
+   },
+   {
+    "id": "HumanEval/154",
+    "pass": true,
+    "err": "",
+    "tokens": 216
+   },
+   {
+    "id": "HumanEval/155",
+    "pass": true,
+    "err": "",
+    "tokens": 176
+   },
+   {
+    "id": "HumanEval/156",
+    "pass": true,
+    "err": "",
+    "tokens": 335
+   },
+   {
+    "id": "HumanEval/157",
+    "pass": true,
+    "err": "",
+    "tokens": 215
+   },
+   {
+    "id": "HumanEval/158",
+    "pass": true,
+    "err": "",
+    "tokens": 44
+   },
+   {
+    "id": "HumanEval/159",
+    "pass": true,
+    "err": "",
+    "tokens": 60
+   },
+   {
+    "id": "HumanEval/160",
+    "pass": true,
+    "err": "",
+    "tokens": 78
+   },
+   {
+    "id": "HumanEval/161",
+    "pass": true,
+    "err": "",
+    "tokens": 49
+   },
+   {
+    "id": "HumanEval/162",
+    "pass": true,
+    "err": "",
+    "tokens": 148
+   },
+   {
+    "id": "HumanEval/163",
+    "pass": true,
+    "err": "",
+    "tokens": 359
+   }
+  ]
+ },
+ "gsm8k": {
+  "passed": 197,
+  "total": 200,
+  "rows": [
+   {
+    "pass": true,
+    "gold": "18",
+    "got": "18",
+    "tokens": 112
+   },
+   {
+    "pass": true,
+    "gold": "3",
+    "got": "3",
+    "tokens": 60
+   },
+   {
+    "pass": true,
+    "gold": "70000",
+    "got": "70000",
+    "tokens": 171
+   },
+   {
+    "pass": true,
+    "gold": "540",
+    "got": "540",
+    "tokens": 67
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 154
+   },
+   {
+    "pass": true,
+    "gold": "64",
+    "got": "64",
+    "tokens": 180
+   },
+   {
+    "pass": true,
+    "gold": "260",
+    "got": "260",
+    "tokens": 111
+   },
+   {
+    "pass": true,
+    "gold": "160",
+    "got": "160",
+    "tokens": 291
+   },
+   {
+    "pass": true,
+    "gold": "45",
+    "got": "45",
+    "tokens": 457
+   },
+   {
+    "pass": true,
+    "gold": "460",
+    "got": "460",
+    "tokens": 146
+   },
+   {
+    "pass": true,
+    "gold": "366",
+    "got": "366",
+    "tokens": 146
+   },
+   {
+    "pass": true,
+    "gold": "694",
+    "got": "694",
+    "tokens": 138
+   },
+   {
+    "pass": true,
+    "gold": "13",
+    "got": "13",
+    "tokens": 327
+   },
+   {
+    "pass": true,
+    "gold": "18",
+    "got": "18",
+    "tokens": 319
+   },
+   {
+    "pass": true,
+    "gold": "60",
+    "got": "60",
+    "tokens": 183
+   },
+   {
+    "pass": true,
+    "gold": "125",
+    "got": "125",
+    "tokens": 151
+   },
+   {
+    "pass": true,
+    "gold": "230",
+    "got": "230",
+    "tokens": 118
+   },
+   {
+    "pass": true,
+    "gold": "57500",
+    "got": "57500",
+    "tokens": 137
+   },
+   {
+    "pass": true,
+    "gold": "7",
+    "got": "7",
+    "tokens": 129
+   },
+   {
+    "pass": true,
+    "gold": "6",
+    "got": "6",
+    "tokens": 230
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 391
+   },
+   {
+    "pass": true,
+    "gold": "14",
+    "got": "14",
+    "tokens": 143
+   },
+   {
+    "pass": true,
+    "gold": "7",
+    "got": "7",
+    "tokens": 144
+   },
+   {
+    "pass": true,
+    "gold": "8",
+    "got": "8",
+    "tokens": 80
+   },
+   {
+    "pass": true,
+    "gold": "26",
+    "got": "26",
+    "tokens": 71
+   },
+   {
+    "pass": true,
+    "gold": "2",
+    "got": "2",
+    "tokens": 178
+   },
+   {
+    "pass": true,
+    "gold": "243",
+    "got": "243",
+    "tokens": 169
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 150
+   },
+   {
+    "pass": true,
+    "gold": "25",
+    "got": "25",
+    "tokens": 60
+   },
+   {
+    "pass": true,
+    "gold": "104",
+    "got": "104",
+    "tokens": 120
+   },
+   {
+    "pass": true,
+    "gold": "109",
+    "got": "109",
+    "tokens": 127
+   },
+   {
+    "pass": true,
+    "gold": "80",
+    "got": "80",
+    "tokens": 203
+   },
+   {
+    "pass": true,
+    "gold": "35",
+    "got": "35",
+    "tokens": 95
+   },
+   {
+    "pass": true,
+    "gold": "70",
+    "got": "70",
+    "tokens": 131
+   },
+   {
+    "pass": true,
+    "gold": "23",
+    "got": "23",
+    "tokens": 121
+   },
+   {
+    "pass": true,
+    "gold": "9",
+    "got": "9",
+    "tokens": 87
+   },
+   {
+    "pass": true,
+    "gold": "75",
+    "got": "75",
+    "tokens": 164
+   },
+   {
+    "pass": true,
+    "gold": "2",
+    "got": "2",
+    "tokens": 147
+   },
+   {
+    "pass": true,
+    "gold": "10",
+    "got": "10",
+    "tokens": 214
+   },
+   {
+    "pass": true,
+    "gold": "18",
+    "got": "18",
+    "tokens": 291
+   },
+   {
+    "pass": true,
+    "gold": "8",
+    "got": "8",
+    "tokens": 163
+   },
+   {
+    "pass": true,
+    "gold": "200",
+    "got": "200",
+    "tokens": 257
+   },
+   {
+    "pass": true,
+    "gold": "26",
+    "got": "26",
+    "tokens": 102
+   },
+   {
+    "pass": true,
+    "gold": "48",
+    "got": "48",
+    "tokens": 256
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 310
+   },
+   {
+    "pass": true,
+    "gold": "104",
+    "got": "104",
+    "tokens": 181
+   },
+   {
+    "pass": true,
+    "gold": "163",
+    "got": "163",
+    "tokens": 154
+   },
+   {
+    "pass": true,
+    "gold": "800",
+    "got": "800",
+    "tokens": 251
+   },
+   {
+    "pass": true,
+    "gold": "8",
+    "got": "8",
+    "tokens": 40
+   },
+   {
+    "pass": true,
+    "gold": "30",
+    "got": "30",
+    "tokens": 112
+   },
+   {
+    "pass": true,
+    "gold": "294",
+    "got": "294",
+    "tokens": 143
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 119
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 191
+   },
+   {
+    "pass": true,
+    "gold": "40",
+    "got": "40",
+    "tokens": 121
+   },
+   {
+    "pass": true,
+    "gold": "40",
+    "got": "40",
+    "tokens": 209
+   },
+   {
+    "pass": true,
+    "gold": "14",
+    "got": "14",
+    "tokens": 115
+   },
+   {
+    "pass": true,
+    "gold": "3",
+    "got": "3",
+    "tokens": 97
+   },
+   {
+    "pass": true,
+    "gold": "83",
+    "got": "83",
+    "tokens": 98
+   },
+   {
+    "pass": true,
+    "gold": "57",
+    "got": "57.00",
+    "tokens": 317
+   },
+   {
+    "pass": true,
+    "gold": "187",
+    "got": "187",
+    "tokens": 59
+   },
+   {
+    "pass": true,
+    "gold": "17",
+    "got": "17",
+    "tokens": 133
+   },
+   {
+    "pass": true,
+    "gold": "1430",
+    "got": "1430",
+    "tokens": 131
+   },
+   {
+    "pass": true,
+    "gold": "25000",
+    "got": "25000",
+    "tokens": 353
+   },
+   {
+    "pass": true,
+    "gold": "1596",
+    "got": "1596",
+    "tokens": 139
+   },
+   {
+    "pass": true,
+    "gold": "300",
+    "got": "300",
+    "tokens": 140
+   },
+   {
+    "pass": true,
+    "gold": "36",
+    "got": "36",
+    "tokens": 168
+   },
+   {
+    "pass": true,
+    "gold": "48",
+    "got": "48",
+    "tokens": 153
+   },
+   {
+    "pass": true,
+    "gold": "595",
+    "got": "595",
+    "tokens": 90
+   },
+   {
+    "pass": true,
+    "gold": "36",
+    "got": "36",
+    "tokens": 105
+   },
+   {
+    "pass": true,
+    "gold": "60",
+    "got": "60",
+    "tokens": 75
+   },
+   {
+    "pass": true,
+    "gold": "7425",
+    "got": "7425",
+    "tokens": 236
+   },
+   {
+    "pass": true,
+    "gold": "60",
+    "got": "60",
+    "tokens": 69
+   },
+   {
+    "pass": true,
+    "gold": "221",
+    "got": "221",
+    "tokens": 129
+   },
+   {
+    "pass": true,
+    "gold": "255",
+    "got": "255",
+    "tokens": 212
+   },
+   {
+    "pass": true,
+    "gold": "88",
+    "got": "88",
+    "tokens": 198
+   },
+   {
+    "pass": true,
+    "gold": "60",
+    "got": "60",
+    "tokens": 207
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 239
+   },
+   {
+    "pass": true,
+    "gold": "100",
+    "got": "100",
+    "tokens": 164
+   },
+   {
+    "pass": true,
+    "gold": "6",
+    "got": "6",
+    "tokens": 288
+   },
+   {
+    "pass": true,
+    "gold": "70",
+    "got": "70",
+    "tokens": 74
+   },
+   {
+    "pass": true,
+    "gold": "10",
+    "got": "10",
+    "tokens": 168
+   },
+   {
+    "pass": true,
+    "gold": "17",
+    "got": "17",
+    "tokens": 106
+   },
+   {
+    "pass": true,
+    "gold": "623",
+    "got": "623",
+    "tokens": 110
+   },
+   {
+    "pass": true,
+    "gold": "600",
+    "got": "600",
+    "tokens": 129
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 129
+   },
+   {
+    "pass": true,
+    "gold": "44",
+    "got": "44",
+    "tokens": 91
+   },
+   {
+    "pass": true,
+    "gold": "22",
+    "got": "22",
+    "tokens": 164
+   },
+   {
+    "pass": true,
+    "gold": "9360",
+    "got": "9360",
+    "tokens": 470
+   },
+   {
+    "pass": true,
+    "gold": "8000",
+    "got": "8000",
+    "tokens": 60
+   },
+   {
+    "pass": true,
+    "gold": "24",
+    "got": "24",
+    "tokens": 51
+   },
+   {
+    "pass": true,
+    "gold": "225",
+    "got": "225",
+    "tokens": 94
+   },
+   {
+    "pass": true,
+    "gold": "28",
+    "got": "28",
+    "tokens": 101
+   },
+   {
+    "pass": true,
+    "gold": "4",
+    "got": "4",
+    "tokens": 106
+   },
+   {
+    "pass": true,
+    "gold": "36",
+    "got": "36",
+    "tokens": 162
+   },
+   {
+    "pass": true,
+    "gold": "348",
+    "got": "348",
+    "tokens": 141
+   },
+   {
+    "pass": true,
+    "gold": "40",
+    "got": "40",
+    "tokens": 133
+   },
+   {
+    "pass": true,
+    "gold": "3",
+    "got": "3",
+    "tokens": 82
+   },
+   {
+    "pass": true,
+    "gold": "12",
+    "got": "12",
+    "tokens": 183
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 114
+   },
+   {
+    "pass": true,
+    "gold": "58",
+    "got": "58",
+    "tokens": 231
+   },
+   {
+    "pass": true,
+    "gold": "175",
+    "got": "175",
+    "tokens": 183
+   },
+   {
+    "pass": true,
+    "gold": "6",
+    "got": "6",
+    "tokens": 129
+   },
+   {
+    "pass": true,
+    "gold": "26",
+    "got": "26",
+    "tokens": 208
+   },
+   {
+    "pass": true,
+    "gold": "140",
+    "got": "140",
+    "tokens": 109
+   },
+   {
+    "pass": true,
+    "gold": "500",
+    "got": "500",
+    "tokens": 101
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 74
+   },
+   {
+    "pass": true,
+    "gold": "72",
+    "got": "72",
+    "tokens": 236
+   },
+   {
+    "pass": true,
+    "gold": "3",
+    "got": "3",
+    "tokens": 244
+   },
+   {
+    "pass": true,
+    "gold": "50",
+    "got": "50",
+    "tokens": 148
+   },
+   {
+    "pass": true,
+    "gold": "28",
+    "got": "28.00",
+    "tokens": 192
+   },
+   {
+    "pass": true,
+    "gold": "45",
+    "got": "45",
+    "tokens": 134
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 205
+   },
+   {
+    "pass": true,
+    "gold": "24",
+    "got": "24",
+    "tokens": 121
+   },
+   {
+    "pass": true,
+    "gold": "25",
+    "got": "25",
+    "tokens": 119
+   },
+   {
+    "pass": true,
+    "gold": "6",
+    "got": "6",
+    "tokens": 173
+   },
+   {
+    "pass": true,
+    "gold": "90",
+    "got": "90",
+    "tokens": 332
+   },
+   {
+    "pass": true,
+    "gold": "42",
+    "got": "42",
+    "tokens": 116
+   },
+   {
+    "pass": true,
+    "gold": "360",
+    "got": "360",
+    "tokens": 129
+   },
+   {
+    "pass": true,
+    "gold": "4",
+    "got": "4",
+    "tokens": 161
+   },
+   {
+    "pass": false,
+    "gold": "95200",
+    "got": "99076.92",
+    "tokens": 670
+   },
+   {
+    "pass": true,
+    "gold": "240",
+    "got": "240",
+    "tokens": 133
+   },
+   {
+    "pass": true,
+    "gold": "27",
+    "got": "27",
+    "tokens": 160
+   },
+   {
+    "pass": true,
+    "gold": "48",
+    "got": "48",
+    "tokens": 214
+   },
+   {
+    "pass": true,
+    "gold": "50",
+    "got": "50",
+    "tokens": 179
+   },
+   {
+    "pass": true,
+    "gold": "10",
+    "got": "10",
+    "tokens": 180
+   },
+   {
+    "pass": false,
+    "gold": "10",
+    "got": "7",
+    "tokens": 240
+   },
+   {
+    "pass": true,
+    "gold": "82",
+    "got": "82",
+    "tokens": 53
+   },
+   {
+    "pass": true,
+    "gold": "120",
+    "got": "120",
+    "tokens": 67
+   },
+   {
+    "pass": true,
+    "gold": "880",
+    "got": "880",
+    "tokens": 200
+   },
+   {
+    "pass": true,
+    "gold": "10000",
+    "got": "10000",
+    "tokens": 271
+   },
+   {
+    "pass": true,
+    "gold": "30",
+    "got": "30",
+    "tokens": 148
+   },
+   {
+    "pass": true,
+    "gold": "940",
+    "got": "940",
+    "tokens": 72
+   },
+   {
+    "pass": true,
+    "gold": "60",
+    "got": "60",
+    "tokens": 183
+   },
+   {
+    "pass": true,
+    "gold": "13",
+    "got": "13",
+    "tokens": 119
+   },
+   {
+    "pass": true,
+    "gold": "720",
+    "got": "720",
+    "tokens": 54
+   },
+   {
+    "pass": true,
+    "gold": "40",
+    "got": "40",
+    "tokens": 130
+   },
+   {
+    "pass": true,
+    "gold": "6",
+    "got": "6",
+    "tokens": 107
+   },
+   {
+    "pass": true,
+    "gold": "29",
+    "got": "29.00",
+    "tokens": 214
+   },
+   {
+    "pass": true,
+    "gold": "105",
+    "got": "105",
+    "tokens": 248
+   },
+   {
+    "pass": true,
+    "gold": "70",
+    "got": "70",
+    "tokens": 61
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 104
+   },
+   {
+    "pass": true,
+    "gold": "400",
+    "got": "400",
+    "tokens": 127
+   },
+   {
+    "pass": true,
+    "gold": "140",
+    "got": "140",
+    "tokens": 126
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 266
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 193
+   },
+   {
+    "pass": true,
+    "gold": "4000",
+    "got": "4000",
+    "tokens": 169
+   },
+   {
+    "pass": true,
+    "gold": "2125",
+    "got": "2125",
+    "tokens": 176
+   },
+   {
+    "pass": true,
+    "gold": "75",
+    "got": "75",
+    "tokens": 272
+   },
+   {
+    "pass": true,
+    "gold": "30",
+    "got": "30",
+    "tokens": 94
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 124
+   },
+   {
+    "pass": true,
+    "gold": "4",
+    "got": "4",
+    "tokens": 250
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 210
+   },
+   {
+    "pass": true,
+    "gold": "4",
+    "got": "4",
+    "tokens": 163
+   },
+   {
+    "pass": true,
+    "gold": "48",
+    "got": "48",
+    "tokens": 339
+   },
+   {
+    "pass": true,
+    "gold": "272",
+    "got": "272",
+    "tokens": 221
+   },
+   {
+    "pass": true,
+    "gold": "280",
+    "got": "280",
+    "tokens": 217
+   },
+   {
+    "pass": true,
+    "gold": "1400",
+    "got": "1400",
+    "tokens": 83
+   },
+   {
+    "pass": true,
+    "gold": "80",
+    "got": "80",
+    "tokens": 409
+   },
+   {
+    "pass": true,
+    "gold": "34",
+    "got": "34",
+    "tokens": 124
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 66
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 68
+   },
+   {
+    "pass": true,
+    "gold": "32",
+    "got": "32",
+    "tokens": 206
+   },
+   {
+    "pass": true,
+    "gold": "92",
+    "got": "92",
+    "tokens": 208
+   },
+   {
+    "pass": true,
+    "gold": "50",
+    "got": "50",
+    "tokens": 203
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 105
+   },
+   {
+    "pass": true,
+    "gold": "77",
+    "got": "77",
+    "tokens": 86
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 128
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 186
+   },
+   {
+    "pass": true,
+    "gold": "18",
+    "got": "18",
+    "tokens": 66
+   },
+   {
+    "pass": true,
+    "gold": "120",
+    "got": "120",
+    "tokens": 146
+   },
+   {
+    "pass": true,
+    "gold": "150",
+    "got": "150",
+    "tokens": 80
+   },
+   {
+    "pass": true,
+    "gold": "1210",
+    "got": "1210",
+    "tokens": 140
+   },
+   {
+    "pass": true,
+    "gold": "51",
+    "got": "51",
+    "tokens": 209
+   },
+   {
+    "pass": true,
+    "gold": "18000",
+    "got": "18000",
+    "tokens": 142
+   },
+   {
+    "pass": true,
+    "gold": "95",
+    "got": "95",
+    "tokens": 147
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 217
+   },
+   {
+    "pass": true,
+    "gold": "100",
+    "got": "100",
+    "tokens": 103
+   },
+   {
+    "pass": true,
+    "gold": "350",
+    "got": "350",
+    "tokens": 256
+   },
+   {
+    "pass": true,
+    "gold": "122",
+    "got": "122",
+    "tokens": 105
+   },
+   {
+    "pass": true,
+    "gold": "130",
+    "got": "130",
+    "tokens": 57
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 68
+   },
+   {
+    "pass": true,
+    "gold": "160",
+    "got": "160",
+    "tokens": 45
+   },
+   {
+    "pass": true,
+    "gold": "23",
+    "got": "23",
+    "tokens": 171
+   },
+   {
+    "pass": true,
+    "gold": "2",
+    "got": "2",
+    "tokens": 149
+   },
+   {
+    "pass": true,
+    "gold": "25",
+    "got": "25",
+    "tokens": 164
+   },
+   {
+    "pass": true,
+    "gold": "30",
+    "got": "30",
+    "tokens": 72
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 250
+   },
+   {
+    "pass": false,
+    "gold": "106",
+    "got": "106.12",
+    "tokens": 156
+   },
+   {
+    "pass": true,
+    "gold": "50",
+    "got": "50",
+    "tokens": 151
+   },
+   {
+    "pass": true,
+    "gold": "34",
+    "got": "34",
+    "tokens": 236
+   },
+   {
+    "pass": true,
+    "gold": "360",
+    "got": "360",
+    "tokens": 98
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 177
+   },
+   {
+    "pass": true,
+    "gold": "91",
+    "got": "91",
+    "tokens": 221
+   },
+   {
+    "pass": true,
+    "gold": "24",
+    "got": "24",
+    "tokens": 238
+   },
+   {
+    "pass": true,
+    "gold": "10",
+    "got": "10",
+    "tokens": 64
+   },
+   {
+    "pass": true,
+    "gold": "12",
+    "got": "12",
+    "tokens": 97
+   },
+   {
+    "pass": true,
+    "gold": "120",
+    "got": "120",
+    "tokens": 63
+   },
+   {
+    "pass": true,
+    "gold": "6277",
+    "got": "6277",
+    "tokens": 64
+   },
+   {
+    "pass": true,
+    "gold": "320",
+    "got": "320",
+    "tokens": 193
+   },
+   {
+    "pass": true,
+    "gold": "7500",
+    "got": "7500",
+    "tokens": 201
+   }
+  ]
+ },
+ "seconds": 612,
+ "usage": {
+  "calls": 364,
+  "cost": 2.9009509999999996,
+  "out_tokens": 68149,
+  "api_ms": 1190038,
+  "errors": 0
+ }
+}

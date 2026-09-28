@@ -1,0 +1,2201 @@
+{
+ "variant": "nvfp4",
+ "think": false,
+ "humaneval": {
+  "passed": 155,
+  "total": 164,
+  "rows": [
+   {
+    "id": "HumanEval/0",
+    "pass": true,
+    "err": "",
+    "tokens": 173
+   },
+   {
+    "id": "HumanEval/1",
+    "pass": true,
+    "err": "",
+    "tokens": 218
+   },
+   {
+    "id": "HumanEval/2",
+    "pass": true,
+    "err": "",
+    "tokens": 97
+   },
+   {
+    "id": "HumanEval/3",
+    "pass": true,
+    "err": "",
+    "tokens": 57
+   },
+   {
+    "id": "HumanEval/4",
+    "pass": true,
+    "err": "",
+    "tokens": 164
+   },
+   {
+    "id": "HumanEval/5",
+    "pass": true,
+    "err": "",
+    "tokens": 152
+   },
+   {
+    "id": "HumanEval/6",
+    "pass": true,
+    "err": "",
+    "tokens": 203
+   },
+   {
+    "id": "HumanEval/7",
+    "pass": true,
+    "err": "",
+    "tokens": 112
+   },
+   {
+    "id": "HumanEval/8",
+    "pass": true,
+    "err": "",
+    "tokens": 163
+   },
+   {
+    "id": "HumanEval/9",
+    "pass": true,
+    "err": "",
+    "tokens": 161
+   },
+   {
+    "id": "HumanEval/10",
+    "pass": false,
+    "err": "emp\\tmppa5y88qv.py\", line 21, in make_palindrome\n    if is_palindrome(suffix):\nNameError: name 'is_palindrome' is not defined. Did you mean: 'make_palindrome'?\n",
+    "tokens": 253
+   },
+   {
+    "id": "HumanEval/11",
+    "pass": true,
+    "err": "",
+    "tokens": 110
+   },
+   {
+    "id": "HumanEval/12",
+    "pass": true,
+    "err": "",
+    "tokens": 128
+   },
+   {
+    "id": "HumanEval/13",
+    "pass": true,
+    "err": "",
+    "tokens": 107
+   },
+   {
+    "id": "HumanEval/14",
+    "pass": true,
+    "err": "",
+    "tokens": 84
+   },
+   {
+    "id": "HumanEval/15",
+    "pass": true,
+    "err": "",
+    "tokens": 92
+   },
+   {
+    "id": "HumanEval/16",
+    "pass": true,
+    "err": "",
+    "tokens": 81
+   },
+   {
+    "id": "HumanEval/17",
+    "pass": true,
+    "err": "",
+    "tokens": 248
+   },
+   {
+    "id": "HumanEval/18",
+    "pass": true,
+    "err": "",
+    "tokens": 161
+   },
+   {
+    "id": "HumanEval/19",
+    "pass": true,
+    "err": "",
+    "tokens": 344
+   },
+   {
+    "id": "HumanEval/20",
+    "pass": true,
+    "err": "",
+    "tokens": 265
+   },
+   {
+    "id": "HumanEval/21",
+    "pass": true,
+    "err": "",
+    "tokens": 193
+   },
+   {
+    "id": "HumanEval/22",
+    "pass": true,
+    "err": "",
+    "tokens": 119
+   },
+   {
+    "id": "HumanEval/23",
+    "pass": true,
+    "err": "",
+    "tokens": 53
+   },
+   {
+    "id": "HumanEval/24",
+    "pass": true,
+    "err": "",
+    "tokens": 91
+   },
+   {
+    "id": "HumanEval/25",
+    "pass": true,
+    "err": "",
+    "tokens": 202
+   },
+   {
+    "id": "HumanEval/26",
+    "pass": true,
+    "err": "",
+    "tokens": 119
+   },
+   {
+    "id": "HumanEval/27",
+    "pass": true,
+    "err": "",
+    "tokens": 80
+   },
+   {
+    "id": "HumanEval/28",
+    "pass": true,
+    "err": "",
+    "tokens": 70
+   },
+   {
+    "id": "HumanEval/29",
+    "pass": true,
+    "err": "",
+    "tokens": 107
+   },
+   {
+    "id": "HumanEval/30",
+    "pass": true,
+    "err": "",
+    "tokens": 139
+   },
+   {
+    "id": "HumanEval/31",
+    "pass": true,
+    "err": "",
+    "tokens": 193
+   },
+   {
+    "id": "HumanEval/32",
+    "pass": true,
+    "err": "",
+    "tokens": 791
+   },
+   {
+    "id": "HumanEval/33",
+    "pass": true,
+    "err": "",
+    "tokens": 263
+   },
+   {
+    "id": "HumanEval/34",
+    "pass": true,
+    "err": "",
+    "tokens": 87
+   },
+   {
+    "id": "HumanEval/35",
+    "pass": true,
+    "err": "",
+    "tokens": 97
+   },
+   {
+    "id": "HumanEval/36",
+    "pass": true,
+    "err": "",
+    "tokens": 139
+   },
+   {
+    "id": "HumanEval/37",
+    "pass": true,
+    "err": "",
+    "tokens": 195
+   },
+   {
+    "id": "HumanEval/38",
+    "pass": false,
+    "err": "cal\\Temp\\tmphdzjtzz7.py\", line 24, in check\n    encoded_str = encode_cyclic(str)\nNameError: name 'encode_cyclic' is not defined. Did you mean: 'decode_cyclic'?\n",
+    "tokens": 143
+   },
+   {
+    "id": "HumanEval/39",
+    "pass": true,
+    "err": "",
+    "tokens": 395
+   },
+   {
+    "id": "HumanEval/40",
+    "pass": true,
+    "err": "",
+    "tokens": 247
+   },
+   {
+    "id": "HumanEval/41",
+    "pass": true,
+    "err": "",
+    "tokens": 163
+   },
+   {
+    "id": "HumanEval/42",
+    "pass": true,
+    "err": "",
+    "tokens": 132
+   },
+   {
+    "id": "HumanEval/43",
+    "pass": true,
+    "err": "",
+    "tokens": 201
+   },
+   {
+    "id": "HumanEval/44",
+    "pass": true,
+    "err": "",
+    "tokens": 157
+   },
+   {
+    "id": "HumanEval/45",
+    "pass": true,
+    "err": "",
+    "tokens": 60
+   },
+   {
+    "id": "HumanEval/46",
+    "pass": true,
+    "err": "",
+    "tokens": 646
+   },
+   {
+    "id": "HumanEval/47",
+    "pass": true,
+    "err": "",
+    "tokens": 151
+   },
+   {
+    "id": "HumanEval/48",
+    "pass": true,
+    "err": "",
+    "tokens": 87
+   },
+   {
+    "id": "HumanEval/49",
+    "pass": true,
+    "err": "",
+    "tokens": 134
+   },
+   {
+    "id": "HumanEval/50",
+    "pass": false,
+    "err": "\\Local\\Temp\\tmpvdcm_rvr.py\", line 21, in check\n    encoded_str = encode_shift(str)\nNameError: name 'encode_shift' is not defined. Did you mean: 'decode_shift'?\n",
+    "tokens": 69
+   },
+   {
+    "id": "HumanEval/51",
+    "pass": true,
+    "err": "",
+    "tokens": 166
+   },
+   {
+    "id": "HumanEval/52",
+    "pass": true,
+    "err": "",
+    "tokens": 100
+   },
+   {
+    "id": "HumanEval/53",
+    "pass": true,
+    "err": "",
+    "tokens": 63
+   },
+   {
+    "id": "HumanEval/54",
+    "pass": true,
+    "err": "",
+    "tokens": 161
+   },
+   {
+    "id": "HumanEval/55",
+    "pass": true,
+    "err": "",
+    "tokens": 126
+   },
+   {
+    "id": "HumanEval/56",
+    "pass": true,
+    "err": "",
+    "tokens": 157
+   },
+   {
+    "id": "HumanEval/57",
+    "pass": true,
+    "err": "",
+    "tokens": 168
+   },
+   {
+    "id": "HumanEval/58",
+    "pass": true,
+    "err": "",
+    "tokens": 142
+   },
+   {
+    "id": "HumanEval/59",
+    "pass": true,
+    "err": "",
+    "tokens": 199
+   },
+   {
+    "id": "HumanEval/60",
+    "pass": true,
+    "err": "",
+    "tokens": 125
+   },
+   {
+    "id": "HumanEval/61",
+    "pass": true,
+    "err": "",
+    "tokens": 156
+   },
+   {
+    "id": "HumanEval/62",
+    "pass": true,
+    "err": "",
+    "tokens": 150
+   },
+   {
+    "id": "HumanEval/63",
+    "pass": true,
+    "err": "",
+    "tokens": 239
+   },
+   {
+    "id": "HumanEval/64",
+    "pass": true,
+    "err": "",
+    "tokens": 192
+   },
+   {
+    "id": "HumanEval/65",
+    "pass": true,
+    "err": "",
+    "tokens": 150
+   },
+   {
+    "id": "HumanEval/66",
+    "pass": true,
+    "err": "",
+    "tokens": 140
+   },
+   {
+    "id": "HumanEval/67",
+    "pass": false,
+    "err": "~1.RAN\\AppData\\Local\\Temp\\tmpkca72dmw.py\", line 17, in fruit_distribution\n    oranges = int(parts[2])\nValueError: invalid literal for int() with base 10: 'and'\n",
+    "tokens": 263
+   },
+   {
+    "id": "HumanEval/68",
+    "pass": true,
+    "err": "",
+    "tokens": 472
+   },
+   {
+    "id": "HumanEval/69",
+    "pass": true,
+    "err": "",
+    "tokens": 227
+   },
+   {
+    "id": "HumanEval/70",
+    "pass": true,
+    "err": "",
+    "tokens": 70
+   },
+   {
+    "id": "HumanEval/71",
+    "pass": true,
+    "err": "",
+    "tokens": 209
+   },
+   {
+    "id": "HumanEval/72",
+    "pass": true,
+    "err": "",
+    "tokens": 254
+   },
+   {
+    "id": "HumanEval/73",
+    "pass": true,
+    "err": "",
+    "tokens": 210
+   },
+   {
+    "id": "HumanEval/74",
+    "pass": true,
+    "err": "",
+    "tokens": 68
+   },
+   {
+    "id": "HumanEval/75",
+    "pass": true,
+    "err": "",
+    "tokens": 297
+   },
+   {
+    "id": "HumanEval/76",
+    "pass": true,
+    "err": "",
+    "tokens": 902
+   },
+   {
+    "id": "HumanEval/77",
+    "pass": true,
+    "err": "",
+    "tokens": 410
+   },
+   {
+    "id": "HumanEval/78",
+    "pass": true,
+    "err": "",
+    "tokens": 368
+   },
+   {
+    "id": "HumanEval/79",
+    "pass": true,
+    "err": "",
+    "tokens": 193
+   },
+   {
+    "id": "HumanEval/80",
+    "pass": true,
+    "err": "",
+    "tokens": 194
+   },
+   {
+    "id": "HumanEval/81",
+    "pass": true,
+    "err": "",
+    "tokens": 518
+   },
+   {
+    "id": "HumanEval/82",
+    "pass": true,
+    "err": "",
+    "tokens": 140
+   },
+   {
+    "id": "HumanEval/83",
+    "pass": true,
+    "err": "",
+    "tokens": 265
+   },
+   {
+    "id": "HumanEval/84",
+    "pass": true,
+    "err": "",
+    "tokens": 180
+   },
+   {
+    "id": "HumanEval/85",
+    "pass": true,
+    "err": "",
+    "tokens": 87
+   },
+   {
+    "id": "HumanEval/86",
+    "pass": true,
+    "err": "",
+    "tokens": 199
+   },
+   {
+    "id": "HumanEval/87",
+    "pass": true,
+    "err": "",
+    "tokens": 399
+   },
+   {
+    "id": "HumanEval/88",
+    "pass": true,
+    "err": "",
+    "tokens": 75
+   },
+   {
+    "id": "HumanEval/89",
+    "pass": true,
+    "err": "",
+    "tokens": 231
+   },
+   {
+    "id": "HumanEval/90",
+    "pass": true,
+    "err": "",
+    "tokens": 168
+   },
+   {
+    "id": "HumanEval/91",
+    "pass": true,
+    "err": "",
+    "tokens": 203
+   },
+   {
+    "id": "HumanEval/92",
+    "pass": true,
+    "err": "",
+    "tokens": 62
+   },
+   {
+    "id": "HumanEval/93",
+    "pass": true,
+    "err": "",
+    "tokens": 351
+   },
+   {
+    "id": "HumanEval/94",
+    "pass": true,
+    "err": "",
+    "tokens": 464
+   },
+   {
+    "id": "HumanEval/95",
+    "pass": false,
+    "err": "ta\\Local\\Temp\\tmprydrye5t.py\", line 7, in check_dict_case\n    return allLower or allUpper\nNameError: name 'allLower' is not defined. Did you mean: 'all_lower'?\n",
+    "tokens": 80
+   },
+   {
+    "id": "HumanEval/96",
+    "pass": true,
+    "err": "",
+    "tokens": 298
+   },
+   {
+    "id": "HumanEval/97",
+    "pass": true,
+    "err": "",
+    "tokens": 139
+   },
+   {
+    "id": "HumanEval/98",
+    "pass": true,
+    "err": "",
+    "tokens": 126
+   },
+   {
+    "id": "HumanEval/99",
+    "pass": true,
+    "err": "",
+    "tokens": 218
+   },
+   {
+    "id": "HumanEval/100",
+    "pass": true,
+    "err": "",
+    "tokens": 198
+   },
+   {
+    "id": "HumanEval/101",
+    "pass": true,
+    "err": "",
+    "tokens": 149
+   },
+   {
+    "id": "HumanEval/102",
+    "pass": true,
+    "err": "",
+    "tokens": 172
+   },
+   {
+    "id": "HumanEval/103",
+    "pass": true,
+    "err": "",
+    "tokens": 262
+   },
+   {
+    "id": "HumanEval/104",
+    "pass": true,
+    "err": "",
+    "tokens": 184
+   },
+   {
+    "id": "HumanEval/105",
+    "pass": true,
+    "err": "",
+    "tokens": 132
+   },
+   {
+    "id": "HumanEval/106",
+    "pass": true,
+    "err": "",
+    "tokens": 231
+   },
+   {
+    "id": "HumanEval/107",
+    "pass": true,
+    "err": "",
+    "tokens": 307
+   },
+   {
+    "id": "HumanEval/108",
+    "pass": true,
+    "err": "",
+    "tokens": 288
+   },
+   {
+    "id": "HumanEval/109",
+    "pass": true,
+    "err": "",
+    "tokens": 417
+   },
+   {
+    "id": "HumanEval/110",
+    "pass": true,
+    "err": "",
+    "tokens": 284
+   },
+   {
+    "id": "HumanEval/111",
+    "pass": true,
+    "err": "",
+    "tokens": 239
+   },
+   {
+    "id": "HumanEval/112",
+    "pass": true,
+    "err": "",
+    "tokens": 52
+   },
+   {
+    "id": "HumanEval/113",
+    "pass": true,
+    "err": "",
+    "tokens": 260
+   },
+   {
+    "id": "HumanEval/114",
+    "pass": true,
+    "err": "",
+    "tokens": 158
+   },
+   {
+    "id": "HumanEval/115",
+    "pass": true,
+    "err": "",
+    "tokens": 383
+   },
+   {
+    "id": "HumanEval/116",
+    "pass": true,
+    "err": "",
+    "tokens": 199
+   },
+   {
+    "id": "HumanEval/117",
+    "pass": true,
+    "err": "",
+    "tokens": 290
+   },
+   {
+    "id": "HumanEval/118",
+    "pass": true,
+    "err": "",
+    "tokens": 180
+   },
+   {
+    "id": "HumanEval/119",
+    "pass": true,
+    "err": "",
+    "tokens": 231
+   },
+   {
+    "id": "HumanEval/120",
+    "pass": true,
+    "err": "",
+    "tokens": 277
+   },
+   {
+    "id": "HumanEval/121",
+    "pass": true,
+    "err": "",
+    "tokens": 136
+   },
+   {
+    "id": "HumanEval/122",
+    "pass": true,
+    "err": "",
+    "tokens": 185
+   },
+   {
+    "id": "HumanEval/123",
+    "pass": true,
+    "err": "",
+    "tokens": 318
+   },
+   {
+    "id": "HumanEval/124",
+    "pass": true,
+    "err": "",
+    "tokens": 574
+   },
+   {
+    "id": "HumanEval/125",
+    "pass": true,
+    "err": "",
+    "tokens": 95
+   },
+   {
+    "id": "HumanEval/126",
+    "pass": true,
+    "err": "",
+    "tokens": 349
+   },
+   {
+    "id": "HumanEval/127",
+    "pass": false,
+    "err": "k(intersection)\n  File \"C:\\Users\\LUCAS~1.RAN\\AppData\\Local\\Temp\\tmpugpwtywo.py\", line 51, in check\n    assert candidate((-1, 1), (0, 4)) == \"NO\"\nAssertionError\n",
+    "tokens": 416
+   },
+   {
+    "id": "HumanEval/128",
+    "pass": true,
+    "err": "",
+    "tokens": 218
+   },
+   {
+    "id": "HumanEval/129",
+    "pass": true,
+    "err": "",
+    "tokens": 735
+   },
+   {
+    "id": "HumanEval/130",
+    "pass": true,
+    "err": "",
+    "tokens": 778
+   },
+   {
+    "id": "HumanEval/131",
+    "pass": true,
+    "err": "",
+    "tokens": 143
+   },
+   {
+    "id": "HumanEval/132",
+    "pass": false,
+    "err": "le>\n    check(is_nested)\n  File \"C:\\Users\\LUCAS~1.RAN\\AppData\\Local\\Temp\\tmp5pcpqya9.py\", line 39, in check\n    assert candidate('[[]') == False\nAssertionError\n",
+    "tokens": 217
+   },
+   {
+    "id": "HumanEval/133",
+    "pass": true,
+    "err": "",
+    "tokens": 204
+   },
+   {
+    "id": "HumanEval/134",
+    "pass": true,
+    "err": "",
+    "tokens": 523
+   },
+   {
+    "id": "HumanEval/135",
+    "pass": true,
+    "err": "",
+    "tokens": 147
+   },
+   {
+    "id": "HumanEval/136",
+    "pass": true,
+    "err": "",
+    "tokens": 80
+   },
+   {
+    "id": "HumanEval/137",
+    "pass": true,
+    "err": "",
+    "tokens": 232
+   },
+   {
+    "id": "HumanEval/138",
+    "pass": true,
+    "err": "",
+    "tokens": 209
+   },
+   {
+    "id": "HumanEval/139",
+    "pass": true,
+    "err": "",
+    "tokens": 140
+   },
+   {
+    "id": "HumanEval/140",
+    "pass": true,
+    "err": "",
+    "tokens": 267
+   },
+   {
+    "id": "HumanEval/141",
+    "pass": true,
+    "err": "",
+    "tokens": 408
+   },
+   {
+    "id": "HumanEval/142",
+    "pass": true,
+    "err": "",
+    "tokens": 78
+   },
+   {
+    "id": "HumanEval/143",
+    "pass": true,
+    "err": "",
+    "tokens": 282
+   },
+   {
+    "id": "HumanEval/144",
+    "pass": true,
+    "err": "",
+    "tokens": 222
+   },
+   {
+    "id": "HumanEval/145",
+    "pass": false,
+    "err": "\"C:\\Users\\LUCAS~1.RAN\\AppData\\Local\\Temp\\tmp_6tm4lvc.py\", line 21, in check\n    assert candidate([1, 11, -1, -11, -12]) == [-1, -11, 1, -12, 11]\nAssertionError\n",
+    "tokens": 170
+   },
+   {
+    "id": "HumanEval/146",
+    "pass": true,
+    "err": "",
+    "tokens": 92
+   },
+   {
+    "id": "HumanEval/147",
+    "pass": false,
+    "err": "  File \"C:\\Users\\LUCAS~1.RAN\\AppData\\Local\\Temp\\tmpdrqm21px.py\", line 1\n    ```python\n    ^\nSyntaxError: invalid syntax\n",
+    "tokens": 1024
+   },
+   {
+    "id": "HumanEval/148",
+    "pass": true,
+    "err": "",
+    "tokens": 129
+   },
+   {
+    "id": "HumanEval/149",
+    "pass": true,
+    "err": "",
+    "tokens": 237
+   },
+   {
+    "id": "HumanEval/150",
+    "pass": true,
+    "err": "",
+    "tokens": 144
+   },
+   {
+    "id": "HumanEval/151",
+    "pass": true,
+    "err": "",
+    "tokens": 196
+   },
+   {
+    "id": "HumanEval/152",
+    "pass": true,
+    "err": "",
+    "tokens": 31
+   },
+   {
+    "id": "HumanEval/153",
+    "pass": true,
+    "err": "",
+    "tokens": 83
+   },
+   {
+    "id": "HumanEval/154",
+    "pass": true,
+    "err": "",
+    "tokens": 188
+   },
+   {
+    "id": "HumanEval/155",
+    "pass": true,
+    "err": "",
+    "tokens": 130
+   },
+   {
+    "id": "HumanEval/156",
+    "pass": true,
+    "err": "",
+    "tokens": 259
+   },
+   {
+    "id": "HumanEval/157",
+    "pass": true,
+    "err": "",
+    "tokens": 152
+   },
+   {
+    "id": "HumanEval/158",
+    "pass": true,
+    "err": "",
+    "tokens": 188
+   },
+   {
+    "id": "HumanEval/159",
+    "pass": true,
+    "err": "",
+    "tokens": 341
+   },
+   {
+    "id": "HumanEval/160",
+    "pass": true,
+    "err": "",
+    "tokens": 273
+   },
+   {
+    "id": "HumanEval/161",
+    "pass": true,
+    "err": "",
+    "tokens": 180
+   },
+   {
+    "id": "HumanEval/162",
+    "pass": true,
+    "err": "",
+    "tokens": 121
+   },
+   {
+    "id": "HumanEval/163",
+    "pass": true,
+    "err": "",
+    "tokens": 178
+   }
+  ]
+ },
+ "gsm8k": {
+  "passed": 191,
+  "total": 200,
+  "rows": [
+   {
+    "pass": true,
+    "gold": "18",
+    "got": "18",
+    "tokens": 276
+   },
+   {
+    "pass": true,
+    "gold": "3",
+    "got": "3",
+    "tokens": 189
+   },
+   {
+    "pass": true,
+    "gold": "70000",
+    "got": "70000",
+    "tokens": 695
+   },
+   {
+    "pass": true,
+    "gold": "540",
+    "got": "540",
+    "tokens": 264
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 235
+   },
+   {
+    "pass": true,
+    "gold": "64",
+    "got": "64",
+    "tokens": 653
+   },
+   {
+    "pass": true,
+    "gold": "260",
+    "got": "260",
+    "tokens": 370
+   },
+   {
+    "pass": true,
+    "gold": "160",
+    "got": "160",
+    "tokens": 464
+   },
+   {
+    "pass": true,
+    "gold": "45",
+    "got": "45",
+    "tokens": 702
+   },
+   {
+    "pass": true,
+    "gold": "460",
+    "got": "460",
+    "tokens": 378
+   },
+   {
+    "pass": true,
+    "gold": "366",
+    "got": "366",
+    "tokens": 464
+   },
+   {
+    "pass": true,
+    "gold": "694",
+    "got": "694",
+    "tokens": 446
+   },
+   {
+    "pass": false,
+    "gold": "13",
+    "got": null,
+    "tokens": 1024
+   },
+   {
+    "pass": true,
+    "gold": "18",
+    "got": "18",
+    "tokens": 491
+   },
+   {
+    "pass": true,
+    "gold": "60",
+    "got": "60",
+    "tokens": 432
+   },
+   {
+    "pass": true,
+    "gold": "125",
+    "got": "125",
+    "tokens": 340
+   },
+   {
+    "pass": true,
+    "gold": "230",
+    "got": "230",
+    "tokens": 256
+   },
+   {
+    "pass": true,
+    "gold": "57500",
+    "got": "57500",
+    "tokens": 363
+   },
+   {
+    "pass": true,
+    "gold": "7",
+    "got": "7",
+    "tokens": 255
+   },
+   {
+    "pass": true,
+    "gold": "6",
+    "got": "6",
+    "tokens": 466
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 608
+   },
+   {
+    "pass": true,
+    "gold": "14",
+    "got": "14",
+    "tokens": 302
+   },
+   {
+    "pass": true,
+    "gold": "7",
+    "got": "7",
+    "tokens": 209
+   },
+   {
+    "pass": true,
+    "gold": "8",
+    "got": "8",
+    "tokens": 214
+   },
+   {
+    "pass": true,
+    "gold": "26",
+    "got": "26",
+    "tokens": 398
+   },
+   {
+    "pass": true,
+    "gold": "2",
+    "got": "2",
+    "tokens": 503
+   },
+   {
+    "pass": true,
+    "gold": "243",
+    "got": "243",
+    "tokens": 582
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 248
+   },
+   {
+    "pass": true,
+    "gold": "25",
+    "got": "25",
+    "tokens": 305
+   },
+   {
+    "pass": true,
+    "gold": "104",
+    "got": "104",
+    "tokens": 242
+   },
+   {
+    "pass": true,
+    "gold": "109",
+    "got": "109",
+    "tokens": 357
+   },
+   {
+    "pass": true,
+    "gold": "80",
+    "got": "80",
+    "tokens": 322
+   },
+   {
+    "pass": true,
+    "gold": "35",
+    "got": "35",
+    "tokens": 217
+   },
+   {
+    "pass": true,
+    "gold": "70",
+    "got": "70",
+    "tokens": 295
+   },
+   {
+    "pass": true,
+    "gold": "23",
+    "got": "23",
+    "tokens": 262
+   },
+   {
+    "pass": true,
+    "gold": "9",
+    "got": "9",
+    "tokens": 264
+   },
+   {
+    "pass": true,
+    "gold": "75",
+    "got": "75",
+    "tokens": 374
+   },
+   {
+    "pass": true,
+    "gold": "2",
+    "got": "2",
+    "tokens": 341
+   },
+   {
+    "pass": true,
+    "gold": "10",
+    "got": "10",
+    "tokens": 441
+   },
+   {
+    "pass": true,
+    "gold": "18",
+    "got": "18",
+    "tokens": 597
+   },
+   {
+    "pass": true,
+    "gold": "8",
+    "got": "8",
+    "tokens": 287
+   },
+   {
+    "pass": true,
+    "gold": "200",
+    "got": "200",
+    "tokens": 414
+   },
+   {
+    "pass": true,
+    "gold": "26",
+    "got": "26",
+    "tokens": 210
+   },
+   {
+    "pass": true,
+    "gold": "48",
+    "got": "48",
+    "tokens": 562
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 319
+   },
+   {
+    "pass": true,
+    "gold": "104",
+    "got": "104",
+    "tokens": 770
+   },
+   {
+    "pass": true,
+    "gold": "163",
+    "got": "163",
+    "tokens": 401
+   },
+   {
+    "pass": true,
+    "gold": "800",
+    "got": "800",
+    "tokens": 451
+   },
+   {
+    "pass": true,
+    "gold": "8",
+    "got": "8",
+    "tokens": 208
+   },
+   {
+    "pass": true,
+    "gold": "30",
+    "got": "30",
+    "tokens": 250
+   },
+   {
+    "pass": true,
+    "gold": "294",
+    "got": "294",
+    "tokens": 294
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 242
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 355
+   },
+   {
+    "pass": true,
+    "gold": "40",
+    "got": "40",
+    "tokens": 366
+   },
+   {
+    "pass": true,
+    "gold": "40",
+    "got": "40",
+    "tokens": 340
+   },
+   {
+    "pass": true,
+    "gold": "14",
+    "got": "14",
+    "tokens": 154
+   },
+   {
+    "pass": true,
+    "gold": "3",
+    "got": "3",
+    "tokens": 251
+   },
+   {
+    "pass": true,
+    "gold": "83",
+    "got": "83",
+    "tokens": 390
+   },
+   {
+    "pass": true,
+    "gold": "57",
+    "got": "57.00",
+    "tokens": 295
+   },
+   {
+    "pass": true,
+    "gold": "187",
+    "got": "187",
+    "tokens": 180
+   },
+   {
+    "pass": true,
+    "gold": "17",
+    "got": "17",
+    "tokens": 358
+   },
+   {
+    "pass": true,
+    "gold": "1430",
+    "got": "1430",
+    "tokens": 313
+   },
+   {
+    "pass": false,
+    "gold": "25000",
+    "got": null,
+    "tokens": 1024
+   },
+   {
+    "pass": true,
+    "gold": "1596",
+    "got": "1596",
+    "tokens": 464
+   },
+   {
+    "pass": true,
+    "gold": "300",
+    "got": "300",
+    "tokens": 315
+   },
+   {
+    "pass": true,
+    "gold": "36",
+    "got": "36",
+    "tokens": 256
+   },
+   {
+    "pass": true,
+    "gold": "48",
+    "got": "48",
+    "tokens": 390
+   },
+   {
+    "pass": true,
+    "gold": "595",
+    "got": "595",
+    "tokens": 391
+   },
+   {
+    "pass": true,
+    "gold": "36",
+    "got": "36",
+    "tokens": 314
+   },
+   {
+    "pass": true,
+    "gold": "60",
+    "got": "60",
+    "tokens": 298
+   },
+   {
+    "pass": true,
+    "gold": "7425",
+    "got": "7425",
+    "tokens": 493
+   },
+   {
+    "pass": true,
+    "gold": "60",
+    "got": "60",
+    "tokens": 209
+   },
+   {
+    "pass": true,
+    "gold": "221",
+    "got": "221",
+    "tokens": 268
+   },
+   {
+    "pass": true,
+    "gold": "255",
+    "got": "255",
+    "tokens": 347
+   },
+   {
+    "pass": true,
+    "gold": "88",
+    "got": "88",
+    "tokens": 461
+   },
+   {
+    "pass": true,
+    "gold": "60",
+    "got": "60",
+    "tokens": 547
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 463
+   },
+   {
+    "pass": true,
+    "gold": "100",
+    "got": "100",
+    "tokens": 376
+   },
+   {
+    "pass": true,
+    "gold": "6",
+    "got": "6",
+    "tokens": 369
+   },
+   {
+    "pass": true,
+    "gold": "70",
+    "got": "70",
+    "tokens": 162
+   },
+   {
+    "pass": true,
+    "gold": "10",
+    "got": "10",
+    "tokens": 268
+   },
+   {
+    "pass": true,
+    "gold": "17",
+    "got": "17",
+    "tokens": 251
+   },
+   {
+    "pass": true,
+    "gold": "623",
+    "got": "623",
+    "tokens": 340
+   },
+   {
+    "pass": true,
+    "gold": "600",
+    "got": "600",
+    "tokens": 189
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 284
+   },
+   {
+    "pass": false,
+    "gold": "44",
+    "got": "48",
+    "tokens": 369
+   },
+   {
+    "pass": true,
+    "gold": "22",
+    "got": "22",
+    "tokens": 347
+   },
+   {
+    "pass": true,
+    "gold": "9360",
+    "got": "9360",
+    "tokens": 772
+   },
+   {
+    "pass": true,
+    "gold": "8000",
+    "got": "8000",
+    "tokens": 288
+   },
+   {
+    "pass": true,
+    "gold": "24",
+    "got": "24",
+    "tokens": 195
+   },
+   {
+    "pass": true,
+    "gold": "225",
+    "got": "225",
+    "tokens": 348
+   },
+   {
+    "pass": true,
+    "gold": "28",
+    "got": "28",
+    "tokens": 326
+   },
+   {
+    "pass": true,
+    "gold": "4",
+    "got": "4",
+    "tokens": 306
+   },
+   {
+    "pass": false,
+    "gold": "36",
+    "got": "36.36",
+    "tokens": 887
+   },
+   {
+    "pass": true,
+    "gold": "348",
+    "got": "348",
+    "tokens": 427
+   },
+   {
+    "pass": true,
+    "gold": "40",
+    "got": "40",
+    "tokens": 346
+   },
+   {
+    "pass": true,
+    "gold": "3",
+    "got": "3",
+    "tokens": 244
+   },
+   {
+    "pass": true,
+    "gold": "12",
+    "got": "12",
+    "tokens": 447
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 298
+   },
+   {
+    "pass": true,
+    "gold": "58",
+    "got": "58",
+    "tokens": 310
+   },
+   {
+    "pass": true,
+    "gold": "175",
+    "got": "175",
+    "tokens": 481
+   },
+   {
+    "pass": true,
+    "gold": "6",
+    "got": "6",
+    "tokens": 258
+   },
+   {
+    "pass": true,
+    "gold": "26",
+    "got": "26",
+    "tokens": 489
+   },
+   {
+    "pass": true,
+    "gold": "140",
+    "got": "140",
+    "tokens": 401
+   },
+   {
+    "pass": true,
+    "gold": "500",
+    "got": "500",
+    "tokens": 350
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 108
+   },
+   {
+    "pass": true,
+    "gold": "72",
+    "got": "72",
+    "tokens": 576
+   },
+   {
+    "pass": true,
+    "gold": "3",
+    "got": "3",
+    "tokens": 498
+   },
+   {
+    "pass": true,
+    "gold": "50",
+    "got": "50",
+    "tokens": 389
+   },
+   {
+    "pass": true,
+    "gold": "28",
+    "got": "28",
+    "tokens": 282
+   },
+   {
+    "pass": true,
+    "gold": "45",
+    "got": "45",
+    "tokens": 326
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 486
+   },
+   {
+    "pass": true,
+    "gold": "24",
+    "got": "24",
+    "tokens": 199
+   },
+   {
+    "pass": true,
+    "gold": "25",
+    "got": "25",
+    "tokens": 157
+   },
+   {
+    "pass": true,
+    "gold": "6",
+    "got": "6",
+    "tokens": 307
+   },
+   {
+    "pass": true,
+    "gold": "90",
+    "got": "90",
+    "tokens": 577
+   },
+   {
+    "pass": true,
+    "gold": "42",
+    "got": "42",
+    "tokens": 321
+   },
+   {
+    "pass": true,
+    "gold": "360",
+    "got": "360",
+    "tokens": 149
+   },
+   {
+    "pass": true,
+    "gold": "4",
+    "got": "4",
+    "tokens": 352
+   },
+   {
+    "pass": false,
+    "gold": "95200",
+    "got": null,
+    "tokens": 1024
+   },
+   {
+    "pass": true,
+    "gold": "240",
+    "got": "240",
+    "tokens": 189
+   },
+   {
+    "pass": true,
+    "gold": "27",
+    "got": "27",
+    "tokens": 225
+   },
+   {
+    "pass": true,
+    "gold": "48",
+    "got": "48",
+    "tokens": 344
+   },
+   {
+    "pass": true,
+    "gold": "50",
+    "got": "50",
+    "tokens": 415
+   },
+   {
+    "pass": true,
+    "gold": "10",
+    "got": "10",
+    "tokens": 279
+   },
+   {
+    "pass": true,
+    "gold": "10",
+    "got": "10",
+    "tokens": 440
+   },
+   {
+    "pass": true,
+    "gold": "82",
+    "got": "82",
+    "tokens": 205
+   },
+   {
+    "pass": true,
+    "gold": "120",
+    "got": "120",
+    "tokens": 273
+   },
+   {
+    "pass": true,
+    "gold": "880",
+    "got": "880",
+    "tokens": 432
+   },
+   {
+    "pass": true,
+    "gold": "10000",
+    "got": "10000",
+    "tokens": 447
+   },
+   {
+    "pass": true,
+    "gold": "30",
+    "got": "30",
+    "tokens": 201
+   },
+   {
+    "pass": true,
+    "gold": "940",
+    "got": "940",
+    "tokens": 266
+   },
+   {
+    "pass": true,
+    "gold": "60",
+    "got": "60",
+    "tokens": 251
+   },
+   {
+    "pass": true,
+    "gold": "13",
+    "got": "13",
+    "tokens": 301
+   },
+   {
+    "pass": true,
+    "gold": "720",
+    "got": "720",
+    "tokens": 259
+   },
+   {
+    "pass": true,
+    "gold": "40",
+    "got": "40",
+    "tokens": 303
+   },
+   {
+    "pass": true,
+    "gold": "6",
+    "got": "6",
+    "tokens": 184
+   },
+   {
+    "pass": true,
+    "gold": "29",
+    "got": "29.00",
+    "tokens": 440
+   },
+   {
+    "pass": true,
+    "gold": "105",
+    "got": "105",
+    "tokens": 556
+   },
+   {
+    "pass": false,
+    "gold": "70",
+    "got": null,
+    "tokens": 1024
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 379
+   },
+   {
+    "pass": true,
+    "gold": "400",
+    "got": "400",
+    "tokens": 462
+   },
+   {
+    "pass": true,
+    "gold": "140",
+    "got": "140",
+    "tokens": 184
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 376
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 324
+   },
+   {
+    "pass": true,
+    "gold": "4000",
+    "got": "4000",
+    "tokens": 244
+   },
+   {
+    "pass": true,
+    "gold": "2125",
+    "got": "2125",
+    "tokens": 406
+   },
+   {
+    "pass": true,
+    "gold": "75",
+    "got": "75",
+    "tokens": 505
+   },
+   {
+    "pass": true,
+    "gold": "30",
+    "got": "30",
+    "tokens": 164
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 253
+   },
+   {
+    "pass": true,
+    "gold": "4",
+    "got": "4",
+    "tokens": 553
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 400
+   },
+   {
+    "pass": true,
+    "gold": "4",
+    "got": "4",
+    "tokens": 190
+   },
+   {
+    "pass": true,
+    "gold": "48",
+    "got": "48",
+    "tokens": 667
+   },
+   {
+    "pass": true,
+    "gold": "272",
+    "got": "272",
+    "tokens": 482
+   },
+   {
+    "pass": true,
+    "gold": "280",
+    "got": "280",
+    "tokens": 371
+   },
+   {
+    "pass": true,
+    "gold": "1400",
+    "got": "1400",
+    "tokens": 236
+   },
+   {
+    "pass": true,
+    "gold": "80",
+    "got": "80",
+    "tokens": 970
+   },
+   {
+    "pass": true,
+    "gold": "34",
+    "got": "34",
+    "tokens": 318
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 206
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 276
+   },
+   {
+    "pass": true,
+    "gold": "32",
+    "got": "32",
+    "tokens": 317
+   },
+   {
+    "pass": true,
+    "gold": "92",
+    "got": "92",
+    "tokens": 520
+   },
+   {
+    "pass": true,
+    "gold": "50",
+    "got": "50",
+    "tokens": 386
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 279
+   },
+   {
+    "pass": true,
+    "gold": "77",
+    "got": "77",
+    "tokens": 325
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 310
+   },
+   {
+    "pass": true,
+    "gold": "16",
+    "got": "16",
+    "tokens": 434
+   },
+   {
+    "pass": true,
+    "gold": "18",
+    "got": "18",
+    "tokens": 186
+   },
+   {
+    "pass": true,
+    "gold": "120",
+    "got": "120",
+    "tokens": 257
+   },
+   {
+    "pass": true,
+    "gold": "150",
+    "got": "150",
+    "tokens": 403
+   },
+   {
+    "pass": true,
+    "gold": "1210",
+    "got": "1210",
+    "tokens": 298
+   },
+   {
+    "pass": true,
+    "gold": "51",
+    "got": "51",
+    "tokens": 580
+   },
+   {
+    "pass": true,
+    "gold": "18000",
+    "got": "18000",
+    "tokens": 422
+   },
+   {
+    "pass": true,
+    "gold": "95",
+    "got": "95",
+    "tokens": 547
+   },
+   {
+    "pass": true,
+    "gold": "15",
+    "got": "15",
+    "tokens": 322
+   },
+   {
+    "pass": true,
+    "gold": "100",
+    "got": "100",
+    "tokens": 201
+   },
+   {
+    "pass": true,
+    "gold": "350",
+    "got": "350",
+    "tokens": 483
+   },
+   {
+    "pass": true,
+    "gold": "122",
+    "got": "122",
+    "tokens": 394
+   },
+   {
+    "pass": true,
+    "gold": "130",
+    "got": "130",
+    "tokens": 187
+   },
+   {
+    "pass": true,
+    "gold": "20",
+    "got": "20",
+    "tokens": 219
+   },
+   {
+    "pass": false,
+    "gold": "160",
+    "got": null,
+    "tokens": 1024
+   },
+   {
+    "pass": true,
+    "gold": "23",
+    "got": "23",
+    "tokens": 475
+   },
+   {
+    "pass": true,
+    "gold": "2",
+    "got": "2",
+    "tokens": 590
+   },
+   {
+    "pass": false,
+    "gold": "25",
+    "got": null,
+    "tokens": 1024
+   },
+   {
+    "pass": true,
+    "gold": "30",
+    "got": "30",
+    "tokens": 227
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 480
+   },
+   {
+    "pass": false,
+    "gold": "106",
+    "got": null,
+    "tokens": 1024
+   },
+   {
+    "pass": true,
+    "gold": "50",
+    "got": "50",
+    "tokens": 338
+   },
+   {
+    "pass": true,
+    "gold": "34",
+    "got": "34",
+    "tokens": 432
+   },
+   {
+    "pass": true,
+    "gold": "360",
+    "got": "360",
+    "tokens": 204
+   },
+   {
+    "pass": true,
+    "gold": "5",
+    "got": "5",
+    "tokens": 156
+   },
+   {
+    "pass": true,
+    "gold": "91",
+    "got": "91",
+    "tokens": 374
+   },
+   {
+    "pass": true,
+    "gold": "24",
+    "got": "24",
+    "tokens": 374
+   },
+   {
+    "pass": true,
+    "gold": "10",
+    "got": "10",
+    "tokens": 210
+   },
+   {
+    "pass": true,
+    "gold": "12",
+    "got": "12",
+    "tokens": 256
+   },
+   {
+    "pass": true,
+    "gold": "120",
+    "got": "120",
+    "tokens": 248
+   },
+   {
+    "pass": true,
+    "gold": "6277",
+    "got": "6277",
+    "tokens": 202
+   },
+   {
+    "pass": true,
+    "gold": "320",
+    "got": "320",
+    "tokens": 430
+   },
+   {
+    "pass": true,
+    "gold": "7500",
+    "got": "7500",
+    "tokens": 388
+   }
+  ]
+ },
+ "seconds": 1043
+}

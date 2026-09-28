@@ -6,7 +6,7 @@ import suite
 sizes = [int(x) for x in sys.argv[1:]] or [16000, 22000, 26000, 30000]
 rows = []
 for t in sizes:
-    for seed in (1, 2, 3):
+    for seed in range(1, int(os.environ.get('SEEDS', '3')) + 1):
         needle = f"CODIGO-SECRETO-{40000 + t % 997 + seed}"
         hay = suite.filler(t, seed); pos = len(hay) // 2
         hay = hay[:pos] + f"\n\nA senha do cofre e {needle}.\n\n" + hay[pos:]

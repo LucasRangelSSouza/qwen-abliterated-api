@@ -1,0 +1,66 @@
+[
+ {
+  "target": 32000,
+  "seed": 1,
+  "prompt_tokens": 30074,
+  "ttft": 12.32058334350586,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40097"
+ },
+ {
+  "target": 32000,
+  "seed": 2,
+  "prompt_tokens": 30186,
+  "ttft": 12.730786323547363,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40098"
+ },
+ {
+  "target": 64000,
+  "seed": 1,
+  "prompt_tokens": 59910,
+  "ttft": 33.93402910232544,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40193"
+ },
+ {
+  "target": 64000,
+  "seed": 2,
+  "prompt_tokens": 59943,
+  "ttft": 31.62356686592102,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40194"
+ },
+ {
+  "target": 100000,
+  "seed": 1,
+  "prompt_tokens": 93487,
+  "ttft": 61.792534589767456,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40301"
+ },
+ {
+  "target": 100000,
+  "seed": 2,
+  "prompt_tokens": 93490,
+  "ttft": 58.404804706573486,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40302"
+ },
+ {
+  "target": 150000,
+  "seed": 1,
+  "prompt_tokens": 140193,
+  "ttft": 100.66616368293762,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40451"
+ },
+ {
+  "target": 150000,
+  "seed": 2,
+  "prompt_tokens": 139936,
+  "ttft": 98.25630021095276,
+  "ok": true,
+  "head": "CODIGO-SECRETO-40452"
+ }
+]

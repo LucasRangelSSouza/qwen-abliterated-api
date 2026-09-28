@@ -1,0 +1,88 @@
+09:44:35 bf16 present
+09:44:35 == deploy fp8-160k {'TARGET_DIR': '/workspace/models/bf16', 'QUANT': 'fp8', 'MAX_LEN': '160000'}
+09:52:55 deploy fp8-160k: AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.) ready_after=487s total=496s
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+root@79.101.2.169: Permission denied (publickey).
+09:52:55 run C:\Users\lucas.rangel\AppData\Local\Programs\Python\Python310\python.exe -u tests/suite.py --out reports/run-fp8-160k.json
+--- 09:58:21 previous entries above were an aborted run (ssh key dropped); results discarded
+09:58:23 bf16 present
+09:58:23 == deploy fp8-160k {'TARGET_DIR': '/workspace/models/bf16', 'QUANT': 'fp8', 'MAX_LEN': '160000'}
+09:58:35 deploy fp8-160k: AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.) ready_after=3s total=9s
+(EngineCore pid=18894) INFO 09-28 12:58:48 [model_runner.py:428] Model loading took 31.83 GiB memory and 365.557344 seconds
+(EngineCore pid=18894) INFO 09-28 13:00:04 [gpu_worker.py:640] Available KV cache memory: 34.78 GiB
+(EngineCore pid=18894) INFO 09-28 13:00:04 [kv_cache_utils.py:2395] GPU KV cache size: 402,479 tokens, Maximum concurrency for 160,000 tokens per request: 2.52x
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+09:58:35 run C:\Users\lucas.rangel\AppData\Local\Programs\Python\Python310\python.exe -u tests/suite.py --out reports/run-fp8-160k.json
+10:22:03 : 9, "total": 10, "rows": [{"task": "fizzbuzz", "pass": true, "tokens": 81, "decode_tps": 41.81868169530858, "err": ""}, {"task": "is_palindrome", "pass": true, "tokens": 39, "decode_tps": 63.746357703566446, "err": ""}, {"task": "merge_intervals", "pass": true, "tokens": 10
+[tools] 4s {"status": 200, "tool_calls": [{"name": "get_weather", "arguments": "{\"city\": \"Sao Paulo\"}"}], "pass": true}
+[context] 165s {"~2000": {"prompt_tokens": 2163, "ttft": 2.892976442972819, "found": 3, "of": 3}, "~8000": {"prompt_tokens": 7749, "ttft": 7.356988747914632, "found": 3, "of": 3}, "~16000": {"prompt_tokens": 15207, "ttft": 9.912268479665121, "found": 3, "of": 3}, "~24000": {"prompt_tokens": 22677, "ttft": 17.50216
+[concurrency] 62s {"c=1": {"ok": 1, "aggregate_tps": 31.2, "per_req_tps": {"n": 1, "mean": 38.53, "min": 38.53, "max": 38.53}, "ttft": {"n": 1, "mean": 1.58, "min": 1.58, "max": 1.58}, "wall": 8.3}, "c=2": {"ok": 2, "aggregate_tps": 22.0, "per_req_tps": {"n": 2, "mean": 38.19, "min": 37.96, "max": 38.42}, "ttft": {"n
+[longgen] 224s {"status": 200, "tokens": 4096, "decode_tps": 18.453235796180145, "ttft": 1.993288516998291, "finish": "length"}
+[prefix_cache] 14s {"first_ttft": 8.822053670883179, "second_ttft": 2.1826062202453613, "prompt_tokens": 11476, "pass": true}
+[default_thinking] 3s {"reasoning_chars": 142, "content": "\n\n144", "ttft": 1.1127822399139404}
+[stability] 63s {"requests": 60, "ok": 60, "errors": 0, "p50": 3.62, "p95": 6.56}
+saved reports/run-fp8-160k.json
+
+10:22:03 run C:\Users\lucas.rangel\AppData\Local\Programs\Python\Python310\python.exe -u tests/longctx.py 32000 64000 100000 150000
+10:29:02 32000 1 30074 12.3 OK
+32000 2 30186 12.7 OK
+64000 1 59910 33.9 OK
+64000 2 59943 31.6 OK
+100000 1 93487 61.8 OK
+100000 2 93490 58.4 OK
+150000 1 140193 100.7 OK
+150000 2 139936 98.3 OK
+
+10:29:02 == deploy nvfp4-160k {'MAX_LEN': '160000'}
+10:34:37 deploy nvfp4-160k: AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.) ready_after=323s total=332s
+(EngineCore pid=20713) INFO 09-28 13:40:24 [model_runner.py:428] Model loading took 31.46 GiB memory and 197.331961 seconds
+(EngineCore pid=20713) INFO 09-28 13:41:26 [gpu_worker.py:640] Available KV cache memory: 34.29 GiB
+(EngineCore pid=20713) INFO 09-28 13:41:26 [kv_cache_utils.py:2395] GPU KV cache size: 396,785 tokens, Maximum concurrency for 160,000 tokens per request: 2.48x
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+10:34:37 run C:\Users\lucas.rangel\AppData\Local\Programs\Python\Python310\python.exe -u tests/longctx.py 32000 64000 100000 150000
+10:43:42 32000 1 29804 25.1 OK
+32000 2 29916 23.0 OK
+64000 1 59640 47.4 OK
+64000 2 59673 48.0 OK
+100000 1 93217 75.8 OK
+100000 2 93220 73.3 OK
+150000 1 139923 121.4 OK
+150000 2 139666 120.0 OK
+
+10:43:42 QUEUE DONE
+10:44:01 quality queue: first queue finished
+10:44:01 run C:\Users\lucas.rangel\AppData\Local\Programs\Python\Python310\python.exe -u tests/quality.py nvfp4
+11:04:24 humaneval 155/164  (341s)
+gsm8k 191/200  (1043s)
+saved quality + fidelity for nvfp4
+
+11:04:24 == deploy fp8-160k {'TARGET_DIR': '/workspace/models/bf16', 'QUANT': 'fp8', 'MAX_LEN': '160000'}
+11:11:28 deploy fp8-160k: AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.) ready_after=409s total=420s
+(EngineCore pid=22164) INFO 09-28 14:18:25 [model_runner.py:428] Model loading took 31.83 GiB memory and 355.738994 seconds
+(EngineCore pid=22164) INFO 09-28 14:18:49 [gpu_worker.py:640] Available KV cache memory: 35.93 GiB
+(EngineCore pid=22164) INFO 09-28 14:18:49 [kv_cache_utils.py:2395] GPU KV cache size: 415,889 tokens, Maximum concurrency for 160,000 tokens per request: 2.60x
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+11:11:28 run C:\Users\lucas.rangel\AppData\Local\Programs\Python\Python310\python.exe -u tests/quality.py fp8
+--- 11:16:43 quality queue v2 (fixed HumanEval protocol + 2048 max tokens)
+11:16:43 run C:\Users\lucas.rangel\AppData\Local\Programs\Python\Python310\python.exe -u tests/quality.py fp8
+11:35:55 humaneval 158/164  (342s)
+gsm8k 192/200  (1002s)
+saved quality + fidelity for fp8
+
+11:35:55 == deploy nvfp4-160k {'MAX_LEN': '160000'}
+11:40:22 deploy nvfp4-160k: AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.) ready_after=254s total=263s
+(EngineCore pid=23432) INFO 09-28 14:47:18 [model_runner.py:428] Model loading took 31.46 GiB memory and 195.904131 seconds
+(EngineCore pid=23432) INFO 09-28 14:47:40 [gpu_worker.py:640] Available KV cache memory: 35.65 GiB
+(EngineCore pid=23432) INFO 09-28 14:47:40 [kv_cache_utils.py:2395] GPU KV cache size: 412,583 tokens, Maximum concurrency for 160,000 tokens per request: 2.58x
+Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
+Have fun!
+AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
+11:40:22 run C:\Users\lucas.rangel\AppData\Local\Programs\Python\Python310\python.exe -u tests/quality.py nvfp4

@@ -1,0 +1,3 @@
+humaneval 164/164  (271s)
+gsm8k 197/200  (612s)
+saved claude-sonnet-5-medium {'calls': 364, 'cost': 2.9009509999999996, 'out_tokens': 68149, 'api_ms': 1190038, 'errors': 0}

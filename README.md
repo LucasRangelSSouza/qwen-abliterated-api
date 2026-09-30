@@ -111,6 +111,8 @@ r = c.chat.completions.create(model="qwen-abliterated", temperature=0, max_token
 - **Images**: `{"type":"image_url","image_url":{"url":"data:image/png;base64,..."}}` inside the message content.
 - **Audio**: transcribe first, then chat —
   `curl $OPENAI_BASE_URL/audio/transcriptions -H "Authorization: Bearer $OPENAI_API_KEY" -F model=whisper -F language=pt -F file=@question.wav`
+- **Embeddings**: `POST /v1/embeddings` with model `qwen-embedding` (Qwen3-Embedding-4B, a third vLLM on the same GPU with the pooling runner, `EMBED=0` disables it). The model is Matryoshka, so `"dimensions": 768` gives 768-dimension vectors. Put the instruction on the query side only (`Instruct: <task>
+Query:<text>`) and send documents without a prefix. Measured through the public endpoint from a server: about 22 texts per second (about 1,400 tokens per second) with batches of 64 and 8 concurrent requests; 16 concurrent requests was slower. It shares the GPU with the chat model, so a heavy embedding job slows chat responses (`tests/embed_bench.py` measures quality and speed).
 - **Context**: 160 000 tokens configured. Long prompts cost prefill time; reuse the same prefix to benefit from the cache.
 - The model card recommends `temperature=0`.
 

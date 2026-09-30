@@ -41,8 +41,21 @@ command -v supervisorctl >/dev/null || { echo "Vast vLLM image is required" >&2;
 # before starting, so the two servers never profile GPU memory at the same time.
 WHISPER="${WHISPER:-1}"
 WHISPER_REPO="${WHISPER_REPO:-openai/whisper-large-v3-turbo}"
-WHISPER_PORT="${WHISPER_PORT:-3000}"      # container port; Vast maps it to VAST_TCP_PORT_3000
+WHISPER_PORT="${WHISPER_PORT:-3001}"      # internal port behind the mux
 WHISPER_UTIL="${WHISPER_UTIL:-0.10}"
+
+# Embedding sidecar: a third vLLM (pooling runner) serving /v1/embeddings. Vast only maps the ports declared at
+# instance creation and 3000 is the only spare one, so a tiny path mux owns 3000 and fans out:
+#   /v1/audio/* -> whisper (WHISPER_PORT), /v1/embeddings -> embed (EMBED_PORT). Backends enforce the bearer key.
+# EMBED=0 disables it. Qwen3-Embedding is Matryoshka: request "dimensions":768 to be a drop-in for
+# text-multilingual-embedding-002 (768-d).
+EMBED="${EMBED:-1}"
+EMBED_REPO="${EMBED_REPO:-Qwen/Qwen3-Embedding-4B}"
+EMBED_NAME="${EMBED_NAME:-qwen-embedding}"
+EMBED_PORT="${EMBED_PORT:-3002}"
+EMBED_UTIL="${EMBED_UTIL:-0.12}"
+EMBED_MAX_LEN="${EMBED_MAX_LEN:-8192}"
+MUX_PORT="${MUX_PORT:-3000}"              # container port; Vast maps it to VAST_TCP_PORT_3000
 
 setup_whisper() {
   [ "$WHISPER" = 1 ] || return 0
@@ -87,6 +100,90 @@ CONF
   fi
 }
 
+# install_service NAME SCRIPT_BODY: write Supervisor program + script, restart only when either changed.
+install_service() {
+  local name="$1" body="$2" script="/opt/supervisor-scripts/$1.sh" conf="/etc/supervisor/conf.d/$1.conf" changed=0 want_conf
+  want_conf=$(cat <<CONF
+[program:$name]
+environment=PROC_NAME="%(program_name)s"
+command=$script
+autostart=true
+autorestart=unexpected
+stopasgroup=true
+killasgroup=true
+stdout_logfile=/dev/stdout
+redirect_stderr=true
+stdout_logfile_maxbytes=0
+CONF
+)
+  [ "$(cat "$script" 2>/dev/null)" = "$body" ] || { printf '%s\n' "$body" >"$script"; chmod +x "$script"; changed=1; }
+  [ "$(cat "$conf" 2>/dev/null)" = "$want_conf" ] || { printf '%s\n' "$want_conf" >"$conf"; changed=1; }
+  if [ "$changed" = 1 ]; then
+    supervisorctl reread >/dev/null && supervisorctl update >/dev/null
+    supervisorctl restart "$name" >/dev/null || true
+    echo "$name: service (re)configured"
+  else
+    supervisorctl status "$name" | grep -q RUNNING || supervisorctl start "$name" >/dev/null || true
+    echo "$name: service unchanged"
+  fi
+}
+
+setup_embed() {
+  [ "$EMBED" = 1 ] || return 0
+  hf download "$EMBED_REPO" --local-dir "$MODELS_DIR/embed" >/dev/null
+  test -s "$MODELS_DIR/embed/config.json"
+  install_service embed "$(cat <<SCRIPT
+#!/bin/bash
+# managed by qwen-abliterated-api/configure-vast-vllm.sh
+utils=/opt/supervisor-scripts/utils
+. "\${utils}/logging.sh"
+. "\${utils}/environment.sh"
+[[ -f /venv/main/bin/activate ]] && . /venv/main/bin/activate
+until curl -sf http://127.0.0.1:18000/health >/dev/null; do sleep 5; done
+# older vLLM spells the pooling runner --task embed
+if vllm serve --help=all 2>/dev/null | grep -q -- '--runner'; then RUN="--runner pooling --convert embed"; else RUN="--task embed"; fi
+exec vllm serve $MODELS_DIR/embed \$RUN --served-model-name $EMBED_NAME --host 127.0.0.1 --port $EMBED_PORT \\
+  --gpu-memory-utilization $EMBED_UTIL --max-model-len $EMBED_MAX_LEN --max-num-seqs 64 --max-num-batched-tokens 32768 \\
+  --hf-overrides '{"is_matryoshka":true}' --api-key "\${VLLM_API_KEY:-}" 2>&1
+SCRIPT
+)"
+}
+
+setup_mux() {
+  [ "$WHISPER" = 1 ] || [ "$EMBED" = 1 ] || return 0
+  local py=/opt/qwen-mux.py
+  local want_py
+  want_py=$(cat <<PY
+# managed by qwen-abliterated-api/configure-vast-vllm.sh: path mux on the single spare Vast port
+import httpx, uvicorn
+from fastapi import FastAPI, Request, Response
+ROUTES = {"/v1/audio": "http://127.0.0.1:$WHISPER_PORT", "/v1/embeddings": "http://127.0.0.1:$EMBED_PORT"}
+app = FastAPI()
+client = httpx.AsyncClient(timeout=600)
+@app.api_route("/{path:path}", methods=["GET", "POST"])
+async def proxy(path: str, request: Request):
+    full = "/" + path
+    base = next((b for k, b in ROUTES.items() if full.startswith(k)), None)
+    if base is None:
+        return Response(status_code=404)
+    r = await client.request(request.method, base + full, content=await request.body(),
+                             headers={k: v for k, v in request.headers.items() if k.lower() in ("authorization", "content-type")})
+    return Response(r.content, r.status_code, media_type=r.headers.get("content-type"))
+uvicorn.run(app, host="0.0.0.0", port=$MUX_PORT, log_level="warning")
+PY
+)
+  [ "$(cat "$py" 2>/dev/null)" = "$want_py" ] || printf '%s\n' "$want_py" >"$py"
+  install_service mux "$(cat <<SCRIPT
+#!/bin/bash
+# managed by qwen-abliterated-api/configure-vast-vllm.sh
+[[ -f /venv/main/bin/activate ]] && . /venv/main/bin/activate
+exec python $py 2>&1
+SCRIPT
+)"
+}
+
+setup_sidecars() { setup_whisper; setup_embed; setup_mux; }
+
 mkdir -p "$MODELS_DIR"
 # hf download is a no-op when the files are already complete, so stop/start and re-runs never re-download.
 hf download "$TARGET_REPO" --local-dir "$TARGET_DIR"
@@ -117,7 +214,7 @@ if [ "$CURRENT" = "$DESIRED" ] && supervisorctl status vllm | grep -q RUNNING; t
   # Right config and the process is up: it may simply still be loading weights (minutes). Give it time
   # instead of restarting it mid-load; only a server that never becomes healthy is restarted below.
   for _ in $(seq 1 ${HEALTH_WAIT_S:-900}); do
-    if healthy; then setup_whisper; echo "configure: env unchanged and vLLM healthy, nothing to do"; exit 0; fi
+    if healthy; then setup_sidecars; echo "configure: env unchanged and vLLM healthy, nothing to do"; exit 0; fi
     supervisorctl status vllm | grep -q RUNNING || break
     sleep 1
   done
@@ -136,4 +233,4 @@ for _ in $(seq 1 30); do ss -ltn | grep -q ':18000 ' || break; sleep 2; done
 ss -ltn | grep -q ':18000 ' && { echo "port 18000 still busy" >&2; exit 4; }
 supervisorctl start vllm
 supervisorctl status vllm
-setup_whisper
+setup_sidecars

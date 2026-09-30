@@ -58,9 +58,9 @@ def remove(s, name):
     return re.sub(rf"^    {name}:  # managed by qwen-abliterated-api.*?(?=^    \S|^  \S|^\S|\Z)", "", s, flags=re.S | re.M)
 
 
-# speech-to-text sidecar: /v1/audio/* goes straight to its port (vLLM enforces the same bearer key there)
+# sidecar mux (port 3000): /v1/audio/* (whisper) and /v1/embeddings go to it; the backends enforce the same bearer key
 wrouter = f'''    qwen-whisper-router:  # managed by qwen-abliterated-api/publish-endpoint.sh
-      rule: "Host(`{e['PUBLIC_HOST']}`) && PathPrefix(`/v1/audio`)"
+      rule: "Host(`{e['PUBLIC_HOST']}`) && (PathPrefix(`/v1/audio`) || PathPrefix(`/v1/embeddings`))"
       entryPoints:
         - websecure
       tls:

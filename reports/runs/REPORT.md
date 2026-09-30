@@ -1,6 +1,6 @@
 # Test report
 
-Endpoint: `https://qwen.rangeltech.net/v1` · started 2026-09-28T09:09:34-0300
+Endpoint: `https://qwen.example.com/v1` · started 2026-09-28T09:09:34-0300
 
 ## Authentication
 

@@ -46,7 +46,7 @@
    "step": "dns-upsert.sh already in place",
    "pass": true,
    "seconds": null,
-   "detail": "dns: qwen.rangeltech.net already -> 66.94.101.153"
+   "detail": "dns: qwen.example.com already -> EDGE_IP"
   },
   {
    "step": "configure.sh repairs config drift and API returns",

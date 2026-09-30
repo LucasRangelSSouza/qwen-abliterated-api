@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Operar uma API compatível com OpenAI para um Qwen3.8-27B abliterated (thinking, código, tool calling, visão) em uma GPU alugada, publicada em `https://qwen.rangeltech.net/v1`, reconstruível em outra máquina mudando apenas o endereço dela, e sem redownload dos pesos em reinícios normais.
+Operar uma API compatível com OpenAI para um Qwen3.8-27B abliterated (thinking, código, tool calling, visão) em uma GPU alugada, publicada em `https://qwen.example.com/v1`, reconstruível em outra máquina mudando apenas o endereço dela, e sem redownload dos pesos em reinícios normais.
 
 ## Contrato de acesso
 

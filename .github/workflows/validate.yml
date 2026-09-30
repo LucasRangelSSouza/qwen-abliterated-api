@@ -21,4 +21,10 @@ jobs:
       - run: terraform -chdir=infra/terraform-vast validate
       - run: docker compose --env-file .env.example -f compose.yaml config --quiet
       - run: bash -n scripts/*.sh
+      - run: python -m py_compile tests/*.py
+      - run: python -c "import json;json.load(open('tests/refusal_prompts.json',encoding='utf-8'))"
+      - name: No secrets, keys or private addresses tracked
+        run: |
+          if git ls-files | grep -E '\.(tfstate|tfvars|pem|key)$|(^|/)\.env$'; then echo 'secret-like file tracked'; exit 1; fi
+          if git grep -nIE 'BEGIN (RSA|OPENSSH|PRIVATE)|ghp_[A-Za-z0-9]{20,}|hf_[A-Za-z0-9]{20,}' -- . ':!.github/workflows/validate.yml'; then echo 'secret-like content tracked'; exit 1; fi
 

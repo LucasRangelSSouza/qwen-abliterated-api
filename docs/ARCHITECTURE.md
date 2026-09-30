@@ -51,7 +51,7 @@ The drafter was trained against the base Qwen3.8-27B; abliteration is a small we
 client ──HTTPS──► Traefik (edge VPS, Let's Encrypt) ──HTTP──► Vast mapped port ──► Caddy (token auth) ──► vLLM (--api-key)
 ```
 
-- **Why a proxy at all.** A DNS A record cannot carry a port, and Vast maps container ports to random high numbers that change on recreation. The edge VPS already runs Traefik for `*.rangeltech.net`, so the route is one file provider block; the DNS record points at the VPS, not at the GPU.
+- **Why a proxy at all.** A DNS A record cannot carry a port, and Vast maps container ports to random high numbers that change on recreation. The edge VPS already runs Traefik for `*.example.com`, so the route is one file provider block; the DNS record points at the VPS, not at the GPU.
 - **Two token layers, one stable key.** The Vast Caddy edge requires the instance token (which changes per instance). Instead of handing that token to clients, Traefik injects it as the `C.<id>_auth_token` cookie (Caddy accepts bearer, query and cookie), leaving `Authorization: Bearer` free for vLLM's own `--api-key`. Clients only ever hold the stable `VLLM_API_KEY`.
 - **Streaming.** `responseForwarding.flushInterval: 1ms` keeps SSE token streaming smooth through the proxy.
 - **Replacement.** A new instance changes IP, port, label and token; `scripts/publish-endpoint.sh` rewrites exactly three managed blocks in the Traefik file (router, middleware, service; five when the speech sidecar route is enabled) and `scripts/dns-upsert.sh` makes sure the record exists. Both are idempotent and tested for it.

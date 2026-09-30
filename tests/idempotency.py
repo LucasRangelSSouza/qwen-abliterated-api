@@ -112,7 +112,7 @@ t0 = time.time(); rc, out = sh("hf download Blackfrost-AI/Qwen3.8-27B-ABLITERATE
 rec("hf download re-run moves no bytes", "rc=0" in out and weights_fingerprint() == fp0 and dt < 60, dt)
 
 # 3. publish-endpoint twice: second is unchanged
-env = {"EDGE_SSH": E["EDGE_SSH"], "EDGE_KEY": E["EDGE_KEY"], "PUBLIC_HOST": E.get("PUBLIC_HOST", "qwen.rangeltech.net"), "VAST_IP": E["VAST_IP"],
+env = {"EDGE_SSH": E["EDGE_SSH"], "EDGE_KEY": E["EDGE_KEY"], "PUBLIC_HOST": E["PUBLIC_HOST"], "VAST_IP": E["VAST_IP"],
        "VAST_PORT": E["VAST_PORT"], "VAST_LABEL": E["VAST_LABEL"], "VAST_TOKEN": E["VAST_TOKEN"], "WHISPER_PORT": E.get("WHISPER_PORT", "")}
 local([BASH, os.path.join(ROOT, "scripts", "publish-endpoint.sh")], env)
 rc, out = local([BASH, os.path.join(ROOT, "scripts", "publish-endpoint.sh")], env)
@@ -122,7 +122,7 @@ expected_blocks = "5" if E.get("WHISPER_PORT") else "3"
 rec(f"publish-endpoint.sh leaves exactly {expected_blocks} managed blocks (no duplication)", n == expected_blocks, detail=f"blocks={n}")
 
 # 4. dns-upsert twice
-rc, out = local([BASH, os.path.join(ROOT, "scripts", "dns-upsert.sh"), "rangeltech.net", "qwen", "66.94.101.153"], {"HOSTINGER_API_KEY": E["HOSTINGER_API_KEY"]})
+rc, out = local([BASH, os.path.join(ROOT, "scripts", "dns-upsert.sh"), E["PUBLIC_HOST"].split(".",1)[1], E["PUBLIC_HOST"].split(".",1)[0], E["EDGE_IP"]], {"HOSTINGER_API_KEY": E["HOSTINGER_API_KEY"]})
 rec("dns-upsert.sh already in place", rc == 0 and "already" in out, detail=out[-80:])
 
 # 5. drift repair: corrupt the managed block, configure must repair and end healthy

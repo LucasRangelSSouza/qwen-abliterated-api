@@ -2,13 +2,13 @@
 """End-to-end test + benchmark suite for the OpenAI-compatible Qwen endpoint.
 
 stdlib only. Usage:
-  BASE_URL=https://qwen.rangeltech.net/v1 API_KEY=sk-... python tests/suite.py [--out reports/runs/run.json] [--only auth,speed,...]
+  BASE_URL=https://qwen.example.com/v1 API_KEY=sk-... python tests/suite.py [--out reports/runs/run.json] [--only auth,speed,...]
 
 Every section records raw numbers into a JSON file; tests/make_report.py turns it into Markdown.
 """
 import argparse, concurrent.futures as cf, json, os, random, re, statistics, subprocess, sys, tempfile, textwrap, time, urllib.error, urllib.request
 
-BASE = os.environ.get("BASE_URL", "https://qwen.rangeltech.net/v1").rstrip("/")
+BASE = os.environ.get("BASE_URL", "https://qwen.example.com/v1").rstrip("/")
 KEY = os.environ.get("API_KEY", "")
 MODEL = os.environ.get("MODEL", "qwen-abliterated")
 

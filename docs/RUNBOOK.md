@@ -4,11 +4,11 @@
 
 | item | value |
 |---|---|
-| public URL | `https://qwen.rangeltech.net/v1` |
+| public URL | `https://qwen.example.com/v1` |
 | model name | `qwen-abliterated` |
 | instance | Vast `53155573`, GB10, Texas, ~US$ 0.45/h while running |
 | SSH | `ssh -i <deploy key> -p <VAST_TCP_PORT_22> root@<PUBLIC_IPADDR>` (currently 41083) |
-| edge | VPS `66.94.101.153` (Traefik), DNS at Hostinger, zone `rangeltech.net` |
+| edge | VPS `EDGE_IP` (Traefik), DNS at Hostinger, zone `example.com` |
 | keys | vault `personal-skills/secrets/qwen-api.env`; GitHub secrets on this repo |
 
 Ports and IP are per-instance. Read them from inside the container:
@@ -51,8 +51,8 @@ Actions → **Deploy to Vast instance** with the four instance inputs. Locally, 
 ```bash
 scp/ssh scripts/configure-vast-vllm.sh → /root/configure.sh
 VLLM_API_KEY=... /root/configure.sh                # downloads weights once, writes config, starts vLLM
-scripts/publish-endpoint.sh && scripts/dns-upsert.sh rangeltech.net qwen 66.94.101.153
-scripts/smoke-test.sh https://qwen.rangeltech.net "$VLLM_API_KEY"
+scripts/publish-endpoint.sh && scripts/dns-upsert.sh example.com qwen EDGE_IP
+scripts/smoke-test.sh https://qwen.example.com "$VLLM_API_KEY"
 ```
 
 ## Health and logs
@@ -87,7 +87,7 @@ A second vLLM process (`whisper` in Supervisor) serves `openai/whisper-large-v3-
 ```bash
 supervisorctl status whisper
 tail -f /var/log/portal/whisper.log
-curl -s https://qwen.rangeltech.net/v1/audio/transcriptions -H "Authorization: Bearer $VLLM_API_KEY" \
+curl -s https://qwen.example.com/v1/audio/transcriptions -H "Authorization: Bearer $VLLM_API_KEY" \
   -F model=whisper -F language=pt -F file=@tests/fixtures/speech-pt.wav
 ```
 

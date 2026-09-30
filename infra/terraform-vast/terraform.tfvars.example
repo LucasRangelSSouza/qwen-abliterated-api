@@ -8,3 +8,6 @@ hostinger_api_key    = "..."
 edge_ssh_key_path    = "~/.ssh/edge_ed25519"
 vast_whisper_port    = 40033          # VAST_TCP_PORT_3000 (whisper sidecar); whisper_enabled = false to skip
 # profile = "fp8" (default) | "nvfp4"
+edge_ssh             = "root@203.0.113.20"   # the edge host that runs Traefik
+edge_ip              = "203.0.113.20"        # IPv4 the DNS record points at
+public_host          = "qwen.example.com"

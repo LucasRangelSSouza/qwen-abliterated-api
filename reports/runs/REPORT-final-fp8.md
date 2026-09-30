@@ -1,6 +1,6 @@
 # Test report
 
-Endpoint: `https://qwen.rangeltech.net/v1` · started 2026-09-28T13:21:52-0300
+Endpoint: `https://qwen.example.com/v1` · started 2026-09-28T13:21:52-0300
 
 ## Authentication
 
@@ -121,7 +121,7 @@ reasoning present: **yes** (138 chars), TTFT 1.46 s, content starts `'\n\n144'`
 | hf download re-run moves no bytes | PASS | 3 |  |
 | publish-endpoint.sh second run unchanged | PASS | None | edge: dynamic.yml unchanged |
 | publish-endpoint.sh leaves exactly 5 managed blocks (no duplication) | PASS | None | blocks=5 |
-| dns-upsert.sh already in place | PASS | None | dns: qwen.rangeltech.net already -> 66.94.101.153 |
+| dns-upsert.sh already in place | PASS | None | dns: qwen.example.com already -> EDGE_IP |
 | configure.sh repairs config drift and API returns | PASS | 426 | max_model_len restored=True |
 | weights untouched by drift repair (no re-download) | PASS | None |  |
 | hard restart #1: API back, no download, weights identical | PASS | 437 |  |

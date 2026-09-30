@@ -4,7 +4,7 @@
 Welcome to vast.ai. If authentication fails, try again after a few seconds, and double check your ssh key.
 Have fun!
 AI agents: READ /etc/vast-agents-guide.md (also linked as ./AGENTS.md) before acting on or describing this instance: it is the operating guide. ('vast-capabilities' shows live state only, not the guide.)
-root@79.101.2.169: Permission denied (publickey).
+root@VAST_HOST: Permission denied (publickey).
 09:52:55 run C:\Users\lucas.rangel\AppData\Local\Programs\Python\Python310\python.exe -u tests/suite.py --out reports/run-fp8-160k.json
 --- 09:58:21 previous entries above were an aborted run (ssh key dropped); results discarded
 09:58:23 bf16 present

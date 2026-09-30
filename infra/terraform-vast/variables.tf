@@ -31,7 +31,6 @@ variable "hostinger_api_key" {
 variable "edge_ssh" {
   description = "user@host of the edge VPS running Traefik"
   type        = string
-  default     = "root@66.94.101.153"
 }
 variable "edge_ssh_key_path" {
   description = "Private key for the edge VPS"
@@ -40,12 +39,11 @@ variable "edge_ssh_key_path" {
 variable "edge_ip" {
   description = "IPv4 the DNS record points at (the edge VPS)"
   type        = string
-  default     = "66.94.101.153"
 }
 variable "public_host" {
   description = "Public FQDN served by the edge"
   type        = string
-  default     = "qwen.rangeltech.net"
+  default     = "qwen.example.com"
 }
 variable "profile" {
   description = "fp8 (default, BF16 checkpoint quantised at load) or nvfp4"

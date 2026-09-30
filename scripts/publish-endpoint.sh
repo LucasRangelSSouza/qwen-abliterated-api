@@ -5,7 +5,7 @@ set -Eeuo pipefail
 # injecting the Vast edge auth cookie so clients only need the stable VLLM_API_KEY.
 # Re-run whenever the Vast IP/port/token changes (recreate); it is idempotent.
 #
-# env: EDGE_SSH ("root@66.94.101.153"), EDGE_KEY (ssh key), PUBLIC_HOST (qwen.rangeltech.net),
+# env: EDGE_SSH ("root@EDGE_IP"), EDGE_KEY (ssh key), PUBLIC_HOST (qwen.example.com),
 #      VAST_IP, VAST_PORT (mapped 8000), VAST_LABEL (C.<id>), VAST_TOKEN
 : "${EDGE_SSH:?}" "${PUBLIC_HOST:?}" "${VAST_IP:?}" "${VAST_PORT:?}" "${VAST_LABEL:?}" "${VAST_TOKEN:?}"
 EDGE_KEY="${EDGE_KEY:-$HOME/.ssh/id_ed25519}"

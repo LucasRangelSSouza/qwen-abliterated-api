@@ -7,7 +7,8 @@ This repository is the whole system: the serving configuration, the edge routing
 - [Results at a glance](#results-at-a-glance)
 - [Architecture](#architecture)
 - [Use the API](#use-the-api)
-- [Bring it up](#bring-it-up)
+- [Bring it up](#bring-it-up) (step-by-step: [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md))
+- [CI and CD](#ci-and-cd)
 - [How it works](#how-it-works)
 - [Operate it](#operate-it)
 - [Tests and benchmarks](#tests-and-benchmarks)
@@ -38,11 +39,37 @@ Two findings worth knowing before you copy this setup:
 1. **FP8 is as fast as NVFP4 once speculative decoding is on**, contrary to the bandwidth arithmetic for plain decoding (details in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)). The two precisions are statistically indistinguishable in quality; FP8 wins on prefill and throughput, so it is the default. `PROFILE=nvfp4` selects the other one.
 2. **An fp8 KV cache silently corrupted long generations**: in a saved experiment the needle test passed at prompts up to ~21k tokens and failed in all 6 attempts at ~24.5k tokens and above (6/12 overall), always with the same degenerate output, while every short benchmark passed; with the bf16 KV cache the same series was 12/12. The default is the bf16 KV cache, and `tests/longctx.py` is the test that catches it (data: `reports/longctx/longctx-fp8kv-experiment.json`).
 
+### Figures
+
+![Decode speed against the memory-bandwidth ceiling, by weight format](docs/article/figures/fig1_bandwidth_ceiling.png)
+
+*Decode speed against the bandwidth ceiling. Plain decoding sits at the ceiling of its number format; speculative decoding goes past it on predictable text.*
+
+![Decode speed by workload](docs/article/figures/fig2_decode_by_workload.png)
+
+*Decode speed by workload (code, SQL, prose), thinking on and off.*
+
+![Prefill time against context length](docs/article/figures/fig3_prefill_vs_context.png)
+
+*Time to first token against prompt length, FP8 and NVFP4.*
+
+![Quality against cost per 1,000 tasks](docs/article/figures/fig4_quality_vs_cost.png)
+
+*HumanEval pass@1 with 95 percent intervals against cost per 1,000 tasks.*
+
+![Needle retrieval with fp8 and bf16 KV caches](docs/article/figures/fig5_kv_cache_needle.png)
+
+*The fp8 KV cache failed from about 24,500 prompt tokens; the bf16 KV cache did not.*
+
+## CI and CD
+
+CI runs here (`validate.yml`: Terraform validate and fmt, Compose config, shell syntax, Python compile). CD runs from a separate infra repository that holds the secrets and checks this repository out. Diagram and how to recreate it: [`docs/CICD.md`](docs/CICD.md).
+
 ## Architecture
 
 ```text
 client (OpenAI SDK / curl)
-   │  https://qwen.rangeltech.net/v1        Authorization: Bearer <VLLM_API_KEY>
+   │  https://qwen.example.com/v1        Authorization: Bearer <VLLM_API_KEY>
    ▼
 Traefik on the edge VPS       TLS: Let's Encrypt · DNS: Hostinger A record · streaming flushInterval 1 ms
    │  /v1/*        injects the provider's edge auth cookie (clients never see it)
@@ -58,7 +85,7 @@ Why an edge VPS at all: a DNS A record cannot carry a port, and the GPU provider
 ## Use the API
 
 ```bash
-export OPENAI_BASE_URL=https://qwen.rangeltech.net/v1
+export OPENAI_BASE_URL=https://qwen.example.com/v1
 export OPENAI_API_KEY=...        # the VLLM_API_KEY secret
 
 curl "$OPENAI_BASE_URL/chat/completions" -H "Authorization: Bearer $OPENAI_API_KEY" -H 'Content-Type: application/json' \
@@ -68,7 +95,7 @@ curl "$OPENAI_BASE_URL/chat/completions" -H "Authorization: Bearer $OPENAI_API_K
 
 ```python
 from openai import OpenAI
-c = OpenAI(base_url="https://qwen.rangeltech.net/v1", api_key="...")
+c = OpenAI(base_url="https://qwen.example.com/v1", api_key="...")
 r = c.chat.completions.create(model="qwen-abliterated", temperature=0, max_tokens=2048,
       messages=[{"role": "user", "content": "Write a robust Python retry helper."}],
       extra_body={"chat_template_kwargs": {"enable_thinking": True}})   # reasoning arrives in message.reasoning
@@ -100,9 +127,9 @@ terraform plan -detailed-exitcode                # exit 0: nothing to change
 
 No provider is downloaded (`terraform_data` + `local-exec`); each step re-runs only when its inputs change. A new machine means changing `vast_ssh_host`, `vast_ssh_port`, `vast_api_port`, `vast_whisper_port`, `vast_instance_id` and applying again.
 
-### B. GitHub Actions
+### B. GitHub Actions (in the infra repository)
 
-Actions → **Deploy to Vast instance** with `ssh_host`, `ssh_port`, `api_port`, `whisper_port`, `instance_id` (and `profile`, default `fp8`). It downloads weights if missing, writes the config, publishes the route, upserts DNS, waits for `/v1/models` and smoke-tests a completion.
+Deployment workflows hold secrets, so they live in a separate infra repository and check this one out at run time ([`docs/CICD.md`](docs/CICD.md)). Run **Deploy Qwen API to Vast instance** there with `ssh_host`, `ssh_port`, `api_port`, `whisper_port`, `instance_id` (and `profile`, default `fp8`). It downloads weights if missing, writes the config, publishes the route, upserts DNS, waits for `/v1/models` and smoke-tests a completion.
 
 ### C. By hand
 
@@ -122,7 +149,7 @@ The first deployment downloads ~56 GB (BF16 52 GB, drafter 3.6 GB) plus 1.6 GB f
 
 Profiles and knobs (environment variables of `configure-vast-vllm.sh`): `PROFILE=fp8|nvfp4`, `MAX_LEN` (160000), `GPU_UTIL` (0.60, leaves room for other GPU workloads), `KV_DTYPE` (`auto`), `NSPEC` (7), `WHISPER=0|1`, `PRUNE_UNUSED=1` (delete the other profile's weights from the billed disk).
 
-A second deployment path for a genuine Ubuntu GPU VM (Docker + Caddy) lives in [`compose.yaml`](compose.yaml), [`infra/terraform`](infra/terraform) and `deploy.yml`.
+A second deployment path for a genuine Ubuntu GPU VM (Docker + Caddy) lives in [`compose.yaml`](compose.yaml), [`infra/terraform`](infra/terraform) and the `deploy-qwen-terraform.yml` workflow in the infra repository.
 
 ## How it works
 
@@ -161,7 +188,7 @@ Everything is scripted, stdlib-only Python, and writes raw JSON under [`reports/
 | [`tests/run_all.py`](tests/run_all.py) | one entry point: suite, audio pipeline, idempotency, reports |
 
 ```bash
-export BASE_URL=https://qwen.rangeltech.net/v1 API_KEY=...
+export BASE_URL=https://qwen.example.com/v1 API_KEY=...
 python tests/suite.py --out reports/runs/run.json           # ~25 min, no server access needed
 python tests/quality.py fp8                                  # HumanEval + GSM8K (~17 min)
 python tests/run_all.py --tag mytag                          # also needs the SSH/provider variables (see its docstring)
@@ -181,7 +208,7 @@ Method notes that matter when reading the numbers:
 | `scripts/` | `configure-vast-vllm.sh` (weights, vLLM, Whisper, idempotent), `publish-endpoint.sh` (Traefik route), `dns-upsert.sh`, `vast-power.sh`, `smoke-test.sh`, `benchmark.sh`, VM bootstrap for the Docker path |
 | `infra/terraform-vast/` | Terraform for the container profile (configure, route, DNS, acceptance) |
 | `infra/terraform/`, `compose.yaml`, `Caddyfile` | the genuine-VM path (Docker + Caddy) |
-| `.github/workflows/` | `deploy-vast.yml` (rebuild on any container), `deploy.yml` (VM path), `validate.yml` (Terraform, Compose, shell syntax) |
+| `.github/workflows/` | `validate.yml` (CI: Terraform, Compose, shell syntax, Python compile). Deploy workflows live in the infra repository, see [`docs/CICD.md`](docs/CICD.md) |
 | `tests/` | the suite, quality, idempotency and queue scripts above; `tests/fixtures/speech-pt.wav` |
 | `reports/` | raw data by kind: `runs/`, `quality/`, `longctx/`, `ops/` |
 | `docs/` | [`ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`RUNBOOK.md`](docs/RUNBOOK.md), [`RESULTS.md`](docs/RESULTS.md), [`article/`](docs/article/) (dossier for the write-up) |
@@ -201,5 +228,6 @@ Method notes that matter when reading the numbers:
 
 - No secret is committed: keys live in GitHub secrets and a private vault; `*.tfvars`, `*.tfstate` and `.env` are git-ignored, and a scan of the tracked files and recent history found none of the keys in use.
 - Clients hold one stable key; the provider's edge token never leaves the edge host.
-- The edge SSH key is a broad credential (root on a shared VPS). Keep it out of any public repository's secrets and prefer a scoped deploy user before publishing this repo.
+- Deploy secrets (SSH keys, DNS token, API key) live in the infra repository, never here. The edge SSH key is a broad credential (root on a shared VPS), so use a scoped deploy user where you can.
+- Addresses and hostnames in this repository are placeholders (`example.com`, `EDGE_IP`, `203.0.113.x`).
 - Model licences and the publishers' cards apply; the abliterated checkpoints are research previews by their authors.

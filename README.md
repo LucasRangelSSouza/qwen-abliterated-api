@@ -32,6 +32,7 @@ Default profile: **FP8** weights (BF16 checkpoint quantised at load) + DFlash2 s
 | audio | Whisper sidecar on the same GPU, `/v1/audio/transcriptions` (the chat model has no audio input; it is rejected with a clean 400) |
 | parallel questions | 16 different questions at once, 16/16 correct |
 | idempotency | 16/16 checks, including a real provider stop/start |
+| refusal probe (37 lawful adult prompts) | Qwen 0 refused, Sonnet 5 3 refused ([`docs/REFUSAL.md`](docs/REFUSAL.md)) |
 | cost | ~US$ 0.34 per 1000 benchmark tasks with a busy GPU vs ~US$ 8 per 1000 with Sonnet 5 (API-equivalent); the GPU is cheaper above ~4 % utilisation |
 
 Two findings worth knowing before you copy this setup:
@@ -60,6 +61,10 @@ Two findings worth knowing before you copy this setup:
 ![Needle retrieval with fp8 and bf16 KV caches](docs/article/figures/fig5_kv_cache_needle.png)
 
 *The fp8 KV cache failed from about 24,500 prompt tokens; the bf16 KV cache did not.*
+
+![Refusal rate by category](docs/article/figures/fig6_refusal.png)
+
+*Refusal probe: 37 lawful prompts for adults, one run each. Full table and caveats in `docs/REFUSAL.md`.*
 
 ## CI and CD
 
@@ -181,6 +186,7 @@ Everything is scripted, stdlib-only Python, and writes raw JSON under [`reports/
 | [`tests/quality.py`](tests/quality.py) | HumanEval (164, code executed locally with timeouts) and GSM8K (200), plus fixed-prompt outputs for fidelity comparison |
 | [`tests/quality_claude.py`](tests/quality_claude.py) | the same prompts and grader run through Claude Code (`claude -p`, Sonnet 5 medium, tools off) as a yardstick |
 | [`tests/longctx.py`](tests/longctx.py) | needle in a haystack from 16k to 150k tokens, several seeds |
+| [`tests/refusal.py`](tests/refusal.py), [`make_refusal_report.py`](tests/make_refusal_report.py) | refusal probe over lawful adult prompts for any OpenAI-compatible endpoint or Claude Code; stores verdicts and refusal openings only |
 | [`tests/pipeline_audio.py`](tests/pipeline_audio.py) | speech → Whisper → Qwen round trip through the public API |
 | [`tests/idempotency.py`](tests/idempotency.py), [`restart_cycles.py`](tests/restart_cycles.py) | re-running changes nothing, config drift is repaired, forced kills recover without downloads, a real provider stop/start comes back on the same address |
 | [`tests/queue_variants.py`](tests/queue_variants.py), [`queue_quality.py`](tests/queue_quality.py) | unattended experiment queues (deploy a variant, run the same benchmarks) |
@@ -216,7 +222,7 @@ Method notes that matter when reading the numbers:
 
 ## Limits and what is not claimed
 
-- **Refusal behaviour was not measured.** The checkpoints are the publisher's abliteration of Qwen3.8-27B (same weights in both precisions, per the model cards). No refusal-rate number is claimed anywhere in this repository.
+- **Refusal behaviour is measured only narrowly.** A probe of 37 lawful prompts for adults (harm-reduction dosing, self-managed medication, adult creative writing, edgy humor, security education) got 0 refusals from this model and 3 from Sonnet 5 on the same prompts; details and caveats in [`docs/REFUSAL.md`](docs/REFUSAL.md). One run per prompt, one prompt set, a regex classifier, no GPT measured. The abliteration itself is the publisher's work (same weights in both precisions, per the model cards).
 - **Not a frontier model.** A dense 27B at FP8 is 4 points below Sonnet 5 on HumanEval in this test and is not equivalent for long agentic work. The yardstick is a plain completion without tools on two tasks, not a general ranking.
 - **Prose is slow** (~14 tok/s) because the drafter accepts fewer tokens on unpredictable text.
 - **Long prompts cost minutes of prefill** (~100 s at 140k tokens on first use).

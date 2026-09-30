@@ -87,4 +87,4 @@ While assembling this dossier a headline figure ("12 of 36 needle tests failed w
 
 ## 14. What was deliberately not done
 
-A test of the model's refusal behaviour was requested and not built: it would have required writing prompts designed to elicit dangerous content, which I do not produce. The abliteration rests on the publisher's model card and the shared lineage of the weights, and the repository says so.
+A refusal test was first left out, then built narrowly on 2026-09-30: lawful prompts for adults only, no criminal, weapon, minor or self-harm content, and full answers never stored. It found 0 refusals for this model and 3 for Sonnet 5 on 37 prompts (`docs/REFUSAL.md`). The abliteration itself still rests on the publisher's model card.

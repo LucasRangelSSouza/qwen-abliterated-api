@@ -91,7 +91,7 @@ Claude's figure is API-equivalent cost reported by Claude Code; on a subscriptio
 | thinking on/off + reasoning parser | PASS | reasoning separated when on, absent when off |
 | vision (image_url) | PASS | On the left there is a red square, and on the right there is a blue ci |
 | audio input rejected cleanly | PASS | HTTP 400, server keeps serving |
-| speech-to-text sidecar | PASS | Qual Ã© a capital do Brasil e quantos estados o paÃ­s tem? |
+| speech-to-text sidecar | PASS | Qual é a capital do Brasil e quantos estados o país tem? |
 | 16 parallel questions | PASS | 16/16 correct in 5.1 s |
 | prefix cache | PASS | 6.9 s -> 3.6 s |
 | stability (60 requests, 4 parallel) | PASS | p50 3.94 s, p95 5.48 s |
@@ -124,5 +124,5 @@ Audio pipeline (speech -> Whisper sidecar -> Qwen, through the public API): PASS
 
 ## Not measured
 
-Refusal behaviour of the abliterated model was **not** tested here: the checkpoints are the publisher's abliteration of Qwen3.8-27B (same weights in both precisions, per the model cards). No refusal-rate number is claimed.
+The abliteration is the publisher's (same weights in both precisions, per the model cards). Refusal behaviour is covered only by the narrow probe in [REFUSAL.md](REFUSAL.md): 37 lawful prompts, one run each.
 

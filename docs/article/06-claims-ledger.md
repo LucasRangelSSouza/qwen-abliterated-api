@@ -22,14 +22,14 @@ Every claim the article may make, the file that supports it, its type, and what 
 | 16 | 16/16 idempotency checks including a real provider stop/start; API back in 472 s, Whisper 29 s later | measured | `reports/ops/idempotency.json` | that the provider guarantees the same GPU on restart |
 | 17 | Terraform `plan` after `apply` shows no changes | measured | recorded in the session; reproducible with `terraform plan -detailed-exitcode` | that a saved artefact of it exists in `reports/` (it does not) |
 | 18 | vision works; audio input is rejected with 400; Whisper sidecar transcribes and the round trip works | measured | `reports/runs/run-final-fp8.json`, `reports/ops/pipeline-audio.json` | that the model "understands audio" |
-| 19 | the model is abliterated | published | model cards (`05-sources.md`) | any refusal-rate or behaviour claim: **not measured** |
+| 19 | the model is abliterated | published | model cards (`05-sources.md`) | refusal behaviour: only the 37-prompt probe in `docs/REFUSAL.md` (Qwen 0 refused, Sonnet 5 3 refused), not a general claim |
 | 20 | the two precisions are the same abliterated weights | derived | the NVFP4 card names the BF16 as its base; FP8 is online quantisation of that BF16 | that the weights were compared bit-for-bit |
 | 21 | 5 s of Portuguese speech transcribed in ~2 s, exact punctuation | measured | `reports/ops/pipeline-audio.json`, `run-final-fp8.json` (one sentence, synthetic voice) | that Whisper accuracy was evaluated |
 | 22 | US$ 0.449/h running, ~US$ 0.007/h stopped | measured | provider API responses during the session (prices change) | that these prices hold |
 
 ## Claims deliberately excluded
 
-- Anything about refusal or safety behaviour of the checkpoints.
+- Any refusal claim beyond the 37-prompt probe in `docs/REFUSAL.md`, and anything about GPT models (not measured).
 - "Same as Sonnet 5" or any general model ranking.
 - Any statement about latency under a second real-time workload sharing the GPU (not measured).
 - The figure "12 of 36 needle failures with fp8 KV", which appeared in an earlier draft and was **removed because no saved file supported it** (see `03-timeline-and-mistakes.md` §13).

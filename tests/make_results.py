@@ -154,6 +154,6 @@ if idem:
         o.append(f"| {r['step']} | {'PASS' if r['pass'] else 'FAIL'} | {r.get('seconds') if r.get('seconds') is not None else '-'} |")
     o.append("")
 
-o.append("## Not measured\n\nRefusal behaviour of the abliterated model was **not** tested here: the checkpoints are the publisher's abliteration of Qwen3.8-27B (same weights in both precisions, per the model cards). No refusal-rate number is claimed.\n")
+o.append("## Not measured\n\nThe abliteration is the publisher's (same weights in both precisions, per the model cards). Refusal behaviour is covered only by the narrow probe in [REFUSAL.md](REFUSAL.md): 37 lawful prompts, one run each.\n")
 
 print("\n".join(o))

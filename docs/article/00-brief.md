@@ -44,5 +44,5 @@ The model answered at 4.4 tokens per second on a GPU I was paying US$ 0.45 an ho
 
 ## Not in scope of the article
 
-- Refusal behaviour of the abliterated model: it was not measured and no claim should be made beyond the publisher's model card.
+- Refusal behaviour beyond `docs/REFUSAL.md`: that probe covers 37 lawful adult prompts, one run each. Do not generalise it.
 - Any credential, IP address, instance identifier or domain that is not already public (see the checklist in `09-writing-guide.md`).

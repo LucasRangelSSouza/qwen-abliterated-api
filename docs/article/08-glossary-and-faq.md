@@ -31,7 +31,7 @@
 
 **What happens if the GPU provider gives the machine to someone else?** The instance may not restart on the same GPU. That is why everything is rebuildable from the repository, with weights re-downloaded in about ten minutes.
 
-**Is the abliterated model dangerous to expose?** That is an operational question the article should raise honestly: the endpoint is behind a key, the repository does not measure or claim refusal behaviour, and anyone publishing a similar service should decide their own acceptable-use policy first.
+**Is the abliterated model dangerous to expose?** That is an operational question the article should raise honestly: the endpoint is behind a key, the repository measures refusal only on a narrow set of lawful prompts (`docs/REFUSAL.md`), and anyone publishing a similar service should decide their own acceptable-use policy first.
 
 **Can I run this on a consumer GPU?** The arithmetic transfers (bandwidth ÷ bytes); the specific numbers, the FP4 format and the drafter recipe do not. A 24 GB card needs a 4-bit GGUF and a different runtime.
 

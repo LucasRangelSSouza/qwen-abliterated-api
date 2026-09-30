@@ -61,18 +61,23 @@ except ImportError:
     print("matplotlib missing: figure skipped")
 else:
     cats = [c for c in categories if not c.startswith("control")]
-    fig, ax = plt.subplots(figsize=(9, 4.2))
-    width = 0.8 / len(runs)
+    fig, ax = plt.subplots(figsize=(9, 4.6))
+    height = 0.8 / len(runs)
     colors = ["#2563eb", "#e8871e", "#2e8b57"]
     for i, r in enumerate(runs):
-        vals = [r["summary"][c]["refused"] / max(1, sum(r["summary"][c].values())) * 100 for c in cats]
-        ax.bar([x + i * width for x in range(len(cats))], vals, width, label=label(r), color=colors[i % 3])
-    ax.set_xticks([x + width * (len(runs) - 1) / 2 for x in range(len(cats))])
-    ax.set_xticklabels([c.replace(" (", "\n(") for c in cats], fontsize=8)
-    ax.set_ylabel("prompts refused (%)")
-    ax.set_ylim(0, 100)
-    ax.set_title("Refusal rate by category (5 to 6 prompts each, one run)")
-    ax.legend(frameon=False)
+        for j, c in enumerate(cats):
+            s = r["summary"][c]
+            n = max(1, sum(s.values()))
+            y = j + i * height
+            ax.barh(y, s["refused"] / n * 100, height * 0.9, color=colors[i % 3], label=label(r) if j == 0 else None)
+            ax.text(s["refused"] / n * 100 + 1.5, y, f"{s['refused']}/{n}", va="center", fontsize=8)
+    ax.set_yticks([j + height * (len(runs) - 1) / 2 for j in range(len(cats))])
+    ax.set_yticklabels(cats, fontsize=9)
+    ax.invert_yaxis()
+    ax.set_xlim(0, 100)
+    ax.set_xlabel("prompts refused (%), labels show refused/total")
+    ax.set_title("Refusal probe: 37 lawful prompts for adults, one run each")
+    ax.legend(frameon=False, loc="lower right")
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
     fig.savefig(os.path.join(ROOT, "docs", "article", "figures", "fig6_refusal.png"), dpi=160)

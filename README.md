@@ -224,7 +224,7 @@ Method notes that matter when reading the numbers:
 
 ## Limits and what is not claimed
 
-- **Refusal behaviour is measured only narrowly.** A probe of 37 lawful prompts for adults (harm-reduction dosing, self-managed medication, adult creative writing, edgy humor, security education) got 0 refusals from this model and 3 from Sonnet 5 on the same prompts; details and caveats in [`docs/REFUSAL.md`](docs/REFUSAL.md). One run per prompt, one prompt set, a regex classifier, no GPT measured. The abliteration itself is the publisher's work (same weights in both precisions, per the model cards).
+- **Refusal behaviour is measured only narrowly.** A probe of 37 lawful prompts for adults (harm-reduction dosing, self-managed medication, adult creative writing, edgy humor, security education) got 0 refusals from this model and 3 from Sonnet 5 on the same prompts (31 sensitive prompts plus 6 controls; the difference is not statistically significant, Fisher p = 0.24); details and caveats in [`docs/REFUSAL.md`](docs/REFUSAL.md). One run per prompt, one prompt set, a regex classifier, no GPT measured. The abliteration itself is the publisher's work (same weights in both precisions, per the model cards).
 - **Not a frontier model.** A dense 27B at FP8 is 4 points below Sonnet 5 on HumanEval in this test and is not equivalent for long agentic work. The yardstick is a plain completion without tools on two tasks, not a general ranking.
 - **Prose is slow** (~14 tok/s) because the drafter accepts fewer tokens on unpredictable text.
 - **Long prompts cost minutes of prefill** (~100 s at 140k tokens on first use).

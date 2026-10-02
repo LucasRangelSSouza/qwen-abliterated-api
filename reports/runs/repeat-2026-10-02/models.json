@@ -1,0 +1,1 @@
+{"object":"list","data":[{"id":"qwen-abliterated","object":"model","created":1790981171,"owned_by":"vllm","root":"/root/models/bf16","parent":null,"max_model_len":160000,"permission":[{"id":"modelperm-b9fc4227d6551398","object":"model_permission","created":1790981171,"allow_create_engine":false,"all

@@ -1,0 +1,3 @@
+[speed] 528s {"code_think=False": {"ttft": {"n": 3, "mean": 1.52, "min": 1.16, "max": 2.21}, "decode_tps": {"n": 3, "mean": 34.06, "min": 34.03, "max": 34.09}, "tokens": {"n": 3, "mean": 700, "min": 700, "max": 700}, "errors": 0}, "prose_think=False": {"ttft": {"n": 3, "mean": 1.26, "min": 1.06, "max": 1.37}, "d
+[concurrency] 58s {"c=1": {"ok": 1, "aggregate_tps": 32.4, "per_req_tps": {"n": 1, "mean": 38.17, "min": 38.17, "max": 38.17}, "ttft": {"n": 1, "mean": 1.37, "min": 1.37, "max": 1.37}, "wall": 9.1}, "c=2": {"ok": 2, "aggregate_tps": 55.3, "per_req_tps": {"n": 2, "mean": 36.45, "min": 35.85, "max": 37.05}, "ttft": {"n
+saved reports/runs/repeat-2026-10-02/fp8-run1.json

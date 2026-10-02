@@ -1,0 +1,204 @@
+{
+ "base_url": "https://qwen.rangeltech.net/v1",
+ "started": "2026-10-02T19:38:24-0300",
+ "sections": {
+  "speed": {
+   "code_think=False": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.52,
+     "min": 1.16,
+     "max": 2.21
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 34.06,
+     "min": 34.03,
+     "max": 34.09
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 700,
+     "min": 700,
+     "max": 700
+    },
+    "errors": 0
+   },
+   "prose_think=False": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.26,
+     "min": 1.06,
+     "max": 1.37
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 14.84,
+     "min": 14.78,
+     "max": 14.87
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 461,
+     "min": 461,
+     "max": 461
+    },
+    "errors": 0
+   },
+   "sql_think=False": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.07,
+     "min": 0.98,
+     "max": 1.22
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 37.0,
+     "min": 36.4,
+     "max": 37.31
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 491,
+     "min": 491,
+     "max": 491
+    },
+    "errors": 0
+   },
+   "code_think=True": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.55,
+     "min": 0.89,
+     "max": 2.81
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 22.05,
+     "min": 20.9,
+     "max": 22.71
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 700,
+     "min": 700,
+     "max": 700
+    },
+    "errors": 0
+   },
+   "prose_think=True": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.18,
+     "min": 0.96,
+     "max": 1.39
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 15.98,
+     "min": 15.24,
+     "max": 17.06
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 700,
+     "min": 700,
+     "max": 700
+    },
+    "errors": 0
+   },
+   "sql_think=True": {
+    "ttft": {
+     "n": 3,
+     "mean": 1.4,
+     "min": 1.21,
+     "max": 1.62
+    },
+    "decode_tps": {
+     "n": 3,
+     "mean": 25.27,
+     "min": 25.15,
+     "max": 25.33
+    },
+    "tokens": {
+     "n": 3,
+     "mean": 700,
+     "min": 700,
+     "max": 700
+    },
+    "errors": 0
+   }
+  },
+  "concurrency": {
+   "c=1": {
+    "ok": 1,
+    "aggregate_tps": 32.4,
+    "per_req_tps": {
+     "n": 1,
+     "mean": 38.17,
+     "min": 38.17,
+     "max": 38.17
+    },
+    "ttft": {
+     "n": 1,
+     "mean": 1.37,
+     "min": 1.37,
+     "max": 1.37
+    },
+    "wall": 9.1
+   },
+   "c=2": {
+    "ok": 2,
+    "aggregate_tps": 55.3,
+    "per_req_tps": {
+     "n": 2,
+     "mean": 36.45,
+     "min": 35.85,
+     "max": 37.05
+    },
+    "ttft": {
+     "n": 2,
+     "mean": 1.7,
+     "min": 1.43,
+     "max": 1.97
+    },
+    "wall": 12.6
+   },
+   "c=4": {
+    "ok": 4,
+    "aggregate_tps": 93.7,
+    "per_req_tps": {
+     "n": 4,
+     "mean": 32.95,
+     "min": 32.44,
+     "max": 33.19
+    },
+    "ttft": {
+     "n": 4,
+     "mean": 1.73,
+     "min": 1.4,
+     "max": 1.86
+    },
+    "wall": 13.7
+   },
+   "c=8": {
+    "ok": 8,
+    "aggregate_tps": 107.4,
+    "per_req_tps": {
+     "n": 8,
+     "mean": 32.98,
+     "min": 31.58,
+     "max": 34.29
+    },
+    "ttft": {
+     "n": 8,
+     "mean": 6.25,
+     "min": 1.28,
+     "max": 11.3
+    },
+    "wall": 23.0
+   }
+  }
+ }
+}

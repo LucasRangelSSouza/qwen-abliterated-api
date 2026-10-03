@@ -239,3 +239,11 @@ Method notes that matter when reading the numbers:
 - Deploy secrets (SSH keys, DNS token, API key) live in the infra repository, never here. The edge SSH key is a broad credential (root on a shared VPS), so use a scoped deploy user where you can.
 - Addresses and hostnames in this repository are placeholders (`example.com`, `EDGE_IP`, `203.0.113.x`).
 - Model licences and the publishers' cards apply; the abliterated checkpoints are research previews by their authors.
+
+<!-- articles:start -->
+## Articles
+
+- [How to self-host an uncensored LLM](https://lucas.rangeltech.net/articles/a1-self-host-uncensored-llm/)
+- [Qwen 27B in FP8 vs NVFP4: is the smaller format worth it?](https://lucas.rangeltech.net/articles/a2-fp8-vs-nvfp4/)
+- [How to test whether an LLM really refuses less](https://lucas.rangeltech.net/articles/a3-test-llm-refusal/)
+<!-- articles:end -->

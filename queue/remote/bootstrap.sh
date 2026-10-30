@@ -33,7 +33,7 @@ drive_dl() {  # $1=subpasta no Drive $2=dir ; so se DRIVE_REMOTE e RCLONE_CONFIG
   [ -n "${DRIVE_REMOTE:-}" ] && [ -n "${RCLONE_CONFIG_B64:-}" ] || return 1
   command -v rclone >/dev/null 2>&1 || { curl -fsSL https://rclone.org/install.sh | bash >/dev/null 2>&1 || return 1; }
   printf '%s' "$RCLONE_CONFIG_B64" | base64 -d > /workspace/rclone.conf && chmod 600 /workspace/rclone.conf
-  rclone copy "$DRIVE_REMOTE/$1" "$2" --config /workspace/rclone.conf --transfers 8 --multi-thread-streams 8 --drive-chunk-size 128M --fast-list >/dev/null 2>&1
+  timeout 1200 rclone copy "$DRIVE_REMOTE/$1" "$2" --config /workspace/rclone.conf --transfers 8 --multi-thread-streams 8 --drive-chunk-size 128M --fast-list >/dev/null 2>&1
 }
 
 dl() {  # $1=repo $2=dir $3=subpasta no Drive ; no-op se completo. Drive primeiro (se configurado), Hugging Face de reserva

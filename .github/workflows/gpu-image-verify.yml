@@ -1,0 +1,24 @@
+name: GPU image verify
+# Puxa uma imagem, cronometra o pull e confere que o vLLM importa (sem GPU). Roda na imagem nova e na base, para comparar.
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Imagem"
+        default: "ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1"
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Liberar disco
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL; df -h / | tail -1
+      - name: Pull cronometrado
+        run: |
+          /usr/bin/time -v docker pull "${{ inputs.image }}" 2>&1 | grep -E "Elapsed" || true
+          docker image inspect "${{ inputs.image }}" --format 'descompactada: {{.Size}} bytes, camadas: {{len .RootFS.Layers}}'
+      - name: Imports (vLLM, torch, flashinfer) no python do venv
+        run: |
+          docker run --rm --entrypoint bash "${{ inputs.image }}" -c '. /venv/main/bin/activate 2>/dev/null; which python; python -c "import vllm, torch, flashinfer; print(\"vllm\", vllm.__version__, \"torch\", torch.__version__, \"flashinfer ok\")"; python -c "import flashinfer_cubin, os; print(\"cubins dir:\", os.path.isdir(os.path.join(os.path.dirname(flashinfer_cubin.__file__), \"cubins\")))"; du -sh /usr/local/lib/python3.12/dist-packages | tail -1'

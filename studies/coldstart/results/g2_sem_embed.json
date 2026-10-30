@@ -1,0 +1,264 @@
+{
+  "events": [
+    "[    0.8s] saldo inicial US$1.688",
+    "[    5.0s] destroy previo: {\"ok\":true,\"state\":\"OFF\"}\nWarning: Permanently added '66.94.101.153' (ED25519) to the list of known ",
+    "[   17.9s] env do llm-queue: GPU_IMAGE=ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1, GPU_RUNNING_TIMEOUT_S=900, GPU_DRIVE_REMOTE=gdrive:qwen-cache, RCLONE_CONFIG_B64=***, GPU_EMBED_MODE=off, GPU_CONNECT_RETRIES=1 -> Warning: Permanently added '66.94.101.153' (ED25519) to the list of known hosts.",
+    "[   18.9s] pedidos com a GPU desligada",
+    "[ 1260.8s] stream: {\"http\": 200, \"headers_s\": 0.62, \"notices\": 22, \"first_notice_s\": 0.62, \"first_real_token_s\": 1229.24, \"last_xq\": {\"state\": \"READY\", \"phase\": \"ready\", \"path\": \"new\", \"eta_s\": null, \"elapsed_s\": 1228, \"message\": \"Computador da IA pronto. Respondendo agora.\"}, \"total_s\": 1229.7}",
+    "[ 1260.8s] hermes: completed=True total=1241.5s thinking=['20.7s thinking: {\"text\": \"O computador da IA estava desligado e está sendo ligado agora. Isso leva de 8 a 18 minutos e não é erro: sua pergunta está na fila e será respondida automaticamente.\"}', '30.8s thinking: {\"text\": \"Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 10 minutos.\"}', '81.7s thinking: {\"text\": \"Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 9 minutos.\"}', '142.2s thinking: {\"text\": \"Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 8 minutos.\"}', '202.8s thinking: {\"text\": \"Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 7 minutos.\"}', '263.8s thinking: {\"text\": \"Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 6 minutos.\"}']",
+    "[ 1261.6s] ciclo: [{\"id\": 1793383614722, \"kind\": \"cold\", \"path\": \"new\", \"started_at\": \"2026-10-30T18:06:54Z\", \"ready_at\": \"2026-10-30T18:27:19Z\", \"cold_start_s\": 1224.9, \"stages\": {\"image_s\": 818.5, \"download_s\": 151.4, \"vllm_s\": 250.6, \"warmup_s\": 4.4}, \"host\": 150100, \"geo\": \"Bulgaria, BG\", \"price_dph\": 0.4236, \"stopped_at\": null, \"stop_reason\": null, \"cost_usd\": null, \"failed\": false, \"fail_reason\": null}]",
+    "[ 1274.4s] limites: {\"T1\": {\"http\": 200}, \"T2_429\": {\"body\": {\"message\": \"Limite de uso da janela session (100 tokens): restam 0, este pedido reserva 15 (faltam 15); reduza max_tokens ou aguarde. A janela reabre em 2026-10-30T23:27:36Z.\", \"type\": \"rate_limit_error\", \"code\": \"usage_limit_reached\", \"window\": \"session\", \"resets_at\": \"2026-10-30T23:27:36Z\", \"remaining_tokens\": 0, \"requested_tokens\": 15, \"missing_tokens\": 15}, \"retry_after\": \"17999\"}, \"T2\": {\"codes\": [200, 200, 429]}, \"T3_429\": {\"body\": {\"message\": \"Lim",
+    "[ 1317.0s] stop: {\"ok\":true,\"state\":\"OFF\"}\nWarning: Permanently added '66.94.101.153' (ED25519) to the list of known ",
+    "[ 1452.0s] religar: {\"total_s\": 125.0, \"http\": 200, \"headers_s\": 0.74, \"notices\": 4, \"first_notice_s\": 0.74, \"first_real_token_s\": 124.61, \"last_xq\": {\"state\": \"READY\", \"phase\": \"ready\", \"path\": \"new\", \"eta_s\": null, \"elapsed_s\": 123, \"message\": \"Computador da IA pronto. Respondendo agora.\"}}",
+    "[ 1457.5s] destroy: {\"ok\":true,\"state\":\"OFF\"}\nWarning: Permanently added '66.94.101.153' (ED25519) to the list of known hosts.",
+    "[ 1463.2s] saldo final US$1.627 (gasto US$0.062)"
+  ],
+  "label": "g2_sem_embed",
+  "credit_start": 1.688286584919922,
+  "machines_before": {
+    "status": {
+      "state": "OFF",
+      "eta_s": null,
+      "spend": {
+        "month_usd": 0.738048,
+        "day_usd": 0.738048,
+        "month_cap_usd": 80.0,
+        "remaining_usd": 79.262,
+        "max_allin_dph": 0.45
+      }
+    },
+    "cycles": [
+      {
+        "id": 1793381224507,
+        "kind": "cold",
+        "path": "new",
+        "started_at": "2026-10-30T17:27:04Z",
+        "ready_at": null,
+        "cold_start_s": null,
+        "stages": {},
+        "host": null,
+        "geo": null,
+        "price_dph": null,
+        "stopped_at": "2026-10-30T17:42:09Z",
+        "stop_reason": "sem_oferta",
+        "cost_usd": 0.0,
+        "failed": true,
+        "fail_reason": null
+      },
+      {
+        "id": 1793379410991,
+        "kind": "cold",
+        "path": "new",
+        "started_at": "2026-10-30T16:56:50Z",
+        "ready_at": null,
+        "cold_start_s": null,
+        "stages": {
+          "image_s": 606.1
+        },
+        "host": 155220,
+        "geo": "Austria, AT",
+        "price_dph": 0.4194,
+        "stopped_at": "2026-10-30T17:22:19Z",
+        "stop_reason": "admin",
+        "cost_usd": 0.3326,
+        "failed": true,
+        "fail_reason": null
+      },
+      {
+        "id": 1793378075497,
+        "kind": "cold",
+        "path": "new",
+        "started_at": "2026-10-30T16:34:35Z",
+        "ready_at": null,
+        "cold_start_s": null,
+        "stages": {
+          "image_s": 171.0
+        },
+        "host": 137429,
+        "geo": "Czechia, CZ",
+        "price_dph": 0.4194,
+        "stopped_at": "2026-10-30T16:54:35Z",
+        "stop_reason": "sem_oferta",
+        "cost_usd": 0.1742,
+        "failed": true,
+        "fail_reason": null
+      },
+      {
+        "id": 1793376999069,
+        "kind": "cold",
+        "path": "new",
+        "started_at": "2026-10-30T16:16:39Z",
+        "ready_at": null,
+        "cold_start_s": null,
+        "stages": {},
+        "host": null,
+        "geo": null,
+        "price_dph": null,
+        "stopped_at": "2026-10-30T16:31:45Z",
+        "stop_reason": "sem_oferta",
+        "cost_usd": 0.0,
+        "failed": true,
+        "fail_reason": null
+      },
+      {
+        "id": 1793375008951,
+        "kind": "cold",
+        "path": "new",
+        "started_at": "2026-10-30T15:43:28Z",
+        "ready_at": null,
+        "cold_start_s": null,
+        "stages": {},
+        "host": null,
+        "geo": null,
+        "price_dph": null,
+        "stopped_at": "2026-10-30T15:54:20Z",
+        "stop_reason": "admin",
+        "cost_usd": 0.0555,
+        "failed": true,
+        "fail_reason": null
+      }
+    ],
+    "error": null
+  },
+  "stream": {
+    "http": 200,
+    "headers_s": 0.62,
+    "notices": 22,
+    "first_notice_s": 0.62,
+    "first_real_token_s": 1229.24,
+    "last_xq": {
+      "state": "READY",
+      "phase": "ready",
+      "path": "new",
+      "eta_s": null,
+      "elapsed_s": 1228,
+      "message": "Computador da IA pronto. Respondendo agora."
+    },
+    "total_s": 1229.7
+  },
+  "hermes": {
+    "total_s": 1241.5,
+    "thinking_events": [
+      "20.7s thinking: {\"text\": \"O computador da IA estava desligado e está sendo ligado agora. Isso leva de 8 a 18 minutos e não é erro: sua pergunta está na fila e será respondida automaticamente.\"}",
+      "30.8s thinking: {\"text\": \"Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 10 minutos.\"}",
+      "81.7s thinking: {\"text\": \"Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 9 minutos.\"}",
+      "142.2s thinking: {\"text\": \"Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 8 minutos.\"}",
+      "202.8s thinking: {\"text\": \"Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 7 minutos.\"}",
+      "263.8s thinking: {\"text\": \"Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 6 minutos.\"}"
+    ],
+    "completed": true,
+    "tail": "\"text\": \" Q\"}\r\n1235.1s token: {\"text\": \"W\"}\r\n1235.1s token: {\"text\": \"EN\"}\r\n1235.1s token: {\"text\": \" OK\"}\r\n1235.4s thinking: {\"text\": \"o sistema QWEN OK\"}\r\n1235.6s usage: {\"input_tokens\": 251, \"output_tokens\": 8, \"runtime\": {\"provider\": \"custom\", \"model\": \"qwen-abliterated\"}}\r\n1235.6s done: {\"text\": \"HERMES QWEN OK\", \"format\": \"markdown\"}\r\nSTATUS 200 {\"run_id\":\"kqa-b2c64bd8debc4fb1b436b9ee01d4bf4a\",\"status\":\"completed\",\"error_code\":null,\"terminal\":true}\r\nFIM 1235.7s eventos=23\r\n[fim do script remoto rc=0]\r\n\r\nWarning: Permanently added '66.94.101.153' (ED25519) to the list of known hosts.\r\r\n\r\n"
+  },
+  "cycle": [
+    {
+      "id": 1793383614722,
+      "kind": "cold",
+      "path": "new",
+      "started_at": "2026-10-30T18:06:54Z",
+      "ready_at": "2026-10-30T18:27:19Z",
+      "cold_start_s": 1224.9,
+      "stages": {
+        "image_s": 818.5,
+        "download_s": 151.4,
+        "vllm_s": 250.6,
+        "warmup_s": 4.4
+      },
+      "host": 150100,
+      "geo": "Bulgaria, BG",
+      "price_dph": 0.4236,
+      "stopped_at": null,
+      "stop_reason": null,
+      "cost_usd": null,
+      "failed": false,
+      "fail_reason": null
+    }
+  ],
+  "limits": {
+    "T1": {
+      "http": 200
+    },
+    "T2_429": {
+      "body": {
+        "message": "Limite de uso da janela session (100 tokens): restam 0, este pedido reserva 15 (faltam 15); reduza max_tokens ou aguarde. A janela reabre em 2026-10-30T23:27:36Z.",
+        "type": "rate_limit_error",
+        "code": "usage_limit_reached",
+        "window": "session",
+        "resets_at": "2026-10-30T23:27:36Z",
+        "remaining_tokens": 0,
+        "requested_tokens": 15,
+        "missing_tokens": 15
+      },
+      "retry_after": "17999"
+    },
+    "T2": {
+      "codes": [
+        200,
+        200,
+        429
+      ]
+    },
+    "T3_429": {
+      "body": {
+        "message": "Limite de uso da janela week (200 tokens): restam 8, este pedido reserva 15 (faltam 7); reduza max_tokens ou aguarde. A janela reabre em 2026-11-06T18:27:39Z.",
+        "type": "rate_limit_error",
+        "code": "usage_limit_reached",
+        "window": "week",
+        "resets_at": "2026-11-06T18:27:39Z",
+        "remaining_tokens": 8,
+        "requested_tokens": 15,
+        "missing_tokens": 7
+      },
+      "retry_after": "604796"
+    },
+    "T3": {
+      "codes": [
+        200,
+        200,
+        200,
+        429
+      ]
+    },
+    "T2_usage": {
+      "person": "QA T2 so sessao 100",
+      "session": {
+        "limit": 100,
+        "used": 128,
+        "remaining": 0,
+        "resets_at": "2026-10-30T23:27:36Z"
+      },
+      "week": {
+        "limit": null,
+        "used": 128,
+        "remaining": null,
+        "resets_at": "2026-11-06T18:27:36Z"
+      }
+    },
+    "T5_suspend": {
+      "http": 200,
+      "chat_after": 403
+    },
+    "person_ids": {
+      "t1": 1,
+      "t2": 2,
+      "t3": 3
+    }
+  },
+  "restart": {
+    "total_s": 125.0,
+    "http": 200,
+    "headers_s": 0.74,
+    "notices": 4,
+    "first_notice_s": 0.74,
+    "first_real_token_s": 124.61,
+    "last_xq": {
+      "state": "READY",
+      "phase": "ready",
+      "path": "new",
+      "eta_s": null,
+      "elapsed_s": 123,
+      "message": "Computador da IA pronto. Respondendo agora."
+    }
+  },
+  "credit_end": 1.6266960763199307,
+  "spent_usd": 0.062
+}

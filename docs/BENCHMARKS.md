@@ -49,7 +49,10 @@ Medida à parte (Spec 13, Vast real, 30/10/2026), vLLM 0.30, tensor-parallel 2, 
 | Capacidade em 15 s | ~7 requisições quentes, ~3 frias |
 | Qualidade (sonda de 60 itens) | 60/60 em bf16 e em fp32 |
 | Cold start do zero, host com imagem em cache | 6,3 min (446 s com troca automática de um host com erro de GPU) |
-| Cold start, host novo | 9 a 12 min; pior caso observado 18 min (host gastou 8 min baixando a imagem) |
+| **Cold start do zero com a imagem enxuta e pesos pelo Drive (30/10, Bulgária)** | **20,4 min**: imagem 818 s, download 151 s (~130 MB/s), vLLM 251 s, aquecimento 4 s; o gargalo é a imagem no host |
+| Religar a instância parada (mesma acordada) | 125 s |
+| Drive contra Hugging Face (mesma máquina, 2 Gbps) | 102 MB/s contra 56 MB/s em um fluxo |
+| Cold start, host novo | 9 a 12 min; pior caso observado 18 min (host gastou 8 min baixando a imagem); com a imagem de 23,7 GB da base, 2 de 3 hosts de teste não terminaram o pull em 14 min |
 | Religar a instância parada | ~108 s |
 | Preço | US$ 0,4236/h (Bulgária) a ~0,356 (Quebec); disco parado US$ 0,013 a 0,036/h |
 | Ofertas 2×3090 abaixo de US$ 0,45/h | só ~4 de 51 passam nos filtros |

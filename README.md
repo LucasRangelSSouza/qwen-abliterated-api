@@ -91,7 +91,7 @@ sandbox). Resumo do que decidiu a configuração; tabelas completas, com a causa
 | `queue/tests` (68) | máquina de estados da GPU, tetos, hosts ruins, aviso no stream, 202, log de ciclos, adoção após reinício; Vast simulada com ofertas reais | zero |
 | `access/tests` (36) | janelas de 5 h e semanal, reserva atômica, concorrência, stream cortado, reinício no meio da janela, painel, chaves | zero |
 | Vast real (30/10/2026) | cold start do zero (446 s e pior caso 1.088 s), religar (108 s), parada por ociosidade, chamada pelo gateway com keepalive, Hermes pelo kernel-harness | ≈ US$ 0,57 |
-| Estudo de cold start (30/10) | imagem enxuta puxa mais rápido e o vLLM sobe nela numa 3090; Drive 102 MB/s contra 56 MB/s do Hugging Face; aviso de espera visível no stream e no Hermes com GPU real. **Não validado ponta a ponta com o 27B** (oferta escassa), ver `studies/coldstart/` e a Spec 14 §18 | ≈ US$ 0,41 |
+| Acordada completa na Vast (30/10) | GPU do zero até READY em 20,4 min (imagem 818 s, pesos pelo Drive 151 s, vLLM 251 s); Hermes concluiu; 22 avisos no stream; limites de 5 h e semanal bloqueando com a hora de reabertura; religar em 125 s. Detalhes e as tentativas que falharam: `studies/coldstart/` e Spec 14 §18 | ≈ US$ 0,47 |
 | Campanha de benchmarks (26–28/10) | matriz modelo × GPU, capacidade por GPU, contexto longo, qualidade da quantização | repo privado `benchmarks` |
 | Estudo do GB10 (jul–out/2026) | velocidade, qualidade (HumanEval 96,3 %, GSM8K 96,0 %), sonda de recusa, cache de KV | [`docs/GB10_STUDY.md`](docs/GB10_STUDY.md) |
 

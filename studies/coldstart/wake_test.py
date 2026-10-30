@@ -94,7 +94,7 @@ def stream_probe(res: dict) -> None:
     notices, first_notice, first_real, last = 0, None, None, None
     try:
         with httpx.stream("POST", HOST + "/v1/chat/completions", json=body, headers={"Authorization": f"Bearer {OWNER}"},
-                          timeout=httpx.Timeout(2000.0, connect=20.0)) as r:
+                          timeout=httpx.Timeout(3300.0, connect=20.0)) as r:
             res["http"] = r.status_code
             res["headers_s"] = round(time.time() - t, 2)
             for line in r.iter_lines():

@@ -45,7 +45,7 @@ jobs:
           svc, v = os.environ["SVC"], os.environ["V"]
           env_required = {
               "llm-queue": ["REDIS_URL", "VAST_API_KEY", "SSH_PRIVATE_KEY_B64", "CONSUMERS_JSON"],
-              "llm-access": ["ACCESS_DB_PATH", "ADMIN_PASSWORD_FILE", "UPSTREAM_URL"],
+              "llm-access": ["ADMIN_PASSWORD", "SESSION_SECRET", "UPSTREAM_KEY", "UPSTREAM_ADMIN_KEY", "OWNER_KEY_SHA256", "PLATFORM_KEY_SHA256"],
           }[svc]
           port = 8000
           m = {

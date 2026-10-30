@@ -29,3 +29,15 @@ jobs:
       - run: pip install -q -r requirements-dev.txt
       - run: python -m pytest -q
       - run: npm ci --prefix panel && npm run build --prefix panel
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t llm-queue:ci queue
+      - run: docker build -t llm-access:ci access
+      - name: llm-access sobe e responde /health
+        run: |
+          printf 'senha-ci-123456\n' > /tmp/pw; printf 'segredo-ci-0123456789abcdef\n' > /tmp/sec
+          docker run -d --name acc -p 18090:8000 -v /tmp/pw:/run/pw:ro -v /tmp/sec:/run/sec:ro -e ADMIN_PASSWORD_FILE=/run/pw -e SESSION_SECRET_FILE=/run/sec -e UPSTREAM_URL=http://127.0.0.1:9 llm-access:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:18090/health && exit 0; sleep 1; done
+          docker logs acc; exit 1

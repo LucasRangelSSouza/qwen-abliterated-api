@@ -197,3 +197,43 @@ async def test_status_e_metricas(rig):
     assert j["state"] == "READY" and j["spend"]["month_usd"] == 1.5 and j["spend"]["month_cap_usd"] == 80.0 and "chat" in j["queue"]
     m = await client.get("/metrics")
     assert m.status_code == 200 and b"llmq_gpu_state" in m.content
+
+
+ADMIN = "admin-secreto"
+
+
+async def test_rotas_de_admin_exigem_chave_propria(redis):
+    ctl = StubCtl()
+    calls = []
+
+    async def stop_now(reason):
+        calls.append(("stop", reason))
+        ctl.state = "OFF"
+
+    async def destroy_now(reason):
+        calls.append(("destroy", reason))
+        ctl.state = "OFF"
+    ctl.stop_now, ctl.destroy_now = stop_now, destroy_now
+    s = Settings(tunnel_mode="none", admin_key_sha256=hashlib.sha256(ADMIN.encode()).hexdigest())
+    app = create_app(s, controller=ctl, redis=redis, http=make_upstream(lambda req: httpx.Response(200, json={})), consumers=CONSUMERS)
+    async with app.router.lifespan_context(app):
+        c = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
+        assert (await c.post("/admin/gpu/stop")).status_code == 403
+        assert (await c.post("/admin/gpu/stop", headers={"X-Admin-Key": "errada"})).status_code == 403
+        assert (await c.post("/admin/gpu/stop", headers=H)).status_code == 403  # a chave de consumidor nao serve de admin
+        r = await c.post("/admin/gpu/stop", headers={"X-Admin-Key": ADMIN})
+        assert r.json() == {"ok": True, "state": "OFF"} and calls == [("stop", "admin")]
+        r2 = await c.post("/admin/gpu/stop", headers={"X-Admin-Key": ADMIN})  # ja desligada: nao faz nada
+        assert r2.json()["ok"] is False and calls == [("stop", "admin")]
+        r3 = await c.post("/admin/gpu/destroy", headers={"X-Admin-Key": ADMIN})
+        assert r3.json()["ok"] is True and calls[-1] == ("destroy", "admin")
+        await c.aclose()
+
+
+async def test_admin_desligado_sem_chave_configurada(redis):
+    app = create_app(Settings(tunnel_mode="none"), controller=StubCtl(), redis=redis,
+                     http=make_upstream(lambda req: httpx.Response(200, json={})), consumers=CONSUMERS)
+    async with app.router.lifespan_context(app):
+        c = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
+        assert (await c.post("/admin/gpu/stop", headers={"X-Admin-Key": ""})).status_code == 403
+        await c.aclose()

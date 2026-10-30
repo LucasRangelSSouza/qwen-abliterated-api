@@ -130,6 +130,29 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
                              "max_allin_dph": q.s.effective_max_dph}})
         return st
 
+    def _admin(request: Request) -> App:
+        q: App = request.app.state.q
+        key = request.headers.get("x-admin-key", "")
+        if not q.s.admin_key_sha256 or not hmac.compare_digest(hashlib.sha256(key.encode()).hexdigest(), q.s.admin_key_sha256):
+            raise HTTPException(403, detail=_err("chave de admin invalida", "invalid_request_error", "forbidden"))
+        return q
+
+    @app.post("/admin/gpu/stop")
+    async def admin_stop(request: Request):
+        """Parada de emergencia: para a instancia (guarda o disco). `docker stop llm-queue` NAO desliga a GPU."""
+        q = _admin(request)
+        if q.ctl.state != READY:
+            return {"ok": False, "state": q.ctl.state}
+        await q.ctl.stop_now("admin")
+        return {"ok": True, "state": q.ctl.state}
+
+    @app.post("/admin/gpu/destroy")
+    async def admin_destroy(request: Request):
+        """Destroi a instancia atual (para de pagar disco). A proxima requisicao cria outra do zero."""
+        q = _admin(request)
+        await q.ctl.destroy_now("admin")
+        return {"ok": True, "state": q.ctl.state}
+
     @app.get("/metrics")
     async def metrics(request: Request):
         q: App = request.app.state.q

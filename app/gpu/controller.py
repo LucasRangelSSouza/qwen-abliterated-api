@@ -652,6 +652,11 @@ class GPUController:
         log.info("GPU parada (%s); instancia %s guardada ate %.0f h", reason, iid, self.s.stopped_ttl_h)
         await self._set_state(OFF)
 
+    async def destroy_now(self, reason: str) -> None:
+        """Destroi a instancia atual a pedido (rota de admin); nao mexe em requisicoes em voo alem de derruba-las."""
+        await self._destroy_instance(reason)
+        await self._set_state(OFF)
+
     async def _destroy_instance(self, reason: str) -> None:
         iid = (self.inst or {}).get("id")
         await self.tunnel.close()

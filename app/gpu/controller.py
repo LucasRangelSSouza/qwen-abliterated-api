@@ -29,7 +29,7 @@ K_COLD = "llmq:cold_starts"
 LABEL = "llmq-gpu"
 
 # estimativas de subida por caminho (s), medidas em 30/10 (Spec 13 §7); recalibradas pela mediana dos ultimos cold starts
-ETA_DEFAULT = {"restart": 180, "known": 380, "new": 650}
+ETA_DEFAULT = {"restart": 120, "known": 380, "new": 650}
 
 
 class GPUUnavailable(Exception):

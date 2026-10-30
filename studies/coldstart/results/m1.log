@@ -1,0 +1,15 @@
+{
+  "credit_start": 1.724426324919932,
+  "image": "ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1",
+  "host": 114484,
+  "geo": "Wyoming, US",
+  "inet_down_mbps": 2094.5,
+  "running_s": 29.5,
+  "setup": "rclone v1.60.1-DEV",
+  "hf_range_2GB": "bash: line 1: /usr/bin/time: No such file or directory",
+  "drive_cat_2GB": "2000000000\ndrive_cat 19.4s",
+  "drive_copy_mtp": "849400424\ndrive_copy_mtp 9.4s",
+  "result": "ok",
+  "credit_end": 1.7123459299199197,
+  "spent_usd": 0.012
+}

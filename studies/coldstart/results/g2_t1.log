@@ -1,0 +1,12 @@
+[    2.0s] saldo inicial US$1.915
+[   36.6s] destroy previo: {"ok":true,"state":"OFF"}
+Warning: Permanently added '66.94.101.153' (ED25519) to the list of known 
+[   62.0s] env do llm-queue: GPU_IMAGE=ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1, GPU_RUNNING_TIMEOUT_S=900, GPU_DRIVE_REMOTE=gdrive:qwen-cache, RCLONE_CONFIG_B64=***, GPU_EMBED_MODE=gpu -> Warning: Permanently added '66.94.101.153' (ED25519) to the list of known hosts.
+[   73.2s] pedidos com a GPU desligada
+[ 1600.8s] stream: {"http": 200, "headers_s": 5.32, "notices": 25, "first_notice_s": 5.32, "first_real_token_s": null, "last_xq": {"state": "LOADING", "phase": "loading_model", "path": "new", "eta_s": 5, "elapsed_s": 1440, "message": "Ainda ligando o computador da IA (carregando o modelo). Faltam cerca de 1 minuto. Su
+[ 1600.8s] hermes: completed=False total=1523.5s thinking=['20.7s thinking: {"text": "O computador da IA estava desligado e está sendo ligado agora. Isso leva de 8 a 18 minutos e não é erro: sua pergunta está na fila e será respondida automaticamente."}', '30.8s thinking: {"text": "Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 10 minutos."}', '71.6s thinking: {"text": "Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 9 minutos."}', '132.4s thinking: {"text": "Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 8 minutos."}', '194.0s thinking: {"text": "Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 7 minutos."}', '254.7s thinking: {"text": "Ainda ligando o computador da IA (alugando e preparando a máquina). Faltam cerca de 6 minutos."}']
+[ 1601.8s] ciclo: [{"id": 1793379410991, "kind": "cold", "path": "new", "started_at": "2026-10-30T16:56:50Z", "ready_at": null, "cold_start_s": null, "stages": {"image_s": 606.1}, "host": 155220, "geo": "Austria, AT", "price_dph": 0.4194, "stopped_at": null, "stop_reason": null, "cost_usd": null, "failed": false, "fail_reason": null}]
+[ 1601.8s] ERRO: RuntimeError('a GPU nao ficou pronta: os testes seguintes nao rodam (evita acordar de novo)')
+[ 1610.0s] destroy: {"ok":true,"state":"OFF"}
+Warning: Permanently added '66.94.101.153' (ED25519) to the list of known hosts.
+[ 1615.7s] saldo final US$1.733 (gasto US$0.182)

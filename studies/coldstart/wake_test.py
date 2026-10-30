@@ -211,6 +211,24 @@ def vast_credit() -> float:
     return float(httpx.get("https://console.vast.ai/api/v0/users/current/", headers={"Authorization": f"Bearer {k}"}, timeout=30).json().get("credit") or 0)
 
 
+def diag_instance() -> str:
+    """Antes de destruir uma GPU que nao ficou pronta: le por SSH as etapas, o log do bootstrap e o do vLLM (sem isso o motivo se perde)."""
+    try:
+        k = env_file("qwen-api.env")["VAST_API_KEY"]
+        inst = httpx.get("https://console.vast.ai/api/v1/instances/", headers={"Authorization": f"Bearer {k}"}, timeout=30).json().get("instances", [])
+        i = next((x for x in inst if str(x.get("label") or "").startswith("llmq-gpu")), None)
+        if not i:
+            return "(sem instancia)"
+        key = os.environ.get("SSH_KEY", "/tmp/qk")
+        cmd = ("cat /workspace/stages.txt 2>&1; echo ---boot; tail -8 /workspace/llmq-bootstrap.log 2>&1 | cut -c1-200; echo ---vllm; tail -12 /workspace/vllm_llm.log 2>&1 | cut -c1-220; "
+               "echo ---disk; df -h /workspace | tail -1; du -sh /workspace/models/* 2>&1 | head -4; nvidia-smi --query-gpu=memory.used --format=csv,noheader 2>&1 | head -2")
+        r = subprocess.run(["ssh", "-i", key, "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR",
+                            "-o", "ConnectTimeout=15", "-p", str(i["ssh_port"]), f"root@{i['ssh_host']}", cmd], capture_output=True, timeout=90)
+        return (r.stdout + r.stderr).decode(errors="replace")[-2500:]
+    except Exception as e:  # noqa: BLE001
+        return f"(diagnostico indisponivel: {e!r})"
+
+
 def cleanup() -> None:
     log("destroy: " + queue_admin("destroy")[:120])
 
@@ -258,6 +276,8 @@ def main() -> None:
             raise TimeoutError("teto de tempo da acordada")
         OUT["cycle"] = machines(c)["cycles"][:1]
         log("ciclo: " + json.dumps(OUT["cycle"])[:400])
+        if not OUT["cycle"] or not OUT["cycle"][0].get("ready_at"):
+            raise RuntimeError("a GPU nao ficou pronta: os testes seguintes nao rodam (evita acordar de novo)")
         if a.embed:
             r = {}
             embed_tests(r)
@@ -282,6 +302,9 @@ def main() -> None:
         OUT["error"] = repr(e)
         log(f"ERRO: {e!r}")
     finally:
+        if OUT.get("error"):
+            OUT["instance_diag"] = diag_instance()
+            log("diagnostico da instancia: " + OUT["instance_diag"].replace(NL, " | ")[:1500])
         cleanup()
         time.sleep(5)
         OUT["credit_end"] = vast_credit()

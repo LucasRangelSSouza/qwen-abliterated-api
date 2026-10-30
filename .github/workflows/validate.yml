@@ -14,13 +14,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
-      - run: terraform -chdir=infra/terraform init -backend=false
-      - run: terraform -chdir=infra/terraform validate
-      - run: terraform -chdir=infra/terraform-vast init -backend=false
-      - run: terraform -chdir=infra/terraform-vast fmt -check
-      - run: terraform -chdir=infra/terraform-vast validate
-      - run: docker compose --env-file .env.example -f compose.yaml config --quiet
-      - run: bash -n scripts/*.sh
+      - run: terraform -chdir=legacy/gb10/infra/terraform init -backend=false
+      - run: terraform -chdir=legacy/gb10/infra/terraform validate
+      - run: terraform -chdir=legacy/gb10/infra/terraform-vast init -backend=false
+      - run: terraform -chdir=legacy/gb10/infra/terraform-vast fmt -check
+      - run: terraform -chdir=legacy/gb10/infra/terraform-vast validate
+      - run: docker compose --env-file legacy/gb10/.env.example -f legacy/gb10/compose.yaml config --quiet
+      - run: bash -n legacy/gb10/scripts/*.sh
       - run: python -m py_compile tests/*.py
       - run: python -c "import json;json.load(open('tests/refusal_prompts.json',encoding='utf-8'))"
       - name: No secrets, keys or private addresses tracked

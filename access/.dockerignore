@@ -1,0 +1,7 @@
+.venv-verify
+.pytest_cache
+__pycache__
+tests
+panel/node_modules
+panel/dist
+*.db*

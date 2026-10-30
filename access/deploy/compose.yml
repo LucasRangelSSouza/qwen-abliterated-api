@@ -1,0 +1,53 @@
+# Stack "llm-access" (Spec 14): porta publica da API de IA (https://qwen.rangeltech.net). Copiar para vps_rt_infra/stacks/llm-access/compose.yml.
+# Fica na frente do llm-queue (rede interna) e serve o painel em /admin. Segredos so na VPS: /opt/platform/secrets/llm-access.env
+# (UPSTREAM_KEY, UPSTREAM_ADMIN_KEY, OWNER_KEY_SHA256, PLATFORM_KEY_SHA256, ADMIN_PASSWORD e SESSION_SECRET ou os *_FILE).
+# O banco SQLite vive em /opt/platform/data/llm-access (dono uid 10001, o usuario do container) e entra no backup.
+name: llm-access
+services:
+  llm-access:
+    image: ${LLM_ACCESS_IMAGE:?imagem definida pelo scripts/deploy.sh a partir de releases/llm-access.lock}
+    container_name: llm-access
+    restart: unless-stopped
+    env_file: /opt/platform/secrets/llm-access.env
+    environment:
+      UPSTREAM_URL: http://llm-queue.rt:8000
+      ACCESS_DB_PATH: /data/access.db
+      PORT: "8000"
+    volumes:
+      - /opt/platform/data/llm-access:/data
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
+    logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 8s
+      retries: 5
+      start_period: 20s
+    networks:
+      internal:
+        aliases: [llm-access.rt]   # alias com ponto, como o llm-queue (anti-SSRF do gateway)
+      public: {}                   # rede do Traefik
+    labels:
+      - rt.service=llm-access
+      - rt.layer=B
+      - traefik.enable=true
+      - traefik.docker.network=public
+      - traefik.http.services.llm-access.loadbalancer.server.port=8000
+      # streaming SSE: descarrega a cada 1 ms em vez de bufferizar (o chat e token a token)
+      - traefik.http.services.llm-access.loadbalancer.responseforwarding.flushinterval=1ms
+      - traefik.http.routers.llm-access.rule=Host(`qwen.rangeltech.net`)
+      - traefik.http.routers.llm-access.entrypoints=websecure
+      - traefik.http.routers.llm-access.tls.certresolver=letsencrypt
+      - traefik.http.routers.llm-access.middlewares=security-headers@file
+      - traefik.http.routers.llm-access.service=llm-access
+networks:
+  internal:
+    external: true
+  public:
+    external: true

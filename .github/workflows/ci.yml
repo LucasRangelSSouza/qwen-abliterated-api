@@ -1,0 +1,31 @@
+name: CI (servicos)
+on:
+  pull_request:
+    paths: ["queue/**", "access/**"]
+  push:
+    branches: [main]
+    paths: ["queue/**", "access/**"]
+permissions:
+  contents: read
+jobs:
+  queue:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: queue } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -q -r requirements-dev.txt
+      - run: python -m pytest -q
+  access:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: access } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: pip install -q -r requirements-dev.txt
+      - run: python -m pytest -q
+      - run: npm ci --prefix panel && npm run build --prefix panel

@@ -1,0 +1,79 @@
+name: Release
+# Uma tag v* gera, no mesmo release, um artefato por servico (llm-queue e llm-access), cada um com seu manifesto.
+# NAO faz deploy: so o vps_rt_infra implanta (release-intake gera o .lock, deploy.yml implanta).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versao (ex.: v0.2.0); cria a tag no commit atual"
+        required: true
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Versao
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then V="${{ inputs.version }}"; else V="${GITHUB_REF_NAME}"; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Gate llm-queue (testes e imagem saudavel)
+        run: bash queue/scripts/verify.sh
+      - name: Gate llm-access (testes e imagem saudavel)
+        run: bash access/scripts/verify.sh
+      - name: Build, imagem e manifesto de cada servico
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          for SVC in llm-queue llm-access; do
+            DIR="${SVC#llm-}"; [ "$DIR" = queue ] || DIR=access
+            docker build --build-arg GIT_COMMIT="${GITHUB_SHA}" -t "${SVC}/${SVC}:${V}" "$DIR"
+            docker save "${SVC}/${SVC}:${V}" | gzip -9 > "image-${SVC}.tar.gz"
+            IMAGE_ID="sha256:$(gunzip -c "image-${SVC}.tar.gz" | tar -xO manifest.json | python3 -c "import sys,json,re;print(re.sub(r'^.*/','',json.load(sys.stdin)[0]['Config']).replace('.json',''))")"
+            ARCHIVE_SHA="$(sha256sum "image-${SVC}.tar.gz" | cut -d' ' -f1)"
+            SVC="$SVC" V="$V" IMAGE_ID="$IMAGE_ID" ARCHIVE_SHA="$ARCHIVE_SHA" python3 - <<'PY'
+          import json, os, datetime
+          svc, v = os.environ["SVC"], os.environ["V"]
+          env_required = {
+              "llm-queue": ["REDIS_URL", "VAST_API_KEY", "SSH_PRIVATE_KEY_B64", "CONSUMERS_JSON"],
+              "llm-access": ["ACCESS_DB_PATH", "ADMIN_PASSWORD_FILE", "UPSTREAM_URL"],
+          }[svc]
+          port = 8000
+          m = {
+            "schema": 1,
+            "service": svc,
+            "repo": "LucasRangelSSouza/qwen-abliterated-api",
+            "commit": os.environ["GITHUB_SHA"][:7],
+            "version": v,
+            "artifact": {
+              "type": "docker-archive",
+              "asset": f"image-{svc}.tar.gz",
+              "sha256": os.environ["ARCHIVE_SHA"],
+              "image_id": os.environ["IMAGE_ID"],
+              "tag": f"{svc}/{svc}:{v}"
+            },
+            "built_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "healthcheck": {"path": "/health", "expect": 200, "timeout_s": 90, "port": port},
+            "env": {"required": env_required},
+            "resources": {"memory": "512m", "cpus": "1"}
+          }
+          json.dump(m, open(f"release-manifest.{svc}.json", "w"), indent=2)
+          PY
+          done
+          ls -l image-*.tar.gz release-manifest.*.json
+      - name: GitHub Release com os dois manifestos e imagens
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          FILES="release-manifest.llm-queue.json release-manifest.llm-access.json image-llm-queue.tar.gz image-llm-access.tar.gz"
+          gh release create "$V" $FILES --title "$V" --notes "Artefatos docker-archive de llm-queue e llm-access (sha256 nos manifestos). Deploy: somente vps_rt_infra." --target "${GITHUB_SHA}" || gh release upload "$V" $FILES --clobber

@@ -50,6 +50,19 @@ o script que roda na instância em `remote/bootstrap.sh` (com o vigia embutido).
 Release por tag `v*` (workflow `release.yml`: gate, imagem, manifesto). Quem implanta é o `vps_rt_infra` (intake gera o `.lock`, `deploy.yml`
 implanta). Stack em `deploy/compose.yml`: o alias de rede `llm-queue.rt` existe porque o anti-SSRF do llm-gateway recusa hostname sem ponto.
 
+## Estado da implantação (30/10/2026)
+Em produção na VPS da Contabo (`v0.1.2`), atrás do `llm-gateway`: provedor `qq` (`http://llm-queue.rt:8000/v1`), combo `qwen-abliterated`, tenant `platform`.
+Validado com a Vast real: cold start do zero 446 s (host com erro de GPU trocado sozinho), religar a instância guardada 108 s, parada por ociosidade,
+resposta pelo gateway com os comentários SSE repassados. Pendente: embedding junto da LLM (`GPU_EMBED_MODE=off` até o teste da Spec 13 §4.2),
+alerta no Google Chat (sem webhook configurado) e a troca do portfólio/RAG para este endpoint.
+
+Pontos que custaram caro de aprender (detalhe na Spec 13 §9.3):
+- A fila e as conexões dos clientes vivem na memória do processo; só gasto, hosts e instância ficam em Redis.
+- O vLLM precisa de `--enable-auto-tool-choice --tool-call-parser qwen3_xml`: o Hermes manda `tool_choice: auto`.
+- A Vast guarda o `onstart` na criação; por isso cada instância leva uma impressão (`spec`) do script e é destruída, não religada nem adotada, se ela mudar.
+- Religar e parar devolvem HTTP 200 mesmo quando falham: sempre ler `success`/`error` do corpo (`resources_unavailable`).
+- O TTL da instância parada é limitado também pelo custo do disco (`GPU_STOPPED_MAX_USD`).
+
 ## Operação
 - Estado: `curl -H "Authorization: Bearer <chave>" http://llm-queue:8000/v1/gpu/status`.
 - Parada de emergência: `docker stop llm-queue` **não** desliga a GPU; use o painel da Vast ou espere o vigia (≤ 45 min). Gasto do mês em `/v1/gpu/status`.

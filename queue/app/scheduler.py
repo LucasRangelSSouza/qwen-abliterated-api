@@ -24,6 +24,8 @@ class Ticket:
     t_enq: float
     admitted: bool = False
     t_start: float | None = None
+    end_user: str = ""   # quem pediu (nome da pessoa, so para o painel; nunca o conteudo)
+    kind: str = ""
     done: asyncio.Event = field(default_factory=asyncio.Event)
 
 
@@ -33,6 +35,7 @@ class Lane:
         self.per_consumer = per_consumer or limit
         self.waiting: list[Ticket] = []
         self.inflight = 0
+        self.running: list[Ticket] = []
         self.by_consumer: dict[str, int] = {}
         self._cond = asyncio.Condition()
         self._seq = itertools.count()
@@ -62,6 +65,7 @@ class Lane:
                     self.inflight += 1
                     self.by_consumer[t.consumer] = self.by_consumer.get(t.consumer, 0) + 1
                     t.admitted, t.t_start = True, now
+                    self.running.append(t)
                     return
                 await self._cond.wait()
 
@@ -71,6 +75,8 @@ class Lane:
                 self.inflight -= 1
                 self.by_consumer[t.consumer] = max(0, self.by_consumer.get(t.consumer, 1) - 1)
                 t.admitted = False
+                if t in self.running:
+                    self.running.remove(t)
                 self.served += 1
             self._cond.notify_all()
 

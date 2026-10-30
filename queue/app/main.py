@@ -4,6 +4,7 @@ estourar o STREAM_STALL_TIMEOUT_MS do llm-gateway nem o timeout do undici (Spec 
 from __future__ import annotations
 
 import asyncio
+import collections
 import hashlib
 import hmac
 import json
@@ -46,6 +47,7 @@ class App:
         self.chat = Lane("chat", s.chat_max_inflight, s.chat_queue_max, s.chat_per_consumer)
         self.embed = Lane("embed", s.embed_max_inflight, s.embed_queue_max, s.embed_max_inflight)
         self.consumers = self._load_consumers()
+        self.recent: collections.deque = collections.deque(maxlen=60)  # ultimos pedidos encerrados (so metadados)
 
     def _load_consumers(self) -> dict:
         try:
@@ -134,6 +136,24 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
                              "max_allin_dph": q.s.effective_max_dph}})
         return st
 
+    @app.get("/admin/gpu/jobs")
+    async def admin_jobs(request: Request):
+        """Fila de pedidos para o painel: quem espera, quem esta rodando e os ultimos encerrados. So metadados (sem prompt nem resposta)."""
+        q = _admin(request)
+        now = time.time()
+        gpu_ready = q.ctl.state == READY
+
+        def row(t, state):
+            return {"id": t.seq, "state": state, "kind": t.kind, "consumer": t.consumer, "end_user": t.end_user, "cls": t.cls,
+                    "enq": t.t_enq, "waited_s": round(((t.t_start or now) - t.t_enq), 1), "running_s": round(now - t.t_start, 1) if t.t_start else None}
+        waiting, running = [], []
+        for lane in (q.chat, q.embed):
+            waiting += [row(t, "na_fila" if gpu_ready else "aguardando_gpu") for t in lane.waiting]
+            running += [row(t, "executando") for t in lane.running]
+        waiting.sort(key=lambda r: r["enq"])
+        return {"gpu_state": q.ctl.state, "lanes": {"chat": q.chat.stats(), "embed": q.embed.stats()}, "waiting": waiting, "running": running,
+                "recent": list(q.recent)}
+
     @app.get("/admin/gpu/cycles")
     async def admin_cycles(request: Request, limit: int = 50):
         """Log de ligar/desligar da GPU (tela Maquinas do painel): mais recente primeiro; o ciclo em curso vem com stopped_at nulo."""
@@ -213,6 +233,7 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         except QueueFull as e:
             REQS.labels(consumer["name"], kind, "429").inc()
             raise HTTPException(429, detail=_err("fila cheia", "rate_limit_error", "queue_full"), headers={"Retry-After": str(e.retry_after)})
+        ticket.end_user, ticket.kind = request.headers.get("x-end-user", "")[:60], kind
         stream = bool(body.get("stream")) and kind == "chat"
         media = "text/event-stream" if stream else "application/json"
         headers = {"X-LLM-State": q.ctl.state, "X-LLM-Queue-Position": str(lane.position(ticket)), "Cache-Control": "no-store",
@@ -298,6 +319,8 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             raise
         finally:
             REQS.labels(name, kind, code).inc()
+            q.recent.appendleft({"id": ticket.seq, "kind": kind, "consumer": name, "end_user": ticket.end_user, "cls": ticket.cls, "enq": ticket.t_enq,
+                                 "start": ticket.t_start, "end": time.time(), "code": code})
             if got_slot:
                 await lane.release(ticket)
             else:

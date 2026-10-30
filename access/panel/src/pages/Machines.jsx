@@ -1,4 +1,5 @@
-import { Cpu, Wallet, Server, RefreshCw } from 'lucide-react'
+import { useEffect } from 'react'
+import { Cpu, Wallet, Server, RefreshCw, ListOrdered } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { fmtUsd, fmtDur, fmtFull, fmtIn } from '../lib/format.js'
 import PageHeader from '../components/PageHeader.jsx'
@@ -7,9 +8,21 @@ import { Card, CardHeader, Badge, Progress, Button, Notice, Skeleton, EmptyState
 const STATES = {
   ready: { label: 'Pronta', variant: 'success', text: 'A GPU está ligada e respondendo.' },
   starting: { label: 'Ligando', variant: 'warning', text: 'A GPU está sendo preparada. Quem chamar agora recebe o aviso de espera.' },
-  off: { label: 'Desligada', variant: 'default', text: 'Sem custo. Liga sozinha no próximo pedido.' },
+  fallback: { label: 'Alugando máquina', variant: 'warning', text: 'A fila está procurando e alugando uma máquina (veja as tentativas abaixo).' },
+  loading: { label: 'Carregando o modelo', variant: 'warning', text: 'A máquina já foi alugada; baixando os pesos e subindo o vLLM.' },
+  stopping: { label: 'Desligando', variant: 'default', text: 'Parando a máquina (o disco continua guardado por algumas horas).' },
+  off: { label: 'Desligada', variant: 'default', text: 'Sem custo de GPU. Liga sozinha no próximo pedido.' },
 }
-const stateInfo = (s) => STATES[s] || (s === 'stopped' || s === 'down' || s === 'sleeping' ? STATES.off : s === 'booting' || s === 'warming' ? STATES.starting : { label: s || 'Desconhecido', variant: 'default', text: '' })
+const stateInfo = (s) => {
+  const k = String(s || '').toLowerCase()
+  return STATES[k] || (k === 'stopped' || k === 'down' || k === 'sleeping' ? STATES.off : k === 'booting' || k === 'warming' ? STATES.starting : { label: s || 'Desconhecido', variant: 'default', text: '' })
+}
+const isBooting = (s) => ['starting', 'fallback', 'loading'].includes(String(s || '').toLowerCase())
+const OUTCOME = {
+  running: ['Alugada', 'success'], oferta_sumiu: ['Oferta sumiu', 'warning'], criar_falhou: ['Recusada pela Vast', 'error'],
+  erro_gpu: ['Erro de GPU no host', 'error'], erro_registry: ['Host não baixa a imagem', 'error'], erro_disk: ['Disco cheio', 'error'],
+  nao_chegou_a_running: ['Não ficou pronta a tempo', 'error'], sumiu_da_lista: ['Sumiu da lista da Vast', 'warning'],
+}
 
 const REASON = { ociosidade: 'warning', erro: 'error', 'comando do admin': 'info' }
 const STAGES = [['image_s', 'Imagem'], ['download_s', 'Download'], ['vllm_s', 'vLLM'], ['warmup_s', 'Aquecimento']]
@@ -37,6 +50,86 @@ const Kind = ({ k }) => <Badge variant={k === 'cold' ? 'primary' : 'info'}>{k ==
 const Reason = ({ r, running }) => running ? <Badge variant="success" dot pulse>Em execução</Badge>
   : r ? <Badge variant={REASON[r] || 'default'}>{r.charAt(0).toUpperCase() + r.slice(1)}</Badge> : <span className="text-text-subtle">—</span>
 
+const JOB_STATE = { na_fila: ['Na fila', 'info'], aguardando_gpu: ['Aguardando a GPU', 'warning'], executando: ['Executando', 'success'] }
+const CODE = (c) => (String(c) === '200' ? ['Concluído', 'success'] : String(c) === '499' ? ['Cliente desistiu', 'default'] : String(c) === '429' ? ['Fila cheia', 'warning'] : ['Erro ' + c, 'error'])
+const WHO = (j) => j.end_user || j.consumer
+const KIND = { chat: 'Chat', embed: 'Embedding' }
+
+/** Fila de pedidos: so metadados (quem, tipo, tempo). Atualiza a cada 5 s apenas com a aba visivel, para nao pesar na producao. */
+function Jobs() {
+  const { data, loading, refresh } = useLoad(() => api.queue(), [])
+  useEffect(() => {
+    const t = setInterval(() => { if (document.visibilityState === 'visible') refresh() }, 5000)
+    return () => clearInterval(t)
+  }, [refresh])
+  const active = [...(data?.running || []), ...(data?.waiting || [])]
+  const recent = data?.recent || []
+  const l = data?.lanes?.chat
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader icon={ListOrdered} title="Fila de pedidos" subtitle="Quem está esperando, quem está rodando e os últimos que terminaram (sem o conteúdo das mensagens)" />
+      {loading && !data ? <div className="p-5 pt-2"><Skeleton className="h-16" /></div> : (
+        <div className="border-t border-border-subtle">
+          {data?.error && <div className="px-5 pt-4"><Notice>{data.error}</Notice></div>}
+          <div className="px-5 py-4 grid gap-4 grid-cols-3">
+            <Stat label="Na fila" value={data?.waiting?.length ?? 0} sub={l ? 'limite de ' + l.limit + ' em paralelo' : null} strong />
+            <Stat label="Executando" value={data?.running?.length ?? 0} />
+            <Stat label="Atendidos desde a última subida" value={l?.served ?? 0} />
+          </div>
+          {active.length === 0 ? <p className="px-5 pb-4 text-sm text-text-muted">Nenhum pedido na fila agora.</p> : (
+            <ul className="divide-y divide-border-subtle border-t border-border-subtle">
+              {active.map((j) => {
+                const [label, variant] = JOB_STATE[j.state] || [j.state, 'default']
+                return (
+                  <li key={j.id} className="px-5 py-3 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Badge variant={variant} dot pulse={j.state === 'executando'}>{label}</Badge>
+                      <span className="text-sm text-text-main truncate">{WHO(j)}</span>
+                      <span className="text-xs text-text-muted">{KIND[j.kind] || j.kind}{j.cls === 'batch' ? ' · lote' : ''}</span>
+                    </div>
+                    <span className="num text-sm text-text-muted">{j.state === 'executando' ? 'rodando há ' + fmtDur(j.running_s) : 'esperando há ' + fmtDur(j.waited_s)}</span>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+          {recent.length > 0 && (
+            <div className="overflow-x-auto border-t border-border-subtle">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="text-xs text-text-muted border-b border-border-subtle bg-bg-alt/50">
+                    <th className="font-medium px-5 py-2.5">Terminou</th>
+                    <th className="font-medium px-3 py-2.5">Quem</th>
+                    <th className="font-medium px-3 py-2.5">Tipo</th>
+                    <th className="font-medium px-3 py-2.5 text-right">Esperou</th>
+                    <th className="font-medium px-3 py-2.5 text-right">Rodou</th>
+                    <th className="font-medium px-5 py-2.5">Resultado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recent.slice(0, 15).map((j) => {
+                    const [label, variant] = CODE(j.code)
+                    return (
+                      <tr key={j.id} className="border-b border-border-subtle last:border-b-0">
+                        <td className="px-5 py-2.5 num whitespace-nowrap">{fmtFull(j.end)}</td>
+                        <td className="px-3 py-2.5">{WHO(j)}</td>
+                        <td className="px-3 py-2.5 text-text-muted">{KIND[j.kind] || j.kind}</td>
+                        <td className="px-3 py-2.5 num text-right">{fmtDur((j.start ?? j.end) - j.enq)}</td>
+                        <td className="px-3 py-2.5 num text-right">{j.start ? fmtDur(j.end - j.start) : '—'}</td>
+                        <td className="px-5 py-2.5"><Badge variant={variant}>{label}</Badge></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 export default function Machines() {
   const { data, loading, error, reload, refresh } = useLoad(() => api.machines(50), [])
   const st = data?.status
@@ -61,8 +154,8 @@ export default function Machines() {
                 {loading && !data ? <Skeleton className="h-20" /> : (
                   <>
                     <div className="flex items-center gap-3 flex-wrap">
-                      <Badge variant={info.variant} dot pulse={st?.state === 'starting'} className="text-sm px-3 py-1">{info.label}</Badge>
-                      {st?.eta_s != null && st.state !== 'ready' && <span className="text-sm text-text-muted num">pronta em cerca de {fmtDur(st.eta_s)}</span>}
+                      <Badge variant={info.variant} dot pulse={isBooting(st?.state)} className="text-sm px-3 py-1">{info.label}</Badge>
+                      {st?.eta_s != null && !['ready', 'off'].includes(String(st.state).toLowerCase()) && <span className="text-sm text-text-muted num">pronta em cerca de {fmtDur(st.eta_s)}</span>}
                     </div>
                     <p className="text-sm text-text-muted mt-3">{info.text}</p>
                   </>
@@ -85,6 +178,57 @@ export default function Machines() {
               </div>
             </Card>
           </div>
+
+          <Jobs />
+
+          <Card className="overflow-hidden">
+            <CardHeader icon={Server} title="Máquina e tentativas de aluguel"
+              subtitle="A fila procura a oferta mais barata que passa nos filtros; se uma falha, tenta a próxima" />
+            {loading && !data ? <div className="p-5 pt-2"><Skeleton className="h-16" /></div> : (
+              <div className="border-t border-border-subtle">
+                <div className="px-5 py-4 grid gap-4 sm:grid-cols-4">
+                  <Stat label="Máquina atual" value={st?.instance ? <span className="font-mono text-base">{st.instance.machine ?? '—'}</span> : 'nenhuma'}
+                    sub={st?.instance ? (st.instance.stopped ? 'parada (disco guardado)' : 'alugada') : 'a fila aluga quando houver pedido'} strong />
+                  <Stat label="Região" value={st?.instance?.geo || '—'} />
+                  <Stat label="Preço" value={st?.instance?.dph != null ? `${fmtUsd(st.instance.dph)}/h` : '—'} sub={st?.limits?.max_allin_dph != null ? `teto ${fmtUsd(st.limits.max_allin_dph)}/h` : null} />
+                  <Stat label="Subida esperada" value={st?.path === 'restart' ? 'religar (~2 min)' : st?.path ? 'máquina nova (8–20 min)' : '—'}
+                    sub={st?.limits?.idle_min != null ? `desliga após ${st.limits.idle_min} min sem pedidos` : null} />
+                </div>
+                {(st?.attempts || []).length === 0 ? <p className="px-5 pb-5 text-sm text-text-muted">Nenhuma tentativa de aluguel registrada desde que a fila subiu.</p> : (
+                  <div className="overflow-x-auto border-t border-border-subtle">
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="text-xs text-text-muted border-b border-border-subtle bg-bg-alt/50">
+                          <th className="font-medium px-5 py-3">Hora</th>
+                          <th className="font-medium px-3 py-3">Host / região</th>
+                          <th className="font-medium px-3 py-3 text-right">Preço/h</th>
+                          <th className="font-medium px-3 py-3 text-right">Download</th>
+                          <th className="font-medium px-3 py-3">Resultado</th>
+                          <th className="font-medium px-5 py-3">Detalhe</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...st.attempts].reverse().map((a, i) => {
+                          const [label, variant] = OUTCOME[a.outcome] || [a.outcome, 'default']
+                          return (
+                            <tr key={i} className="border-b border-border-subtle last:border-b-0 align-top">
+                              <td className="px-5 py-3 num whitespace-nowrap">{fmtFull(a.t)}</td>
+                              <td className="px-3 py-3 whitespace-nowrap"><div className="font-mono text-[12px]">{a.machine}{a.known ? ' ★' : ''}</div><div className="text-xs text-text-muted">{a.geo}</div></td>
+                              <td className="px-3 py-3 num text-right whitespace-nowrap">{a.dph != null ? fmtUsd(a.dph) : '—'}</td>
+                              <td className="px-3 py-3 num text-right whitespace-nowrap">{a.down_mbps != null ? `${a.down_mbps} Mbps` : '—'}</td>
+                              <td className="px-3 py-3"><Badge variant={variant}>{label}</Badge></td>
+                              <td className="px-5 py-3 text-xs text-text-muted max-w-[320px] break-words">{a.detail || '—'}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <p className="px-5 py-3 text-xs text-text-muted border-t border-border-subtle">★ = host que já subiu antes (imagem em cache). O preço mostrado é máquina + disco, por hora.</p>
+              </div>
+            )}
+          </Card>
 
           <Card className="overflow-hidden">
             <CardHeader icon={Server} title="Ciclos de vida" subtitle="Uma linha por vez que a GPU foi ligada" />

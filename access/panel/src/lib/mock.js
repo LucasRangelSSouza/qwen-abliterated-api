@@ -62,8 +62,17 @@ const cycles = [
     stages: { image_s: 640, download_s: 288, vllm_s: 102, warmup_s: 60 }, host: 'host-7712', geo: 'US-CA', price_dph: 0.47, stopped_at: iso(now() - 4.6 * 24 * H + 3.1 * H), stop_reason: 'ociosidade', cost_usd: 1.46 },
 ]
 
-const status = () => ({ state: process_state, eta_s: process_state === 'starting' ? 142 : null,
-  spend: { month_usd: 18.62, day_usd: 1.34, month_cap_usd: 60, remaining_usd: 41.38 } })
+const nowS = () => Math.floor(Date.now() / 1000)
+const status = () => ({ state: process_state, eta_s: process_state === 'starting' ? 142 : null, path: 'new',
+  spend: { month_usd: 18.62, day_usd: 1.34, month_cap_usd: 60, remaining_usd: 41.38 },
+  limits: { idle_min: 30, max_allin_dph: 0.45 },
+  instance: process_state === 'off' ? null : { id: 58419432, machine: 150100, geo: 'Bulgaria, BG', dph: 0.4236, stopped: false },
+  attempts: [
+    { t: nowS() - 1900, offer: 1, machine: 137429, geo: 'Czechia, CZ', dph: 0.421, down_mbps: 3064, known: false, outcome: 'nao_chegou_a_running', detail: 'status=loading msg=Pull complete' },
+    { t: nowS() - 1500, offer: 2, machine: 92165, geo: 'Quebec, CA', dph: 0.386, down_mbps: 656, known: false, outcome: 'erro_gpu', detail: 'failed to inject CDI devices: unresolvable CDI devices' },
+    { t: nowS() - 900, offer: 3, machine: 55194, geo: 'Bulgaria, BG', dph: 0.4236, down_mbps: 1100, known: true, outcome: 'oferta_sumiu', detail: 'no_such_ask' },
+    { t: nowS() - 600, offer: 4, machine: 150100, geo: 'Bulgaria, BG', dph: 0.4236, down_mbps: 870, known: false, outcome: 'running', detail: 'em 818s' },
+  ] })
 let process_state = 'ready'
 
 const settings = {
@@ -130,6 +139,21 @@ function handle(method, url, body) {
     let rows = usageRows.filter((r) => (!pid || String(r.person_id) === pid) && (!day || fmt.format(new Date(r.ts)) === day))
     if (pid === '7') rows = []
     return json({ total: rows.length, rows: rows.slice(offset, offset + limit) })
+  }
+  if (method === 'GET' && path === '/queue') {
+    const n = nowS()
+    const off = process_state === 'off'
+    const waitState = process_state === 'ready' ? 'na_fila' : 'aguardando_gpu'
+    return json({ gpu_state: process_state.toUpperCase(), lanes: { chat: { waiting: off ? 0 : 2, inflight: off ? 0 : 1, limit: 6, served: 412 }, embed: { waiting: 0, inflight: 0, limit: 8, served: 0 } },
+      waiting: off ? [] : [
+        { id: 131, state: waitState, kind: 'chat', consumer: 'llm-access', end_user: 'Marina Duarte', cls: 'interactive', enq: n - 42, waited_s: 42, running_s: null },
+        { id: 132, state: waitState, kind: 'chat', consumer: 'llm-access', end_user: 'platform', cls: 'interactive', enq: n - 9, waited_s: 9, running_s: null }],
+      running: off ? [] : [{ id: 130, state: 'executando', kind: 'chat', consumer: 'llm-access', end_user: 'dono', cls: 'interactive', enq: n - 80, waited_s: 3, running_s: 77 }],
+      recent: [
+        { id: 129, kind: 'chat', consumer: 'llm-access', end_user: 'Paulo Henrique', cls: 'interactive', enq: n - 400, start: n - 396, end: n - 351, code: '200' },
+        { id: 128, kind: 'chat', consumer: 'llm-access', end_user: 'Marina Duarte', cls: 'interactive', enq: n - 700, start: n - 699, end: n - 640, code: '200' },
+        { id: 127, kind: 'embed', consumer: 'llm-access', end_user: 'platform', cls: 'batch', enq: n - 900, start: null, end: n - 850, code: '503' }],
+      error: null })
   }
   if (method === 'GET' && path === '/machines') return json({ status: status(), cycles: cycles.slice(0, +(q.get('limit') || 50)) })
   if (method === 'GET' && path === '/settings') return json(settings)

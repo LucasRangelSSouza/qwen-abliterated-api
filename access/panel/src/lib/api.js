@@ -52,6 +52,7 @@ export const api = {
   resetAll: () => request('POST', '/reset-all-windows'),
   usage: (o) => request('GET', '/usage' + qs(o)),
   machines: (limit = 50) => request('GET', '/machines' + qs({ limit })),
+  queue: () => request('GET', '/queue'),
   settings: () => request('GET', '/settings'),
   password: (current, next) => request('POST', '/password', { current, new: next }),
 }

@@ -154,7 +154,16 @@ class GPUController:
                 "stopped": bool(self.inst and self.inst.get("stopped_at")), "inflight": self.inflight,
                 "idle_s": int(now - self.last_activity) if self.state == READY else None,
                 "last_cold_start_s": self.last_cold_s, "last_stop_reason": self.last_stop_reason, "attempts": self.attempts[-8:],
+                "instance": self._instance_info(),
                 "fail": {"reason": self.fail.reason, "retry_after": self.fail.retry_after} if self.fail and self.state == OFF else None}
+
+    def _instance_info(self) -> dict | None:
+        """Maquina atual (alugada, ligando ou parada): host, regiao e preco, para o painel."""
+        i = self.inst
+        if not i:
+            return None
+        return {"id": i.get("id"), "machine": i.get("machine_id"), "geo": self._geo.get(i.get("id")), "dph": i.get("dph"),
+                "stopped": bool(i.get("stopped_at")), "created_at": i.get("created_at")}
 
     def expected_path(self) -> str:
         """Caminho esperado (ou em curso) da subida: restart (instancia parada), known, new. Alimenta o aviso de espera."""
@@ -499,6 +508,7 @@ class GPUController:
     def _note(self, c: "H.Candidate", outcome: str, detail: str = "") -> None:
         """Registro curto de cada tentativa de criar instancia (aparece em /v1/gpu/status.attempts)."""
         self.attempts = (self.attempts + [{"t": round(self.clock()), "offer": c.offer_id, "machine": c.machine_id, "geo": c.geo[:14],
+                                           "dph": c.allin_dph, "down_mbps": int(c.inet_down), "known": c.known_good,
                                            "outcome": outcome, "detail": detail[:200]}])[-20:]
 
     async def _cleanup_failed(self, iid: int, i: Instance | None, t_start: float) -> None:

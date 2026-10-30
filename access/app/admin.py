@@ -297,7 +297,8 @@ async def machines(request: Request, limit: int = 50):
         r = await ctx.http.get(base + "/v1/gpu/status", headers={"Authorization": f"Bearer {ctx.s.upstream_key}"}, timeout=10)
         r.raise_for_status()
         j = r.json()
-        status = {"state": j.get("state"), "eta_s": j.get("eta_s"), "spend": j.get("spend")}
+        status = {"state": j.get("state"), "eta_s": j.get("eta_s"), "spend": j.get("spend"), "path": j.get("path"),
+                  "instance": j.get("instance"), "attempts": j.get("attempts") or [], "limits": j.get("limits"), "fail": j.get("fail")}
     except Exception as e:  # noqa: BLE001
         errors.append(f"status da GPU indisponivel ({type(e).__name__})")
     try:
@@ -311,6 +312,18 @@ async def machines(request: Request, limit: int = 50):
     return {"status": status, "cycles": cycles, "error": "; ".join(errors) or None}
 
 
+@api.get("/queue")
+async def queue(request: Request):
+    """Fila de pedidos (quem espera, quem roda, ultimos encerrados) lida do llm-queue; so metadados. O painel consulta de poucos em poucos segundos."""
+    ctx = require(request)
+    try:
+        r = await ctx.http.get(ctx.s.upstream_base + "/admin/gpu/jobs", headers={"X-Admin-Key": ctx.s.upstream_admin_key}, timeout=8)
+        r.raise_for_status()
+        return {**r.json(), "error": None}
+    except Exception as e:  # noqa: BLE001
+        return {"gpu_state": None, "lanes": {}, "waiting": [], "running": [], "recent": [], "error": f"fila indisponivel ({type(e).__name__})"}
+
+
 # ---- configuracao
 
 @api.get("/settings")
@@ -321,7 +334,7 @@ async def settings(request: Request):
     try:  # tetos e ociosidade vivem no queue; mostramos o que ele expuser
         r = await ctx.http.get(s.upstream_base + "/v1/gpu/status", headers={"Authorization": f"Bearer {s.upstream_key}"}, timeout=5)
         j = r.json()
-        queue = {"spend": j.get("spend"), "idle_min": j.get("idle_min"), "state": j.get("state")}
+        queue = {"spend": j.get("spend"), "idle_min": (j.get("limits") or {}).get("idle_min"), "limits": j.get("limits"), "state": j.get("state")}
     except Exception:  # noqa: BLE001
         pass
     return {"qa_mode": s.qa_mode, "min_window_seconds": s.effective_min_window, "default_session_seconds": s.default_session_seconds,

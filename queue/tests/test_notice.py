@@ -74,3 +74,23 @@ async def test_ciclos_de_gpu_so_com_chave_de_admin(redis):
         r = await c.get("/admin/gpu/cycles", headers={"X-Admin-Key": ADMIN})
         assert r.status_code == 200 and r.json()["cycles"][0]["id"] == 1
         await c.aclose()
+
+
+async def test_fila_de_pedidos_mostra_quem_espera_quem_roda_e_os_encerrados(redis):
+    import asyncio
+    ctl = StubCtl()
+    ctl.delay = 0.5
+    s = Settings(tunnel_mode="none", admin_key_sha256=hashlib.sha256(ADMIN.encode()).hexdigest(), keepalive_s=0.05)
+    app = create_app(s, controller=ctl, redis=redis, http=make_upstream(lambda req: httpx.Response(200, json={"id": "x"})), consumers=CONSUMERS)
+    async with app.router.lifespan_context(app):
+        c = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
+        t = asyncio.create_task(c.post("/v1/chat/completions", json=BODY, headers={**H, "X-End-User": "ana"}))
+        await asyncio.sleep(0.15)
+        j = (await c.get("/admin/gpu/jobs", headers={"X-Admin-Key": ADMIN})).json()
+        assert len(j["waiting"]) == 1 and j["waiting"][0]["end_user"] == "ana" and j["waiting"][0]["state"] == "na_fila" and j["lanes"]["chat"]["waiting"] == 1
+        assert "messages" not in json.dumps(j) and "content" not in json.dumps(j)  # so metadados, nunca o conteudo
+        assert (await t).status_code == 200
+        j2 = (await c.get("/admin/gpu/jobs", headers={"X-Admin-Key": ADMIN})).json()
+        assert j2["waiting"] == [] and j2["running"] == [] and j2["recent"][0]["end_user"] == "ana" and j2["recent"][0]["code"] == "200"
+        assert (await c.get("/admin/gpu/jobs")).status_code == 403
+        await c.aclose()

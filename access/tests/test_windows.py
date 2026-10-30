@@ -198,7 +198,7 @@ async def test_aviso_de_espera_passa_intacto_e_cobra_so_o_real(rig: Rig):
     r = await rig.chat(key, {**BODY, "stream": True}, **{"X-Queue-Class": "interactive", "X-End-User": "u1"})
     assert r.content == b"".join(parts)                  # byte a byte, inclusive comentarios e x_queue
     assert r.headers["x-llm-state"] == "STARTING" and r.headers["x-queue-notice"] == "acordando"
-    assert rig.up.calls[0][2]["x-queue-class"] == "interactive" and rig.up.calls[0][2]["x-end-user"] == "u1"
+    assert rig.up.calls[0][2]["x-queue-class"] == "interactive" and rig.up.calls[0][2]["x-end-user"] == "ana"  # o nome do cadastro vale mais que o do cliente
     assert rig.up.calls[0][1]["stream_options"] == {"include_usage": True}
     assert (await rig.usage(key))["session"]["used"] == 30
 
@@ -276,3 +276,8 @@ async def test_nenhum_texto_de_mensagem_no_banco(rig: Rig):
 async def test_raiz_redireciona_para_o_painel(rig: Rig):
     r = await rig.client.get("/", follow_redirects=False)
     assert r.status_code == 307 and r.headers["location"] == "/admin/"
+
+
+async def test_fila_e_nome_de_quem_pediu_seguem_para_o_queue(rig: Rig):
+    r = await rig.client.get("/admin/api/queue")
+    assert r.status_code == 401  # so o admin ve a fila

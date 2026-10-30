@@ -107,6 +107,10 @@ async def forward(request: Request, path: str, route: str) -> Response:
     for h in PASS_UP:
         if h in request.headers:
             headers[h] = request.headers[h]
+    if p.kind == "person":  # a fila mostra quem pediu; o nome vem do cadastro, nao do cliente (nao da para falsificar)
+        headers["x-end-user"] = p.name.encode("ascii", "replace").decode()[:60]
+    elif p.kind == "owner":
+        headers["x-end-user"] = "dono"
     try:
         req = ctx.http.build_request("POST", ctx.s.upstream_base + path, json=body, headers=headers)
         up = await ctx.http.send(req, stream=True)

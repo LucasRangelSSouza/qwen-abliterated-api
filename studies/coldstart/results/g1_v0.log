@@ -1,0 +1,9 @@
+saldo inicial US$2.100
+143 ofertas candidatas
+sonda vastai/vllm:v0.30.0-cuda-13.0 no host 153812 (Norway, NO, 918.4 Mbps)
+  -> timeout 840.1s 
+sonda vastai/vllm:v0.30.0-cuda-13.0 no host 149401 (France, FR, 934.0 Mbps)
+  -> running 412.0s 
+sonda vastai/vllm:v0.30.0-cuda-13.0 no host 154794 (France, FR, 709.0 Mbps)
+  -> timeout 840.3s 
+saldo final US$2.093 (gasto US$0.007)

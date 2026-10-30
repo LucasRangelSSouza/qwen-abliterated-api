@@ -1,0 +1,370 @@
+{
+  "credit_start": 2.0996649207999525,
+  "credit_end": 2.0930477741599702,
+  "results": [
+    {
+      "image": "vastai/vllm:v0.30.0-cuda-13.0",
+      "machine_id": 153812,
+      "geo": "Norway, NO",
+      "inet_down_mbps": 918.4,
+      "dph": 0.030962962962962963,
+      "cost_per_tb": 2.6666666666666665,
+      "events": [
+        {
+          "t": 0.7,
+          "status": null,
+          "msg": ""
+        },
+        {
+          "t": 22.6,
+          "status": "loading",
+          "msg": "v0.30.0-cuda-13.0: Pulling from vastai/vllm\n"
+        },
+        {
+          "t": 27.8,
+          "status": "loading",
+          "msg": "0b3b5bd92824: Pull complete\n"
+        },
+        {
+          "t": 51.6,
+          "status": "loading",
+          "msg": "7060cfcdc2e7: Pull complete\n"
+        },
+        {
+          "t": 57.4,
+          "status": "loading",
+          "msg": "72a6c87f05fc: Verifying Checksum\n72a6c87f05fc: Download complete\n"
+        },
+        {
+          "t": 62.6,
+          "status": "loading",
+          "msg": "38df1ab86f60: Verifying Checksum\n38df1ab86f60: Download complete\n"
+        },
+        {
+          "t": 67.8,
+          "status": "loading",
+          "msg": "6748d489c477: Verifying Checksum\n6748d489c477: "
+        },
+        {
+          "t": 78.8,
+          "status": "loading",
+          "msg": "d7c634624d50: Verifying Checksum\nd7c634624d50: Download complete\n"
+        },
+        {
+          "t": 89.4,
+          "status": "loading",
+          "msg": "d4944c3ac230: Verifying Checksum\nd4944c3ac230: Download complete\n"
+        },
+        {
+          "t": 139.1,
+          "status": "loading",
+          "msg": "d4819562c6f5: Verifying Checksum\n"
+        },
+        {
+          "t": 144.4,
+          "status": "loading",
+          "msg": "4f4fb700ef54: Pull complete\n"
+        },
+        {
+          "t": 149.6,
+          "status": "loading",
+          "msg": "8fe4c16e900e: Pull complete\n"
+        },
+        {
+          "t": 183.4,
+          "status": "loading",
+          "msg": "37f38cbce67f: Pull complete\n"
+        },
+        {
+          "t": 616.5,
+          "status": "loading",
+          "msg": "d4819562c6f5: Pull complete\n"
+        },
+        {
+          "t": 667.7,
+          "status": "loading",
+          "msg": "72a6c87f05fc: Pull complete\n"
+        },
+        {
+          "t": 689.6,
+          "status": "loading",
+          "msg": "08725c661696: Pull complete\n"
+        },
+        {
+          "t": 705.9,
+          "status": "loading",
+          "msg": "573620a6ecbf: Pull complete\n"
+        },
+        {
+          "t": 750.5,
+          "status": "loading",
+          "msg": "b28e8d812378: Pull complete\n"
+        },
+        {
+          "t": 762.4,
+          "status": "loading",
+          "msg": "d6aca52e827f: Pull complete\n"
+        },
+        {
+          "t": 768.1,
+          "status": "loading",
+          "msg": "6748d489c477: Pull complete\n"
+        }
+      ],
+      "result": "timeout",
+      "pull_s": 840.1,
+      "destroyed": true
+    },
+    {
+      "image": "vastai/vllm:v0.30.0-cuda-13.0",
+      "machine_id": 149401,
+      "geo": "France, FR",
+      "inet_down_mbps": 934.0,
+      "dph": 0.04148148148148148,
+      "cost_per_tb": 2.6666666666666665,
+      "events": [
+        {
+          "t": 0.7,
+          "status": null,
+          "msg": ""
+        },
+        {
+          "t": 12.8,
+          "status": "loading",
+          "msg": "v0.30.0-cuda-13.0: Pulling from vastai/vllm\n"
+        },
+        {
+          "t": 18.5,
+          "status": "loading",
+          "msg": "4f4fb700ef54: Verifying Checksum\n"
+        },
+        {
+          "t": 23.7,
+          "status": "loading",
+          "msg": "37f38cbce67f: Verifying Checksum\n"
+        },
+        {
+          "t": 51.4,
+          "status": "loading",
+          "msg": "9de8dd59a787: Verifying Checksum\n9de8dd59a787: Download complete\n"
+        },
+        {
+          "t": 57.2,
+          "status": "loading",
+          "msg": "8ba2e81f6cfd: Verifying Checksum\n8ba2e81f6cfd: Download complete\n"
+        },
+        {
+          "t": 63.0,
+          "status": "loading",
+          "msg": "573620a6ecbf: Verifying Checksum\n"
+        },
+        {
+          "t": 68.8,
+          "status": "loading",
+          "msg": "6748d489c477: Verifying Checksum\n"
+        },
+        {
+          "t": 74.6,
+          "status": "loading",
+          "msg": "6a4a0b2215ec: Verifying Checksum\n"
+        },
+        {
+          "t": 79.8,
+          "status": "loading",
+          "msg": "d4944c3ac230: Verifying Checksum\nd4944c3ac230: Download complete\n"
+        },
+        {
+          "t": 85.5,
+          "status": "loading",
+          "msg": "7060cfcdc2e7: Pull complete\n"
+        },
+        {
+          "t": 131.3,
+          "status": "loading",
+          "msg": "8fe4c16e900e: Pull complete\n"
+        },
+        {
+          "t": 136.5,
+          "status": "loading",
+          "msg": "d4819562c6f5: Verifying Checksum\nd4819562c6f5: Download complete\n"
+        },
+        {
+          "t": 299.7,
+          "status": "loading",
+          "msg": "d4819562c6f5: Pull complete\n"
+        },
+        {
+          "t": 311.1,
+          "status": "loading",
+          "msg": "72a6c87f05fc: Pull complete\n"
+        },
+        {
+          "t": 316.3,
+          "status": "loading",
+          "msg": "08725c661696: Pull complete\n"
+        },
+        {
+          "t": 327.2,
+          "status": "loading",
+          "msg": "573620a6ecbf: Pull complete\n"
+        },
+        {
+          "t": 344.0,
+          "status": "loading",
+          "msg": "b28e8d812378: Pull complete\n"
+        },
+        {
+          "t": 384.2,
+          "status": "loading",
+          "msg": "d4944c3ac230: Pull complete\n"
+        },
+        {
+          "t": 389.5,
+          "status": "loading",
+          "msg": "fa73917fda8a: Pull complete\n"
+        },
+        {
+          "t": 395.2,
+          "status": "loading",
+          "msg": "#6 4.475 W: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/InRelease: Key is stored in legacy trusted.gpg keyrin"
+        },
+        {
+          "t": 406.3,
+          "status": "created",
+          "msg": "success, running vastai/vllm_v0.30.0-cuda-13.0/ssh"
+        }
+      ],
+      "result": "running",
+      "pull_s": 412.0,
+      "destroyed": true
+    },
+    {
+      "image": "vastai/vllm:v0.30.0-cuda-13.0",
+      "machine_id": 154794,
+      "geo": "France, FR",
+      "inet_down_mbps": 709.0,
+      "dph": 0.042222222222222223,
+      "cost_per_tb": 4.0,
+      "events": [
+        {
+          "t": 0.7,
+          "status": null,
+          "msg": ""
+        },
+        {
+          "t": 30.3,
+          "status": "loading",
+          "msg": "cf57d2112d89: Pull complete\n"
+        },
+        {
+          "t": 36.7,
+          "status": "loading",
+          "msg": "37f38cbce67f: Verifying Checksum\n37f38cbce67f: Download complete\n"
+        },
+        {
+          "t": 42.4,
+          "status": "loading",
+          "msg": "0b3b5bd92824: Pull complete\n"
+        },
+        {
+          "t": 54.2,
+          "status": "loading",
+          "msg": "72a6c87f05fc: Verifying Checksum\n"
+        },
+        {
+          "t": 60.0,
+          "status": "loading",
+          "msg": "8ba2e81f6cfd: Download complete\n"
+        },
+        {
+          "t": 65.2,
+          "status": "loading",
+          "msg": "573620a6ecbf: Verifying Checksum\n573620a6ecbf: "
+        },
+        {
+          "t": 70.5,
+          "status": "loading",
+          "msg": "b92c3f7393c7: Verifying Checksum\nb92c3f7393c7: Download complete\n"
+        },
+        {
+          "t": 75.7,
+          "status": "loading",
+          "msg": "fa73917fda8a: Verifying Checksum\nfa73917fda8a: Download complete\n"
+        },
+        {
+          "t": 86.3,
+          "status": "loading",
+          "msg": "d4944c3ac230: Verifying Checksum\nd4944c3ac230: Download complete\n"
+        },
+        {
+          "t": 102.6,
+          "status": "loading",
+          "msg": "8fe4c16e900e: Pull complete\n"
+        },
+        {
+          "t": 125.7,
+          "status": "loading",
+          "msg": "d4819562c6f5: Verifying Checksum\nd4819562c6f5: Download complete\n"
+        },
+        {
+          "t": 358.0,
+          "status": "loading",
+          "msg": "d4819562c6f5: Pull complete\n"
+        },
+        {
+          "t": 379.8,
+          "status": "loading",
+          "msg": "72a6c87f05fc: Pull complete\n"
+        },
+        {
+          "t": 385.5,
+          "status": "loading",
+          "msg": "08725c661696: Pull complete\n"
+        },
+        {
+          "t": 396.0,
+          "status": "loading",
+          "msg": "573620a6ecbf: Pull complete\n"
+        },
+        {
+          "t": 401.7,
+          "status": "loading",
+          "msg": "c4e0d1789b0e: Pull complete\n"
+        },
+        {
+          "t": 413.2,
+          "status": "loading",
+          "msg": "6748d489c477: Pull complete\n"
+        },
+        {
+          "t": 513.1,
+          "status": "loading",
+          "msg": "fa73917fda8a: Pull complete\n"
+        },
+        {
+          "t": 518.3,
+          "status": "loading",
+          "msg": "#4 DONE 2.1s\n"
+        },
+        {
+          "t": 524.0,
+          "status": "loading",
+          "msg": "\n"
+        },
+        {
+          "t": 529.3,
+          "status": "loading",
+          "msg": "\r\n"
+        },
+        {
+          "t": 534.5,
+          "status": "created",
+          "msg": "Successfully loaded vastai/vllm:v0.30.0-cuda-13.0"
+        }
+      ],
+      "result": "timeout",
+      "pull_s": 840.3,
+      "destroyed": true
+    }
+  ]
+}

@@ -94,7 +94,7 @@ class Settings:
     running_timeout_s: float = 480.0
     ssh_timeout_s: float = 120.0
     health_timeout_s: float = 900.0
-    wait_max_s: float = 900.0
+    wait_max_s: float = 1500.0   # um host que falha ao baixar a imagem custa 8 min antes do proximo; medido: cold start de 18 min no pior caso
     search_retry_s: float = 60.0
     search_window_s: float = 900.0
     keepalive_s: float = 15.0
@@ -165,6 +165,8 @@ class Settings:
             idle_min=_f("GPU_IDLE_MIN", cls.idle_min),
             stopped_ttl_h=_f("GPU_STOPPED_TTL_H", cls.stopped_ttl_h),
             stopped_max_usd=_f("GPU_STOPPED_MAX_USD", cls.stopped_max_usd),
+            wait_max_s=_f("GPU_WAIT_MAX_S", cls.wait_max_s),
+            running_timeout_s=_f("GPU_RUNNING_TIMEOUT_S", cls.running_timeout_s),
             batch_enabled=_b("GPU_BATCH_ENABLED", cls.batch_enabled),
             batch_budget_usd=_f("GPU_BATCH_BUDGET_USD", cls.batch_budget_usd),
             hedge_enabled=_b("GPU_HEDGE_ENABLED", cls.hedge_enabled),

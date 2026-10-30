@@ -1,0 +1,17 @@
+46 ofertas 1x3090
+running em 418.0s; subindo o vLLM
+root@ssh1.vast.ai: Permission denied (publickey).
+{
+  "image": "ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1",
+  "credit_start": 1.5081079192799365,
+  "host": 24191,
+  "geo": "Czechia, CZ",
+  "dph": 0.15881481481481483,
+  "running_s": 418.0,
+  "vllm_health_s": null,
+  "healthy": false,
+  "log_flashinfer": "root@ssh1.vast.ai: Permission denied (publickey).\r\n",
+  "result": "vllm_falhou",
+  "credit_end": 1.4826570596798945,
+  "spent_usd": 0.025
+}

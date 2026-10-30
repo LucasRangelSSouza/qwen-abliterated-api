@@ -1,0 +1,173 @@
+{
+  "events": [
+    "[    0.8s] saldo inicial US$1.622",
+    "[    4.2s] destroy previo: {\"ok\":true,\"state\":\"OFF\"}\nWarning: Permanently added '66.94.101.153' (ED25519) to the list of known ",
+    "[   18.5s] env do llm-queue: GPU_IMAGE=ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1, GPU_RUNNING_TIMEOUT_S=900, GPU_DRIVE_REMOTE=gdrive:qwen-cache, RCLONE_CONFIG_B64=***, GPU_EMBED_MODE=gpu, GPU_WAIT_MAX_S=3000, GPU_CONNECT_RETRIES=1 -> Warning: Permanently added '66.94.101.153' (ED25519) to the list of known hosts.",
+    "[   19.5s] pedidos com a GPU desligada",
+    "[ 2242.9s] stream: {\"http\": 200, \"headers_s\": 0.49, \"notices\": 37, \"first_notice_s\": 0.52, \"first_real_token_s\": null, \"last_xq\": {\"state\": \"LOADING\", \"phase\": \"loading_model\", \"path\": \"known\", \"eta_s\": 5, \"elapsed_s\": 2160, \"message\": \"Ainda ligando o computador da IA (carregando o modelo). Faltam cerca de 1 minuto. ",
+    "[ 2243.7s] ciclo: [{\"id\": 1793385100990, \"kind\": \"cold\", \"path\": \"known\", \"started_at\": \"2026-10-30T18:31:40Z\", \"ready_at\": null, \"cold_start_s\": null, \"stages\": {\"image_s\": 1309.4}, \"host\": 150100, \"geo\": \"Bulgaria, BG\", \"price_dph\": 0.4236, \"stopped_at\": \"2026-10-30T19:08:34Z\", \"stop_reason\": \"desperdicio\", \"cost_usd\": 0.6331, \"failed\": true, \"fail_reason\": null}]",
+    "[ 2243.7s] ERRO: RuntimeError('a GPU nao ficou pronta: os testes seguintes nao rodam (evita acordar de novo)')",
+    "[ 2247.4s] diagnostico da instancia: boot 1793386407.732819723 | download_start 1793386409.612448793 | download_end 1793386679.550347777 | vllm_start 1793386682.796398987 | vllm_ready 1793386932.401048200 | ---boot | == bootstrap 2026-10-30T18:53:27Z | baixado do Drive: llm | baixado do Drive: embed | LLM iniciada (util 0.68) | embedding iniciado (util 0.24) | == bootstrap fim | ---vllm | (APIServer pid=537) INFO:     127.0.0.1:60162 - \"GET /health HTTP/1.1\" 200 OK | (APIServer pid=537) INFO:     127.0.0.1:60176 - \"GET /health HTTP/1.1\" 200 OK | (APIServer pid=537) INFO:     127.0.0.1:55008 - \"GET /health HTTP/1.1\" 200 OK | (APIServer pid=537) INFO:     127.0.0.1:33078 - \"GET /health HTTP/1.1\" 200 OK | (APIServer pid=537) INFO:     127.0.0.1:33086 - \"GET /health HTTP/1.1\" 200 OK | (APIServer pid=537) INFO:     127.0.0.1:43864 - \"GET /health HTTP/1.1\" 200 OK | (APIServer pid=537) INFO:     127.0.0.1:43868 - \"GET /health HTTP/1.1\" 200 OK | (APIServer pid=537) INFO:     127.0.0.1:44400 - \"GET /health HTTP/1.1\" 200 OK | (APIServer pid=537) INFO:     127.0.0.1:44412 - \"GET /health HTTP/1.1\" 200 OK | (APIServer pid=537) INFO:     127.0.0.1:54890 - \"GET /health HTTP/1.1\" 200 OK | (APIServer pid=537) INFO:     127.0.0.1:47884 - \"GET /health HTTP/1.1\" 200 OK | (APIServer pid=537) INFO:     127.0.0.1:47892 - \"GET /metrics HTTP/1.1\" 200 OK | ---disk | overlay          70G   27G   44G  38% / | 19G\t/workspace/models/awq | 7.6G\t/workspace/models/embed | 15340 MiB | 15340 MiB | ",
+    "[ 2252.8s] destroy: {\"ok\":true,\"state\":\"OFF\"}\nWarning: Permanently added '66.94.101.153' (ED25519) to the list of known hosts.",
+    "[ 2258.5s] saldo final US$1.508 (gasto US$0.114)"
+  ],
+  "label": "g3_embed",
+  "credit_start": 1.6219498053199288,
+  "machines_before": {
+    "status": {
+      "state": "OFF",
+      "eta_s": null,
+      "spend": {
+        "month_usd": 0.747028,
+        "day_usd": 0.747028,
+        "month_cap_usd": 80.0,
+        "remaining_usd": 79.253,
+        "max_allin_dph": 0.45
+      }
+    },
+    "cycles": [
+      {
+        "id": 1793384919794,
+        "kind": "restart",
+        "path": "restart",
+        "started_at": "2026-10-30T18:28:39Z",
+        "ready_at": "2026-10-30T18:30:43Z",
+        "cold_start_s": 123.2,
+        "stages": {
+          "image_s": 27.6,
+          "download_s": 0.0,
+          "vllm_s": 111.1,
+          "warmup_s": 0.0
+        },
+        "host": 150100,
+        "geo": "Bulgaria, BG",
+        "price_dph": 0.4236,
+        "stopped_at": "2026-10-30T18:30:49Z",
+        "stop_reason": "admin",
+        "cost_usd": 0.0152,
+        "failed": false,
+        "fail_reason": null
+      },
+      {
+        "id": 1793383614722,
+        "kind": "cold",
+        "path": "new",
+        "started_at": "2026-10-30T18:06:54Z",
+        "ready_at": "2026-10-30T18:27:19Z",
+        "cold_start_s": 1224.9,
+        "stages": {
+          "image_s": 818.5,
+          "download_s": 151.4,
+          "vllm_s": 250.6,
+          "warmup_s": 4.4
+        },
+        "host": 150100,
+        "geo": "Bulgaria, BG",
+        "price_dph": 0.4236,
+        "stopped_at": "2026-10-30T18:28:28Z",
+        "stop_reason": "admin",
+        "cost_usd": 0.1523,
+        "failed": false,
+        "fail_reason": null
+      },
+      {
+        "id": 1793381224507,
+        "kind": "cold",
+        "path": "new",
+        "started_at": "2026-10-30T17:27:04Z",
+        "ready_at": null,
+        "cold_start_s": null,
+        "stages": {},
+        "host": null,
+        "geo": null,
+        "price_dph": null,
+        "stopped_at": "2026-10-30T17:42:09Z",
+        "stop_reason": "sem_oferta",
+        "cost_usd": 0.0,
+        "failed": true,
+        "fail_reason": null
+      },
+      {
+        "id": 1793379410991,
+        "kind": "cold",
+        "path": "new",
+        "started_at": "2026-10-30T16:56:50Z",
+        "ready_at": null,
+        "cold_start_s": null,
+        "stages": {
+          "image_s": 606.1
+        },
+        "host": 155220,
+        "geo": "Austria, AT",
+        "price_dph": 0.4194,
+        "stopped_at": "2026-10-30T17:22:19Z",
+        "stop_reason": "admin",
+        "cost_usd": 0.3326,
+        "failed": true,
+        "fail_reason": null
+      },
+      {
+        "id": 1793378075497,
+        "kind": "cold",
+        "path": "new",
+        "started_at": "2026-10-30T16:34:35Z",
+        "ready_at": null,
+        "cold_start_s": null,
+        "stages": {
+          "image_s": 171.0
+        },
+        "host": 137429,
+        "geo": "Czechia, CZ",
+        "price_dph": 0.4194,
+        "stopped_at": "2026-10-30T16:54:35Z",
+        "stop_reason": "sem_oferta",
+        "cost_usd": 0.1742,
+        "failed": true,
+        "fail_reason": null
+      }
+    ],
+    "error": null
+  },
+  "stream": {
+    "http": 200,
+    "headers_s": 0.49,
+    "notices": 37,
+    "first_notice_s": 0.52,
+    "first_real_token_s": null,
+    "last_xq": {
+      "state": "LOADING",
+      "phase": "loading_model",
+      "path": "known",
+      "eta_s": 5,
+      "elapsed_s": 2160,
+      "message": "Ainda ligando o computador da IA (carregando o modelo). Faltam cerca de 1 minuto. Sua pergunta continua na fila."
+    },
+    "total_s": 2218.9
+  },
+  "hermes": {},
+  "cycle": [
+    {
+      "id": 1793385100990,
+      "kind": "cold",
+      "path": "known",
+      "started_at": "2026-10-30T18:31:40Z",
+      "ready_at": null,
+      "cold_start_s": null,
+      "stages": {
+        "image_s": 1309.4
+      },
+      "host": 150100,
+      "geo": "Bulgaria, BG",
+      "price_dph": 0.4236,
+      "stopped_at": "2026-10-30T19:08:34Z",
+      "stop_reason": "desperdicio",
+      "cost_usd": 0.6331,
+      "failed": true,
+      "fail_reason": null
+    }
+  ],
+  "error": "RuntimeError('a GPU nao ficou pronta: os testes seguintes nao rodam (evita acordar de novo)')",
+  "instance_diag": "boot 1793386407.732819723\ndownload_start 1793386409.612448793\ndownload_end 1793386679.550347777\nvllm_start 1793386682.796398987\nvllm_ready 1793386932.401048200\n---boot\n== bootstrap 2026-10-30T18:53:27Z\nbaixado do Drive: llm\nbaixado do Drive: embed\nLLM iniciada (util 0.68)\nembedding iniciado (util 0.24)\n== bootstrap fim\n---vllm\n(APIServer pid=537) INFO:     127.0.0.1:60162 - \"GET /health HTTP/1.1\" 200 OK\n(APIServer pid=537) INFO:     127.0.0.1:60176 - \"GET /health HTTP/1.1\" 200 OK\n(APIServer pid=537) INFO:     127.0.0.1:55008 - \"GET /health HTTP/1.1\" 200 OK\n(APIServer pid=537) INFO:     127.0.0.1:33078 - \"GET /health HTTP/1.1\" 200 OK\n(APIServer pid=537) INFO:     127.0.0.1:33086 - \"GET /health HTTP/1.1\" 200 OK\n(APIServer pid=537) INFO:     127.0.0.1:43864 - \"GET /health HTTP/1.1\" 200 OK\n(APIServer pid=537) INFO:     127.0.0.1:43868 - \"GET /health HTTP/1.1\" 200 OK\n(APIServer pid=537) INFO:     127.0.0.1:44400 - \"GET /health HTTP/1.1\" 200 OK\n(APIServer pid=537) INFO:     127.0.0.1:44412 - \"GET /health HTTP/1.1\" 200 OK\n(APIServer pid=537) INFO:     127.0.0.1:54890 - \"GET /health HTTP/1.1\" 200 OK\n(APIServer pid=537) INFO:     127.0.0.1:47884 - \"GET /health HTTP/1.1\" 200 OK\n(APIServer pid=537) INFO:     127.0.0.1:47892 - \"GET /metrics HTTP/1.1\" 200 OK\n---disk\noverlay          70G   27G   44G  38% /\n19G\t/workspace/models/awq\n7.6G\t/workspace/models/embed\n15340 MiB\n15340 MiB\n",
+  "credit_end": 1.5081079192799365,
+  "spent_usd": 0.114
+}

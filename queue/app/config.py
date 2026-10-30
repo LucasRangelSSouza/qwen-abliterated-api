@@ -51,6 +51,8 @@ class Settings:
     llm_repo: str = "twolven/Qwen3.8-27B-abliterated-AWQ-MTP"
     embed_repo: str = "Qwen/Qwen3-Embedding-4B"
     tool_parser: str = "qwen3_xml"  # o Hermes envia tools com tool_choice=auto: o vLLM exige --enable-auto-tool-choice e um parser (medido em 30/10)
+    drive_remote: str = ""      # ex.: gdrive:qwen-cache (Spec 14 §5b): origem dos pesos antes do Hugging Face; vazio = so Hugging Face
+    rclone_config_b64: str = ""  # rclone.conf em base64 (segredo; vai no env da instancia, risco aceito pelo dono)
     embed_mode: str = "off"  # off | gpu. "off" ate o teste de convivencia da Fase 2 (Spec 13 §4.2)
     llm_util: float = 0.92   # 0.68 quando embed_mode=gpu
     embed_util: float = 0.24
@@ -98,6 +100,9 @@ class Settings:
     search_retry_s: float = 60.0
     search_window_s: float = 900.0
     keepalive_s: float = 15.0
+    notice_enabled: bool = True          # aviso de espera dentro do stream (Spec 14 §3)
+    notice_every_s: float = 60.0
+    notice_fields: tuple = ("reasoning", "reasoning_content")  # campos do delta que carregam o aviso; o vLLM usa um dos dois conforme a versao
     bad_host_ttl_h: float = 24.0
     bad_host_hard_ttl_h: float = 168.0
     hedge_enabled: bool = True
@@ -143,6 +148,8 @@ class Settings:
             vast_api_key=_secret("VAST_API_KEY"),
             vast_base=os.environ.get("VAST_BASE", cls.vast_base),
             embed_mode=os.environ.get("GPU_EMBED_MODE", cls.embed_mode),
+            drive_remote=os.environ.get("GPU_DRIVE_REMOTE", ""),
+            rclone_config_b64=_secret("RCLONE_CONFIG_B64"),
             tool_parser=os.environ.get("GPU_TOOL_PARSER", cls.tool_parser),
             image=os.environ.get("GPU_IMAGE", cls.image),
             llm_repo=os.environ.get("GPU_LLM_REPO", cls.llm_repo),
@@ -171,6 +178,9 @@ class Settings:
             batch_budget_usd=_f("GPU_BATCH_BUDGET_USD", cls.batch_budget_usd),
             hedge_enabled=_b("GPU_HEDGE_ENABLED", cls.hedge_enabled),
             keepalive_s=_f("KEEPALIVE_S", cls.keepalive_s),
+            notice_enabled=_b("NOTICE_ENABLED", cls.notice_enabled),
+            notice_every_s=_f("NOTICE_EVERY_S", cls.notice_every_s),
+            notice_fields=tuple(x.strip() for x in os.environ.get("NOTICE_FIELDS", ",".join(cls.notice_fields)).split(",") if x.strip()),
             chat_max_inflight=_i("CHAT_MAX_INFLIGHT", cls.chat_max_inflight),
             embed_max_inflight=_i("EMBED_MAX_INFLIGHT", cls.embed_max_inflight),
         )

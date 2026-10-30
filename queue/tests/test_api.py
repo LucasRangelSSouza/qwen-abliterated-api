@@ -39,7 +39,13 @@ class StubCtl:
     def begin_request(self): self.begun += 1
     def end_request(self): self.ended += 1
     def touch(self): pass
-    def status(self): return {"state": self.state, "eta_s": None}
+    def status(self): return {"state": self.state, "eta_s": 240 if self.state != "READY" else None, "path": "restart"}
+    def request_wake(self, priority=False): self.woken = True
+    woken = False
+
+    class cycles:  # noqa: N801
+        @staticmethod
+        async def list(limit=50): return [{"id": 1, "kind": "cold", "stopped_at": None}]
     def start(self): pass
     async def stop_loop(self): pass
 

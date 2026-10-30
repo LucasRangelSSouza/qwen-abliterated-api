@@ -17,6 +17,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
+from app import notice
 from app.alerts import Alerts
 from app.config import Settings
 from app.gpu.controller import READY, GPUController, GPUUnavailable
@@ -130,6 +131,12 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
                              "max_allin_dph": q.s.effective_max_dph}})
         return st
 
+    @app.get("/admin/gpu/cycles")
+    async def admin_cycles(request: Request, limit: int = 50):
+        """Log de ligar/desligar da GPU (tela Maquinas do painel): mais recente primeiro; o ciclo em curso vem com stopped_at nulo."""
+        q = _admin(request)
+        return {"cycles": await q.ctl.cycles.list(max(1, min(limit, 300)))}
+
     def _admin(request: Request) -> App:
         q: App = request.app.state.q
         key = request.headers.get("x-admin-key", "")
@@ -189,6 +196,14 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             approx = len(json.dumps(body.get("messages", []), ensure_ascii=False)) // 3 + int(body.get("max_tokens") or 0)
             if approx > q.s.max_context_tokens * 2:  # folga: a conta de caracteres por 3 superestima
                 raise HTTPException(400, detail=_err("contexto acima do limite de 65536 tokens", "invalid_request_error", "context_length_exceeded"))
+        if request.headers.get("x-queue-wait", "").strip() == "0" and q.ctl.state != READY:
+            # cliente que nao quer ficar pendurado: acorda a GPU e responde 202 com o tempo estimado
+            q.ctl.request_wake(bool(consumer.get("priority")))
+            st = q.ctl.status()
+            eta = int(st.get("eta_s") or 120)
+            return JSONResponse(status_code=202, headers={"Retry-After": str(eta)}, content={
+                "status": "waking", "state": st["state"], "eta_s": st.get("eta_s"),
+                "message": "O computador da IA estava desligado e está sendo ligado agora. Tente de novo no tempo indicado em Retry-After."})
         lane = q.lane_for(kind)
         try:
             ticket = lane.admit(consumer["name"], cls, time.time())
@@ -199,24 +214,42 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         media = "text/event-stream" if stream else "application/json"
         headers = {"X-LLM-State": q.ctl.state, "X-LLM-Queue-Position": str(lane.position(ticket)), "Cache-Control": "no-store",
                    "X-Accel-Buffering": "no"}
-        gen = _run(q, lane, ticket, consumer, kind, path, body, stream, bool(consumer.get("priority")))
+        fields = ("content",) if request.headers.get("x-queue-notice", "").strip().lower() == "content" else q.s.notice_fields
+        gen = _run(q, lane, ticket, consumer, kind, path, body, stream, bool(consumer.get("priority")), fields)
         return StreamingResponse(gen, media_type=media, headers=headers)
 
-    async def _run(q: App, lane: Lane, ticket, consumer: dict, kind: str, path: str, body: dict, stream: bool, priority: bool):
+    async def _run(q: App, lane: Lane, ticket, consumer: dict, kind: str, path: str, body: dict, stream: bool, priority: bool,
+                   fields: tuple = ("reasoning", "reasoning_content")):
         s, name = q.s, consumer["name"]
         keep = b": acordando\n\n" if stream else b" "
         code = "200"
         q.ctl.begin_request()
         got_slot = False
         try:
+            # GPU fora do ar e cliente em stream: o aviso sai na hora (nao e erro, e espera), depois a cada notice_every_s
+            warn = stream and s.notice_enabled and q.ctl.state != READY
+            cid, t_wait, next_warn, warned = notice.new_id(), time.time(), 0.0, False
             prep = asyncio.create_task(_prepare(q, lane, ticket, priority))
             while not prep.done():
-                done, _ = await asyncio.wait({prep}, timeout=s.keepalive_s)
-                if not done:
+                now = time.time()
+                if warn and q.ctl.state != READY and now >= next_warn:
+                    st = q.ctl.status()
+                    txt = notice.first_text(st["path"]) if not warned else notice.update_text(st["state"], st.get("eta_s"))
+                    yield notice.chunk(txt, notice.x_queue(st["state"], st.get("eta_s"), now - t_wait, txt, st["path"]), fields, cid)
+                    warned, next_warn = True, now + s.notice_every_s
+                    continue_wait = min(s.keepalive_s, max(0.05, next_warn - now))
+                else:
+                    continue_wait = s.keepalive_s if not warn else min(s.keepalive_s, max(0.05, next_warn - now))
+                done, _ = await asyncio.wait({prep}, timeout=continue_wait)
+                if not done and not (warn and time.time() >= next_warn):
                     yield keep
             try:
                 prep.result()
                 got_slot = True
+                if warned:  # so avisa "pronto" quando a GPU de fato ficou pronta (falha segue para o erro abaixo)
+                    st = q.ctl.status()
+                    txt = notice.ready_text()
+                    yield notice.chunk(txt, notice.x_queue(st["state"], st.get("eta_s"), time.time() - t_wait, txt, st["path"]), fields, cid)
             except GPUUnavailable as e:
                 code = "503"
                 yield _error_chunk(stream, f"GPU indisponivel ({e.reason}): tente novamente em {e.retry_after}s", "service_unavailable", e.reason)

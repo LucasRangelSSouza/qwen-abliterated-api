@@ -15,6 +15,7 @@ from typing import Awaitable, Callable
 from app.alerts import Alerts
 from app.config import Settings
 from app.gpu import hosts as H
+from app.gpu.cycles import CycleLog
 from app.gpu.ledger import Ledger
 from app.gpu.tunnel import Tunnel
 from app.gpu.vast import Instance, VastAPI
@@ -41,10 +42,13 @@ class GPUUnavailable(Exception):
 
 def render_env(s: Settings) -> dict:
     """Variaveis de ambiente do contêiner (lidas pelo remote/bootstrap.sh)."""
-    return {"LLM_REPO": s.llm_repo, "EMBED_REPO": s.embed_repo, "EMBED_MODE": s.embed_mode,
-            "LLM_UTIL": str(s.effective_llm_util), "EMBED_UTIL": str(s.embed_util),
-            "WATCHDOG_IDLE_MIN": str(int(s.watchdog_idle_min)), "HF_HUB_ENABLE_HF_TRANSFER": "1",
-            "TOOL_PARSER": s.tool_parser}
+    env = {"LLM_REPO": s.llm_repo, "EMBED_REPO": s.embed_repo, "EMBED_MODE": s.embed_mode,
+           "LLM_UTIL": str(s.effective_llm_util), "EMBED_UTIL": str(s.embed_util),
+           "WATCHDOG_IDLE_MIN": str(int(s.watchdog_idle_min)), "HF_HUB_ENABLE_HF_TRANSFER": "1",
+           "TOOL_PARSER": s.tool_parser}
+    if s.drive_remote and s.rclone_config_b64:  # origem alternativa dos pesos (Drive), com o Hugging Face de reserva
+        env.update({"DRIVE_REMOTE": s.drive_remote, "RCLONE_CONFIG_B64": s.rclone_config_b64})
+    return env
 
 
 def _strip(text: str, keep_shebang: bool = True) -> str:
@@ -100,6 +104,8 @@ class GPUController:
         self.wakes: list[float] = []
         self.attempts: list[dict] = []
         self._gone: set[int] = set()  # ofertas recusadas pela Vast (no_such_ask) no ciclo atual
+        self.cycles = CycleLog(redis, clock)  # uma linha por ligada, para a tela Maquinas do painel
+        self._geo: dict[int, str] = {}  # instancia -> regiao da oferta (so para o log de ciclos)
 
     # ------------------------------------------------------------------ API para o resto do servico
     def touch(self) -> None:
@@ -144,11 +150,23 @@ class GPUController:
         if self.state in (STARTING, FALLBACK, LOADING) and self.cold:
             base = self._eta_for(self.cold.get("path") or "new")
             eta = max(5, int(base - (now - self.cold["t0"])))
-        return {"state": self.state, "eta_s": eta, "instance_id": (self.inst or {}).get("id"),
+        return {"state": self.state, "eta_s": eta, "path": self.expected_path(), "instance_id": (self.inst or {}).get("id"),
                 "stopped": bool(self.inst and self.inst.get("stopped_at")), "inflight": self.inflight,
                 "idle_s": int(now - self.last_activity) if self.state == READY else None,
                 "last_cold_start_s": self.last_cold_s, "last_stop_reason": self.last_stop_reason, "attempts": self.attempts[-8:],
                 "fail": {"reason": self.fail.reason, "retry_after": self.fail.retry_after} if self.fail and self.state == OFF else None}
+
+    def expected_path(self) -> str:
+        """Caminho esperado (ou em curso) da subida: restart (instancia parada), known, new. Alimenta o aviso de espera."""
+        if self.cold.get("path") and self.state in (STARTING, FALLBACK, LOADING):
+            return self.cold["path"]
+        return "restart" if (self.inst and self.inst.get("stopped_at")) else "new"
+
+    def request_wake(self, priority: bool = False) -> None:
+        """Pede a partida sem esperar (X-Queue-Wait: 0)."""
+        self._priority = self._priority or priority
+        if self.state == OFF:
+            self._wake.set()
 
     def _eta_for(self, path: str) -> float:
         return ETA_DEFAULT.get(path, 650)
@@ -237,6 +255,7 @@ class GPUController:
 
     # ------------------------------------------------------------------ adocao apos reinicio
     async def adopt(self) -> None:
+        await self.cycles.restore()
         raw = await self.r.get(K_INST)
         rec = json.loads(raw) if raw else None
         live = [i for i in await self.vast.list_instances() if (i.raw.get("label") or "").startswith(LABEL)]
@@ -302,6 +321,7 @@ class GPUController:
         self.fail_ts = self.clock()
         self.fail_seq += 1
         log.error("ciclo de partida falhou: %s", reason)
+        await self._close_cycle(reason, failed=True)
         await self._set_state(OFF)
 
     async def _start_cycle(self) -> None:
@@ -318,6 +338,7 @@ class GPUController:
         self.fail, self.waste = None, 0.0
         self._gone = set()
         self.cold = {"t0": t0, "path": "restart" if (self.inst and self.inst.get("stopped_at")) else "new"}
+        await self.cycles.open(self.cold["path"])
         await self._set_state(STARTING)
         ok, why, retry = await self._gate()
         priority, self._priority = self._priority, False
@@ -334,6 +355,9 @@ class GPUController:
                 known = self.inst and self.inst.get("machine_id") in await self._known_good()
                 path = "known" if known else "new"
             self.cold["path"] = path
+            await self.cycles.mark(path=path, kind="restart" if path == "restart" else "cold", running_at=self.clock(), host=inst.machine_id,
+                                   geo=self._geo.get(inst.id), price_dph=round(inst.dph_total, 4))
+            await self.cycles.stage(image_s=round(self.clock() - t0, 1))
             await self._set_state(LOADING)
             if not await self._connect_and_wait(inst, deadline=self.clock() + s.health_timeout_s):
                 diag = await self._ssh_diag(inst)
@@ -455,6 +479,7 @@ class GPUController:
                 return None
             if i.running:
                 self._note(c, "running", f"em {self.clock() - t_start:.0f}s")
+                self._geo[i.id] = c.geo
                 return i
             await asyncio.sleep(s.poll_s)
         i = await self.vast.get_instance(iid)
@@ -524,6 +549,48 @@ class GPUController:
             self.inst = {"id": winner.id, "machine_id": winner.machine_id, "dph": winner.dph_total, "storage_h": 0.0, "created_at": self.cold.get("t0", self.clock()), "spec": self.spec_id}
             await self._persist()
         return winner
+
+    async def _close_cycle(self, reason: str, failed: bool = False) -> None:
+        """Fecha a linha do ciclo atual com o motivo e o custo estimado (preco travado x horas, mais tentativas perdidas)."""
+        c = self.cycles.cur
+        if c is None:
+            return
+        dph = float((self.inst or {}).get("dph") or c.get("price_dph") or 0.0)
+        cost = dph * max(0.0, self.clock() - c["t0"]) / 3600.0 + self.waste
+        await self.cycles.close(reason, cost, failed=failed)
+
+    async def _collect_stages(self, inst: Instance) -> None:
+        """Le /workspace/stages.txt da instancia (gravado pelo bootstrap) e completa as etapas download e vllm do ciclo."""
+        try:
+            marks: dict[str, float] = {}
+            for line in (await self._ssh_stages(inst)).splitlines():
+                parts = line.split()
+                if len(parts) == 2:
+                    try:
+                        marks[parts[0]] = float(parts[1])
+                    except ValueError:
+                        pass
+            kv = {}
+            if "download_start" in marks and "download_end" in marks:
+                kv["download_s"] = round(marks["download_end"] - marks["download_start"], 1)
+            if "vllm_start" in marks and "vllm_ready" in marks:
+                kv["vllm_s"] = round(marks["vllm_ready"] - marks["vllm_start"], 1)
+            if kv:
+                await self.cycles.stage(**kv)
+        except Exception as e:  # noqa: BLE001
+            log.info("etapas do cold start indisponiveis: %r", e)
+
+    async def _ssh_stages(self, inst: Instance) -> str:
+        if self.s.tunnel_mode == "none" or not self.s.ssh_key_path:
+            return ""
+        cur = await self.vast.get_instance(inst.id) or inst
+        if not (cur.ssh_host and cur.ssh_port):
+            return ""
+        cmd = ["ssh", "-i", self.s.ssh_key_path, "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+               "-o", "LogLevel=ERROR", "-o", "ConnectTimeout=10", "-p", str(cur.ssh_port), f"root@{cur.ssh_host}", "cat /workspace/stages.txt 2>/dev/null"]
+        p = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        out, _ = await asyncio.wait_for(p.communicate(), 25.0)
+        return out.decode(errors="replace")
 
     # --- conexao e saude
     async def _connect_and_wait(self, inst: Instance, deadline: float) -> bool:
@@ -597,6 +664,10 @@ class GPUController:
         if inst.machine_id is not None:
             await self.r.sadd(K_GOOD, str(inst.machine_id))
         self.fail, self._tunnel_bad = None, 0
+        if self.cycles.cur is None:  # instancia adotada apos reinicio do servico
+            await self.cycles.open("adopt")
+        await self.cycles.mark(ready_at=self.clock())
+        asyncio.create_task(self._collect_stages(inst))
         self._last_reconcile = self.clock()
         self.touch()
         await self._set_state(READY)
@@ -624,6 +695,7 @@ class GPUController:
             await self.ledger.end("run", iid)
             if i is not None:
                 await self.vast.destroy(iid)
+            await self._close_cycle("host_caiu", failed=True)
             self.inst = None
             await self._persist()
             return await self._set_state(OFF)
@@ -641,6 +713,7 @@ class GPUController:
             await self.tunnel.close()
             await self.ledger.end("run", iid)
             await self.vast.destroy(iid)
+            await self._close_cycle("sem_saude_em_producao", failed=True)
             self.inst = None
             await self._persist()
             await self._set_state(OFF)
@@ -672,6 +745,7 @@ class GPUController:
         await self.ledger.begin("stopped", iid, rate, now)
         self.inst["stopped_at"] = now
         await self._persist()
+        await self._close_cycle(reason)
         self._wake.clear()
         log.info("GPU parada (%s); instancia %s guardada ate %.0f h", reason, iid, self.s.stopped_ttl_h)
         await self._set_state(OFF)
@@ -689,6 +763,7 @@ class GPUController:
             await self.ledger.end("run", iid)
             await self.ledger.end("stopped", iid)
         log.info("instancia %s destruida (%s)", iid, reason)
+        await self._close_cycle(reason, failed=self.state in (STARTING, FALLBACK, LOADING))
         self.inst = None
         await self._persist()
         if self.state != OFF:

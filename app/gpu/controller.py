@@ -211,7 +211,7 @@ class GPUController:
             if self._wake.is_set():
                 self._wake.clear()
                 await self._start_cycle()
-            elif self.inst and self.inst.get("stopped_at") and now - self.inst["stopped_at"] > self.s.stopped_ttl_h * 3600:
+            elif self.inst and self.inst.get("stopped_at") and now - self.inst["stopped_at"] > self._stopped_ttl_s():
                 await self._destroy_instance("ttl_parada")
         elif self.state == READY:
             if now - self._last_reconcile >= self.s.reconcile_s:
@@ -219,6 +219,14 @@ class GPUController:
                 await self._reconcile()
             if self.state == READY:
                 await self._guards(now)
+
+    def _stopped_ttl_s(self) -> float:
+        """TTL da instancia parada: GPU_STOPPED_TTL_H, mas nunca mais que GPU_STOPPED_MAX_USD de disco (hosts com disco caro)."""
+        ttl_h = self.s.stopped_ttl_h
+        rate = float((self.inst or {}).get("storage_h") or 0.0)
+        if rate > 0 and self.s.stopped_max_usd > 0:
+            ttl_h = min(ttl_h, self.s.stopped_max_usd / rate)
+        return ttl_h * 3600.0
 
     # ------------------------------------------------------------------ adocao apos reinicio
     async def adopt(self) -> None:

@@ -85,6 +85,7 @@ class Settings:
     # --- tempos (segundos, Spec 13 §5)
     idle_min: float = 30.0
     stopped_ttl_h: float = 24.0
+    stopped_max_usd: float = 0.30   # custo maximo do disco de uma instancia parada: o TTL efetivo e o menor entre stopped_ttl_h e este teto / preco do disco
     watchdog_idle_min: float = 45.0
     reconcile_s: float = 60.0
     poll_s: float = 5.0
@@ -161,6 +162,7 @@ class Settings:
             max_dl_usd_tb=_f("GPU_MAX_DL_USD_TB", cls.max_dl_usd_tb),
             idle_min=_f("GPU_IDLE_MIN", cls.idle_min),
             stopped_ttl_h=_f("GPU_STOPPED_TTL_H", cls.stopped_ttl_h),
+            stopped_max_usd=_f("GPU_STOPPED_MAX_USD", cls.stopped_max_usd),
             batch_enabled=_b("GPU_BATCH_ENABLED", cls.batch_enabled),
             batch_budget_usd=_f("GPU_BATCH_BUDGET_USD", cls.batch_budget_usd),
             hedge_enabled=_b("GPU_HEDGE_ENABLED", cls.hedge_enabled),

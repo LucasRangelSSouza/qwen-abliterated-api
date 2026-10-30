@@ -227,3 +227,14 @@ async def test_falha_no_portao_nao_martela_a_vast(make_ctl):
         await ctl.ensure_ready()
     await asyncio.sleep(0.3)  # 30 ciclos de poll: nenhuma nova consulta sem novo pedido
     assert calls["n"] == 1
+
+
+async def test_ttl_efetivo_respeita_o_custo_do_disco_parado(make_ctl):
+    ctl, vast, _ = await make_ctl(fast_settings(stopped_ttl_h=24.0, stopped_max_usd=0.0000002))
+    ctl.inst = {"id": 1, "storage_h": 0.036}
+    assert abs(ctl._stopped_ttl_s() - 0.0000002 / 0.036 * 3600) < 1e-9  # ~0,02 s: o teto de US$ manda
+    ctl.inst = {"id": 1, "storage_h": 0.0}
+    assert ctl._stopped_ttl_s() == 24.0 * 3600  # sem preco conhecido, vale o TTL em horas
+    ctl2, _, _ = await make_ctl(fast_settings(stopped_ttl_h=24.0, stopped_max_usd=0.30))
+    ctl2.inst = {"id": 1, "storage_h": 0.013}
+    assert abs(ctl2._stopped_ttl_s() - 0.30 / 0.013 * 3600) < 1e-6  # disco barato: ~23 h

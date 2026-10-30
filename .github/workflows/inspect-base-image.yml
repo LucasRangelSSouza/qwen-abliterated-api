@@ -18,6 +18,9 @@ jobs:
       - name: Onde estao os bytes
         run: |
           docker run --rm --entrypoint sh "${{ inputs.image }}" -c 'du -xk --max-depth=4 / 2>/dev/null | sort -rn | head -45 | awk "{printf \"%7.2f GB  %s\n\", \$1/1048576, \$2}"'
+      - name: Pacotes maiores em /usr/local/lib/python3.12
+        run: |
+          docker run --rm --entrypoint sh "${{ inputs.image }}" -c 'for d in /usr/local/lib/python3.12/dist-packages /usr/local/lib/python3.12/site-packages; do [ -d $d ] && { echo "== $d"; du -sk $d/* 2>/dev/null | sort -rn | head -25 | awk "{printf \"%7.2f GB  %s\n\", \$1/1048576, \$2}"; }; done; ls /usr/local/lib/python3.12'
       - name: Pacotes python maiores
         run: |
           docker run --rm --entrypoint sh "${{ inputs.image }}" -c 'for d in $(find / -maxdepth 6 -type d -name site-packages -o -maxdepth 6 -type d -name dist-packages 2>/dev/null | head -4); do echo "== $d"; du -sk "$d"/* 2>/dev/null | sort -rn | head -14 | awk "{printf \"%7.2f GB  %s\n\", \$1/1048576, \$2}"; done'

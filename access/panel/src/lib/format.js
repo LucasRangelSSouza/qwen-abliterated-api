@@ -28,7 +28,7 @@ export const fmtIn = (v) => {
 export const fmtAgo = (v) => {
   const d = toDate(v); if (!d) return 'nunca'
   const s = (Date.now() - d.getTime()) / 1000
-  return s < 60 ? 'agora há pouco' : 'há ' + fmtDur(s)
+  return s < 60 ? 'agora há pouco' : 'há ' + fmtDur(Math.round(s / 60) * 60)
 }
 export const todayBR = () => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date())
 export const cn = (...a) => a.filter(Boolean).join(' ')

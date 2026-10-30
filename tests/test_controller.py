@@ -327,3 +327,22 @@ async def test_instancia_que_demora_a_aparecer_na_lista_nao_e_dada_como_perdida(
     ctl.start()
     await ctl.ensure_ready()
     assert ctl.state == READY and await redis.hlen(K_BAD) == 0
+
+
+async def test_oferta_unica_que_sumiu_nao_e_repetida_e_o_filtro_afrouxa(make_ctl):
+    from app.gpu import hosts as H
+    s = fast_settings(min_inet_down=900.0)  # filtro estrito: poucas ofertas no nivel 0
+    n0 = H.qualify(real_offers(), s, set(), set(), 0)
+    n3 = H.qualify(real_offers(), s, set(), set(), 3)
+    assert 0 < len(n0) < len(n3)
+    vast = FakeVast()
+    for c in n0:
+        vast.create_script[c.offer_id] = "gone"  # todas as do nivel 0 foram alugadas por outros
+    ctl, vast, _ = await make_ctl(s, vast)
+    ctl.start()
+    await ctl.ensure_ready()
+    assert ctl.state == READY
+    gone_ids = {c.offer_id for c in n0}
+    creates = [c[1] for c in vast.calls if c[0] == "create"]
+    assert len(creates) == len(set(creates)), "nao pode insistir na mesma oferta"
+    assert creates[-1] not in gone_ids  # a instancia saiu de uma oferta de nivel mais frouxo

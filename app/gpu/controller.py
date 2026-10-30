@@ -99,6 +99,7 @@ class GPUController:
         self.last_stop_reason: str | None = None
         self.wakes: list[float] = []
         self.attempts: list[dict] = []
+        self._gone: set[int] = set()  # ofertas recusadas pela Vast (no_such_ask) no ciclo atual
 
     # ------------------------------------------------------------------ API para o resto do servico
     def touch(self) -> None:
@@ -315,6 +316,7 @@ class GPUController:
         s = self.s
         t0 = self.clock()
         self.fail, self.waste = None, 0.0
+        self._gone = set()
         self.cold = {"t0": t0, "path": "restart" if (self.inst and self.inst.get("stopped_at")) else "new"}
         await self._set_state(STARTING)
         ok, why, retry = await self._gate()
@@ -398,7 +400,8 @@ class GPUController:
             bad, known = await self._bad_hosts(), await self._known_good()
             cands: list[H.Candidate] = []
             for relax in (0, 1, 2, 3):
-                cands = H.qualify(offers, s, bad, known, relax)
+                # ofertas que a Vast ja recusou (no_such_ask) neste ciclo saem da lista; se sobrar nada, o filtro afrouxa um nivel
+                cands = [x for x in H.qualify(offers, s, bad, known, relax) if x.offer_id not in self._gone]
                 if cands:
                     break
             if not cands:
@@ -422,6 +425,8 @@ class GPUController:
         res = await self.vast.create_instance(c.offer_id, s.image, s.disk_gb, f"{LABEL}-{int(t_start)}", self.onstart, env)
         if not res.ok:
             # B: oferta que sumiu nao e culpa do host (nao marca); qualquer outra recusa e registrada com a mensagem da Vast
+            if res.offer_gone:
+                self._gone.add(c.offer_id)  # nao insistir na mesma oferta neste ciclo
             self._note(c, "oferta_sumiu" if res.offer_gone else "criar_falhou", f"{res.error} {res.msg}")
             (log.info if res.offer_gone else log.warning)("criar na oferta %s (host %s) falhou: %s %s", c.offer_id, c.machine_id, res.error, res.msg)
             return None

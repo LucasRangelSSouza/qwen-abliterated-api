@@ -48,7 +48,7 @@ class App:
 
     def _load_consumers(self) -> dict:
         try:
-            raw = json.load(open(self.s.consumers_file, encoding="utf-8"))
+            raw = json.loads(self.s.consumers_json) if self.s.consumers_json else json.load(open(self.s.consumers_file, encoding="utf-8"))
         except Exception:  # noqa: BLE001
             return {}
         return {c["key_sha256"]: c for c in raw}
@@ -75,7 +75,15 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        r = redis or aioredis.from_url(s.redis_url)
+        if s.ssh_private_key_b64 and not s.ssh_key_path:
+            s.ssh_key_path = _write_key(s.ssh_private_key_b64)
+        if redis is not None:
+            r = redis
+        elif s.redis_url.startswith("fakeredis"):  # so desenvolvimento local
+            import fakeredis.aioredis
+            r = fakeredis.aioredis.FakeRedis()
+        else:
+            r = aioredis.from_url(s.redis_url)
         alerts = Alerts(s.webhook_url)
         client = http or httpx.AsyncClient(timeout=httpx.Timeout(s.request_timeout_s, connect=10.0))
         ctl = controller
@@ -246,6 +254,18 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         return (b"data: " + payload + b"\n\ndata: [DONE]\n\n") if stream else payload
 
     return app
+
+
+def _write_key(b64: str) -> str:
+    import base64
+    import os
+    import tempfile
+    d = tempfile.mkdtemp(prefix="llmq-")
+    p = os.path.join(d, "key")
+    with open(p, "wb") as f:
+        f.write(base64.b64decode(b64))
+    os.chmod(p, 0o600)
+    return p
 
 
 def _forwards(s: Settings) -> list[tuple[int, int]]:

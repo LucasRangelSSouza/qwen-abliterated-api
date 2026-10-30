@@ -33,6 +33,8 @@ class Settings:
     # --- servico
     redis_url: str = "redis://redis:6379/5"
     consumers_file: str = "/run/secrets/llm-queue-consumers.json"
+    consumers_json: str = ""      # alternativa ao arquivo: JSON na variavel CONSUMERS_JSON (padrao de segredos do vps_rt_infra: so env_file)
+    ssh_private_key_b64: str = "" # chave SSH privada em base64 na variavel SSH_PRIVATE_KEY_B64 (gravada em /tmp com 0600 ao subir)
     admin_key_sha256: str = ""
     webhook_url: str = ""
     # --- upstreams (portas LOCAIS dos tuneis SSH; nunca o endereco da Vast, Spec 13 §3.3)
@@ -128,6 +130,8 @@ class Settings:
         s = cls(
             redis_url=os.environ.get("REDIS_URL", cls.redis_url),
             consumers_file=os.environ.get("CONSUMERS_FILE", cls.consumers_file),
+            consumers_json=_secret("CONSUMERS_JSON"),
+            ssh_private_key_b64=_secret("SSH_PRIVATE_KEY_B64"),
             admin_key_sha256=os.environ.get("ADMIN_KEY_SHA256", ""),
             webhook_url=_secret("GOOGLE_CHAT_WEBHOOK"),
             chat_upstream=os.environ.get("CHAT_UPSTREAM", cls.chat_upstream),

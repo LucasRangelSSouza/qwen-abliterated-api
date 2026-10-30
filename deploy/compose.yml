@@ -1,0 +1,41 @@
+# Stack "llm-queue" (Spec 13): fila de IA com GPU sob demanda. Copiar para vps_rt_infra/stacks/llm-queue/compose.yml.
+# Sem porta publica e sem rota Traefik: so o llm-gateway, o portfolio-api e o harness chamam, pela rede interna.
+# Segredos so na VPS: /opt/platform/secrets/llm-queue.env (REDIS_URL, VAST_API_KEY, SSH_PRIVATE_KEY_B64, CONSUMERS_JSON, ...).
+name: llm-queue
+services:
+  llm-queue:
+    image: ${LLM_QUEUE_IMAGE:?imagem definida pelo scripts/deploy.sh a partir de releases/llm-queue.lock}
+    container_name: llm-queue
+    restart: unless-stopped
+    env_file: /opt/platform/secrets/llm-queue.env
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 128
+    logging: { driver: json-file, options: { max-size: 10m, max-file: "3" } }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 8s
+      retries: 5
+      start_period: 20s
+    networks:
+      internal:
+        # o anti-SSRF do llm-gateway recusa hostname sem ponto ("llm-queue"); o alias com ponto passa (Spec 13 §3.4)
+        aliases: [llm-queue.rt]
+      public: {}            # so para sair: API da Vast e SSH ate a GPU (sem porta publicada)
+      portfolio: {}         # o portfolio-api chama /v1/embeddings
+    labels:
+      - rt.service=llm-queue
+      - rt.layer=B
+      - traefik.enable=false
+networks:
+  internal:
+    external: true
+  public:
+    external: true
+  portfolio:
+    external: true

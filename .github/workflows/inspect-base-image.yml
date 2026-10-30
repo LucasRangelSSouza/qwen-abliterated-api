@@ -24,5 +24,8 @@ jobs:
       - name: Pacotes python maiores
         run: |
           docker run --rm --entrypoint sh "${{ inputs.image }}" -c 'for d in $(find / -maxdepth 6 -type d -name site-packages -o -maxdepth 6 -type d -name dist-packages 2>/dev/null | head -4); do echo "== $d"; du -sk "$d"/* 2>/dev/null | sort -rn | head -14 | awk "{printf \"%7.2f GB  %s\n\", \$1/1048576, \$2}"; done'
+      - name: Estrutura do flashinfer (cubins por arquitetura)
+        run: |
+          docker run --rm --entrypoint sh "${{ inputs.image }}" -c 'cd /usr/local/lib/python3.12/dist-packages; ls flashinfer_cubin | head; du -sk flashinfer_cubin/* flashinfer_jit_cache/* 2>/dev/null | sort -rn | head -12 | awk "{printf \"%7.2f GB  %s\n\", \$1/1048576, \$2}"; find flashinfer_cubin -maxdepth 3 -type d | head -40; echo ---; find flashinfer_cubin -type f | sed -E "s/.*(sm_?[0-9]+[a-z]*).*/\1/" | sort | uniq -c | sort -rn | head -12; pip list 2>/dev/null | grep -i -E "flashinfer|vllm|torch " '
       - name: Config da imagem
         run: docker image inspect "${{ inputs.image }}" --format '{{json .Config.Entrypoint}} {{json .Config.Cmd}} {{json .Config.WorkingDir}} {{json .Config.User}}'

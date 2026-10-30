@@ -4,6 +4,7 @@ Trata host indisponivel (situacoes A a E), tetos de gasto e adocao de instancia 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import statistics
@@ -42,7 +43,8 @@ def render_env(s: Settings) -> dict:
     """Variaveis de ambiente do contêiner (lidas pelo remote/bootstrap.sh)."""
     return {"LLM_REPO": s.llm_repo, "EMBED_REPO": s.embed_repo, "EMBED_MODE": s.embed_mode,
             "LLM_UTIL": str(s.effective_llm_util), "EMBED_UTIL": str(s.embed_util),
-            "WATCHDOG_IDLE_MIN": str(int(s.watchdog_idle_min)), "HF_HUB_ENABLE_HF_TRANSFER": "1"}
+            "WATCHDOG_IDLE_MIN": str(int(s.watchdog_idle_min)), "HF_HUB_ENABLE_HF_TRANSFER": "1",
+            "TOOL_PARSER": s.tool_parser}
 
 
 def _strip(text: str, keep_shebang: bool = True) -> str:
@@ -75,6 +77,9 @@ class GPUController:
         self.s, self.vast, self.tunnel, self.ledger, self.alerts, self.r = s, vast, tunnel, ledger, alerts, redis
         self.health_probe, self.clock = health_probe, clock
         self.onstart = onstart if onstart is not None else load_onstart()
+        # impressao do que e gravado na instancia ao criar (onstart + env): a Vast guarda isso, entao religar/adotar instancia com
+        # impressao diferente rodaria o script ANTIGO. Impressao diferente => destruir e recriar.
+        self.spec_id = hashlib.sha256((self.onstart + json.dumps(render_env(s), sort_keys=True)).encode()).hexdigest()[:12]
         self.state = OFF
         self.inst: dict | None = None  # {"id","machine_id","dph","storage_h","stopped_at","created_at"}
         self.inflight = 0
@@ -245,6 +250,10 @@ class GPUController:
             if rec and extra.id != rec["id"]:
                 await self.vast.destroy(extra.id)
         self.inst = rec
+        if rec and rec.get("spec") != self.spec_id:  # criada por outra versao do script: nao adotar
+            log.warning("instancia %s com spec diferente (%s != %s): destruindo", rec["id"], rec.get("spec"), self.spec_id)
+            await self._destroy_instance("adopt_spec_diferente")
+            return
         await self._persist()
         if not rec:
             return
@@ -351,6 +360,10 @@ class GPUController:
     # --- A: religar a instancia parada
     async def _restart_stopped(self) -> Instance | None:
         s, iid = self.s, self.inst["id"]
+        if self.inst.get("spec") != self.spec_id:
+            await self.alerts.notify("spec_diferente", f"instancia {iid} foi criada com outro onstart/env: destruindo em vez de religar", "info")
+            await self._destroy_instance("spec_diferente")
+            return None
         res = await self.vast.power(iid, "running")
         if not res.ok:
             await self.alerts.notify("restart_unavailable", f"nao religou a instancia {iid}: {res.error} {res.msg}")
@@ -407,7 +420,7 @@ class GPUController:
                 log.warning("criar falhou: %s %s", res.error, res.msg)
             return None
         iid = res.instance_id
-        self.inst = {"id": iid, "machine_id": c.machine_id, "dph": c.allin_dph, "storage_h": 0.0, "created_at": t_start}
+        self.inst = {"id": iid, "machine_id": c.machine_id, "dph": c.allin_dph, "storage_h": 0.0, "created_at": t_start, "spec": self.spec_id}
         await self._persist()
         end = t_start + s.running_timeout_s
         while self.clock() < end:
@@ -480,7 +493,7 @@ class GPUController:
                     if (i.raw.get("label") or "").startswith(LABEL) and i.id != winner.id:
                         await self.vast.destroy(i.id)
         if winner is not None:
-            self.inst = {"id": winner.id, "machine_id": winner.machine_id, "dph": winner.dph_total, "storage_h": 0.0, "created_at": self.cold.get("t0", self.clock())}
+            self.inst = {"id": winner.id, "machine_id": winner.machine_id, "dph": winner.dph_total, "storage_h": 0.0, "created_at": self.cold.get("t0", self.clock()), "spec": self.spec_id}
             await self._persist()
         return winner
 

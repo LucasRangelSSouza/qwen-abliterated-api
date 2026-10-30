@@ -14,6 +14,7 @@ def test_onstart_embute_o_vigia_e_e_bash_valido():
     assert t.startswith("#!/bin/bash") and "#__WATCHDOG__" not in t
     assert "WATCHDOG_EOF" in t and "vllm:request_success_total" in t and "console.vast.ai" in t
     assert "--tensor-parallel-size 2" in t and "--mamba-ssm-cache-dtype bfloat16" in t
+    assert "--enable-auto-tool-choice" in t and "--tool-call-parser" in t  # o Hermes envia tools com tool_choice=auto
     assert len(t.encode()) < 6500, f"onstart grande demais para o campo da Vast: {len(t.encode())} bytes"
     bash = shutil.which("bash")
     if bash:
@@ -26,4 +27,5 @@ def test_env_do_conteiner_reflete_a_configuracao():
     s = Settings(embed_mode="gpu", llm_util=0.92)
     e = render_env(s)
     assert e["EMBED_MODE"] == "gpu" and e["LLM_UTIL"] == "0.68" and e["EMBED_UTIL"] == "0.24"  # com embedding a LLM encolhe
+    assert render_env(Settings())["TOOL_PARSER"] == "qwen3_xml"
     assert render_env(Settings())["LLM_UTIL"] == "0.92" and render_env(Settings())["EMBED_MODE"] == "off"

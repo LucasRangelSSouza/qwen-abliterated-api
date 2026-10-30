@@ -50,6 +50,7 @@ class Settings:
     image: str = "vastai/vllm:v0.30.0-cuda-13.0"
     llm_repo: str = "twolven/Qwen3.8-27B-abliterated-AWQ-MTP"
     embed_repo: str = "Qwen/Qwen3-Embedding-4B"
+    tool_parser: str = "qwen3_xml"  # o Hermes envia tools com tool_choice=auto: o vLLM exige --enable-auto-tool-choice e um parser (medido em 30/10)
     embed_mode: str = "off"  # off | gpu. "off" ate o teste de convivencia da Fase 2 (Spec 13 §4.2)
     llm_util: float = 0.92   # 0.68 quando embed_mode=gpu
     embed_util: float = 0.24
@@ -142,6 +143,7 @@ class Settings:
             vast_api_key=_secret("VAST_API_KEY"),
             vast_base=os.environ.get("VAST_BASE", cls.vast_base),
             embed_mode=os.environ.get("GPU_EMBED_MODE", cls.embed_mode),
+            tool_parser=os.environ.get("GPU_TOOL_PARSER", cls.tool_parser),
             image=os.environ.get("GPU_IMAGE", cls.image),
             llm_repo=os.environ.get("GPU_LLM_REPO", cls.llm_repo),
             embed_repo=os.environ.get("GPU_EMBED_REPO", cls.embed_repo),

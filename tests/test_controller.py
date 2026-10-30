@@ -193,10 +193,50 @@ async def test_adocao_apos_reinicio(make_ctl, redis):
     res = await vast.create_instance(cand.offer_id, "img", 70, f"{LABEL}-1", "", {})
     for _ in range(5):
         await vast.get_instance(res.instance_id)
-    await redis.set(K_INST, json.dumps({"id": res.instance_id, "machine_id": cand.machine_id, "dph": 0.4, "storage_h": 0.01, "created_at": 1}))
     ctl, vast, _ = await make_ctl(vast=vast)
+    await redis.set(K_INST, json.dumps({"id": res.instance_id, "machine_id": cand.machine_id, "dph": 0.4, "storage_h": 0.01,
+                                        "created_at": 1, "spec": ctl.spec_id}))
     await ctl.adopt()
     assert ctl.state == READY and ctl.inst["id"] == res.instance_id and vast.count("create") == 1
+
+
+async def test_adocao_de_instancia_com_spec_diferente_destroi(make_ctl, redis):
+    vast = FakeVast()
+    cand = _first_cand(fast_settings())[0]
+    res = await vast.create_instance(cand.offer_id, "img", 70, f"{LABEL}-1", "", {})
+    for _ in range(5):
+        await vast.get_instance(res.instance_id)
+    ctl, vast, _ = await make_ctl(vast=vast)
+    await redis.set(K_INST, json.dumps({"id": res.instance_id, "machine_id": cand.machine_id, "dph": 0.4, "storage_h": 0.01,
+                                        "created_at": 1, "spec": "script-antigo"}))
+    await ctl.adopt()
+    assert ctl.state == OFF and ctl.inst is None and res.instance_id not in vast.instances
+
+
+async def test_instancia_orfa_sem_registro_nao_e_adotada(make_ctl):
+    vast = FakeVast()
+    cand = _first_cand(fast_settings())[0]
+    res = await vast.create_instance(cand.offer_id, "img", 70, f"{LABEL}-1", "", {})
+    for _ in range(5):
+        await vast.get_instance(res.instance_id)
+    ctl, vast, _ = await make_ctl(vast=vast)
+    await ctl.adopt()  # existe na Vast com o nosso rotulo, mas sem spec: criada por versao desconhecida
+    assert ctl.state == OFF and res.instance_id not in vast.instances
+
+
+async def test_religar_com_spec_diferente_destroi_e_recria(make_ctl):
+    ctl, vast, _ = await make_ctl()
+    ctl.start()
+    await ctl.ensure_ready()
+    for _ in range(300):
+        await asyncio.sleep(0.02)
+        if ctl.state == OFF:
+            break
+    first_id = ctl.inst["id"]
+    ctl.inst["spec"] = "script-antigo"
+    await ctl.ensure_ready()
+    assert ctl.state == READY and vast.count("create") == 2 and first_id not in vast.instances
+    assert ctl.inst["spec"] == ctl.spec_id
 
 
 async def test_hedge_segunda_oferta_vence_e_a_perdedora_e_destruida(make_ctl):

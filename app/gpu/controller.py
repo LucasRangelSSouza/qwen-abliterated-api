@@ -333,6 +333,10 @@ class GPUController:
             self.cold["path"] = path
             await self._set_state(LOADING)
             if not await self._connect_and_wait(inst, deadline=self.clock() + s.health_timeout_s):
+                diag = await self._ssh_diag(inst)
+                if diag:
+                    log.error("diagnostico da instancia %s (sem saude): %s", inst.id, diag)
+                    await self.alerts.notify("diag_sem_saude", "LLM nao ficou saudavel; ultimas linhas do log da instancia: " + diag[-700:])
                 await self._account_waste(inst, "sem_saude")
                 await self._destroy_instance("sem_saude")
                 raise GPUUnavailable("sem_saude", "instancia subiu mas a LLM nao ficou saudavel", 120)
@@ -531,6 +535,23 @@ class GPUController:
                 return True
             await asyncio.sleep(s.poll_s)
         return False
+
+    async def _ssh_diag(self, inst: Instance) -> str:
+        """Ultimas linhas do log do vLLM e do onstart, lidas por SSH antes de destruir uma instancia sem saude (sem isso o motivo se perde)."""
+        if self.s.tunnel_mode == "none" or not self.s.ssh_key_path:
+            return ""
+        cur = await self.vast.get_instance(inst.id) or inst
+        if not (cur.ssh_host and cur.ssh_port):
+            return ""
+        cmd = ["ssh", "-i", self.s.ssh_key_path, "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+               "-o", "LogLevel=ERROR", "-o", "ConnectTimeout=10", "-p", str(cur.ssh_port), f"root@{cur.ssh_host}",
+               "tail -n 14 /workspace/vllm_llm.log 2>&1 | cut -c1-200; echo ---onstart; tail -n 6 /var/log/onstart.log 2>&1 | cut -c1-200"]
+        try:
+            p = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
+            out, _ = await asyncio.wait_for(p.communicate(), 25.0)
+            return out.decode(errors="replace").strip()
+        except Exception as e:  # noqa: BLE001
+            return f"(diagnostico indisponivel: {e!r})"
 
     async def _ssh_key_ok(self) -> bool:
         try:

@@ -34,7 +34,8 @@ if ! healthy 18000 && ! pgrep -f "port 18000" >/dev/null; then
   nohup vllm serve "$LLM_DIR" --served-model-name qwen-abliterated --host 127.0.0.1 --port 18000 \
     --tensor-parallel-size 2 --gpu-memory-utilization "$LLM_UTIL" --max-model-len 65536 --max-num-seqs 24 \
     --max-num-batched-tokens 16384 --reasoning-parser qwen3 --enable-prefix-caching \
-    --mamba-ssm-cache-dtype bfloat16 --mamba-cache-mode align \n    --enable-auto-tool-choice --tool-call-parser "${TOOL_PARSER:-qwen3_xml}" > /workspace/vllm_llm.log 2>&1 &
+    --mamba-ssm-cache-dtype bfloat16 --mamba-cache-mode align \
+    --enable-auto-tool-choice --tool-call-parser "${TOOL_PARSER:-qwen3_xml}" > /workspace/vllm_llm.log 2>&1 &
   echo "LLM iniciada (util $LLM_UTIL)"
 fi
 

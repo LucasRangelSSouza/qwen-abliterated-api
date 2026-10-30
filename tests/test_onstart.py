@@ -29,3 +29,20 @@ def test_env_do_conteiner_reflete_a_configuracao():
     assert e["EMBED_MODE"] == "gpu" and e["LLM_UTIL"] == "0.68" and e["EMBED_UTIL"] == "0.24"  # com embedding a LLM encolhe
     assert render_env(Settings())["TOOL_PARSER"] == "qwen3_xml"
     assert render_env(Settings())["LLM_UTIL"] == "0.92" and render_env(Settings())["EMBED_MODE"] == "off"
+
+
+def test_comando_do_vllm_tem_continuacao_de_linha_valida():
+    """Regressao de 30/10: um \n literal no lugar da quebra de linha entregou o argumento 'n' ao vLLM e a GPU nunca ficou saudavel."""
+    lines = load_onstart().splitlines()
+    i = next(k for k, line in enumerate(lines) if "--enable-auto-tool-choice" in line)
+    prev = lines[i - 1]
+    bs_n = chr(92) + "n"  # barra + n, a sequencia de dois caracteres que nao pode aparecer no comando
+    assert prev.rstrip().endswith(chr(92)) and bs_n not in prev, prev
+    for k in range(i - 6, i + 1):
+        assert bs_n not in lines[k], lines[k]
+
+
+def test_o_teste_acima_pegaria_o_arquivo_quebrado():
+    bs_n = chr(92) + "n"
+    quebrado = "vllm serve x --mamba-cache-mode align " + chr(92) + "n    --enable-auto-tool-choice"
+    assert bs_n in quebrado  # o mesmo criterio acusa o defeito de 30/10

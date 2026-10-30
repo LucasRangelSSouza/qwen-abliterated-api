@@ -278,3 +278,25 @@ async def test_ttl_efetivo_respeita_o_custo_do_disco_parado(make_ctl):
     ctl2, _, _ = await make_ctl(fast_settings(stopped_ttl_h=24.0, stopped_max_usd=0.30))
     ctl2.inst = {"id": 1, "storage_h": 0.013}
     assert abs(ctl2._stopped_ttl_s() - 0.30 / 0.013 * 3600) < 1e-6  # disco barato: ~23 h
+
+
+async def test_sem_saude_inclui_diagnostico_da_instancia_no_alerta(make_ctl):
+    ctl, vast, probe = await make_ctl(fast_settings(health_timeout_s=0.3, tunnel_mode="none"))
+    probe.ok = False
+    seen = []
+
+    async def fake_diag(inst):
+        return "vllm: error: unrecognized arguments: n"
+    ctl._ssh_diag = fake_diag
+    orig = ctl.alerts.notify
+
+    async def spy(key, text, level="warning"):
+        seen.append((key, text))
+        return await orig(key, text, level)
+    ctl.alerts.notify = spy
+    ctl.start()
+    with pytest.raises(GPUUnavailable) as e:
+        await ctl.ensure_ready()
+    assert e.value.reason == "sem_saude"
+    assert any(k == "diag_sem_saude" and "unrecognized arguments" in t for k, t in seen)
+    assert vast.instances == {}  # destruida depois do diagnostico

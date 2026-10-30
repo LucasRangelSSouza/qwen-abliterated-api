@@ -32,7 +32,7 @@ for i, p in enumerate(BIG):
 ex = " ".join(f"--exclude={p}" for p in BIG)
 out.append(f"COPY --from=slim {ex} /usr/local /usr/local")
 out.append("COPY --from=slim --exclude=usr/local /usr /usr")
-out.append("COPY --from=slim --exclude=usr /. /")
+out.append("COPY --from=slim --exclude=usr / /")
 for e in cfg.get("Env") or []:
     k, _, v = e.partition("=")
     out.append(f"ENV {k}={q(v)}")

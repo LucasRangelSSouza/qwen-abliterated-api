@@ -33,7 +33,7 @@ jobs:
           cat Dockerfile.slim | cut -c1-200
       - name: Build e push (camadas gzip, para qualquer Docker de host)
         run: |
-          docker buildx build -f Dockerfile.slim -t "$IMAGE:${{ inputs.tag }}" --push --provenance=false \
+          docker buildx build -f Dockerfile.slim --provenance=false \
             --output type=image,name=$IMAGE:${{ inputs.tag }},push=true,compression=gzip,compression-level=6,force-compression=true .
       - name: Camadas da imagem nova
         run: |

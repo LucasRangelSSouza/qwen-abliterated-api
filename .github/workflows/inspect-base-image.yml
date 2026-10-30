@@ -1,0 +1,25 @@
+name: Inspect base GPU image
+# Estudo do cold start (Spec 14 §5c): mostra onde estao os bytes da imagem base e quanto leva puxar do Docker Hub e descompactar.
+on:
+  workflow_dispatch:
+    inputs:
+      image:
+        description: "Imagem base"
+        default: "vastai/vllm:v0.30.0-cuda-13.0"
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull cronometrado
+        run: |
+          df -h / | tail -1
+          /usr/bin/time -v docker pull "${{ inputs.image }}" 2>&1 | grep -E "Elapsed|Maximum resident" || true
+          docker image inspect "${{ inputs.image }}" --format 'tamanho descompactado: {{.Size}} bytes, camadas: {{len .RootFS.Layers}}'
+      - name: Onde estao os bytes
+        run: |
+          docker run --rm --entrypoint sh "${{ inputs.image }}" -c 'du -xk --max-depth=4 / 2>/dev/null | sort -rn | head -45 | awk "{printf \"%7.2f GB  %s\n\", \$1/1048576, \$2}"'
+      - name: Pacotes python maiores
+        run: |
+          docker run --rm --entrypoint sh "${{ inputs.image }}" -c 'for d in $(find / -maxdepth 6 -type d -name site-packages -o -maxdepth 6 -type d -name dist-packages 2>/dev/null | head -4); do echo "== $d"; du -sk "$d"/* 2>/dev/null | sort -rn | head -14 | awk "{printf \"%7.2f GB  %s\n\", \$1/1048576, \$2}"; done'
+      - name: Config da imagem
+        run: docker image inspect "${{ inputs.image }}" --format '{{json .Config.Entrypoint}} {{json .Config.Cmd}} {{json .Config.WorkingDir}} {{json .Config.User}}'

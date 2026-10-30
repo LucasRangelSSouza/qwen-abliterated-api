@@ -125,7 +125,10 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         q.auth(request)
         st = q.ctl.status()
         led = await q.ctl.ledger.snapshot()
-        st.update({"queue": {"chat": q.chat.stats(), "embed": q.embed.stats()},
+        st.update({"limits": {"idle_min": q.s.idle_min, "max_daily_usd": q.s.max_daily_usd, "monthly_budget_usd": q.s.monthly_budget_usd,
+                              "max_allin_dph": q.s.effective_max_dph, "min_credit_usd": q.s.min_credit_usd, "wait_max_s": q.s.wait_max_s,
+                              "stopped_ttl_h": q.s.stopped_ttl_h, "embed_mode": q.s.embed_mode},
+                   "queue": {"chat": q.chat.stats(), "embed": q.embed.stats()},
                    "spend": {"month_usd": led["month_usd"], "day_usd": led["day_usd"], "month_cap_usd": q.s.monthly_budget_usd,
                              "remaining_usd": round(max(0.0, q.s.monthly_budget_usd - led["month_usd"]), 4),
                              "max_allin_dph": q.s.effective_max_dph}})

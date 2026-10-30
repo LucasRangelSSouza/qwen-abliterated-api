@@ -13,3 +13,6 @@
 | 30/10/2026 | Aviso de espera como raciocínio, não como resposta | Não suja o histórico da conversa |
 | 30/10/2026 | Imagem enxuta da GPU no GHCR e pesos no Drive (Hugging Face de reserva) | Encurtar o cold start; a imagem base é a parte mais lenta |
 | 30/10/2026 | Risco de credencial em máquina de terceiro aceito | Nada sigiloso na conta; tudo se recria |
+| 30/10/2026 | Pesos pelo Drive como origem principal, Hugging Face de reserva e limite de 20 min no Drive | Medido: Drive 102 MB/s contra 56 MB/s do Hugging Face (um fluxo, mesma máquina) |
+| 30/10/2026 | Embedding fica desligado em produção (`GPU_EMBED_MODE=off`) até o teste dedicado | Com LLM + embedding a subida passa de ~25 min (limite de espera) |
+| 30/10/2026 | `GPU_RUNNING_TIMEOUT_S` 480 → 900 e troca de oferta no mesmo ciclo (`GPU_CONNECT_RETRIES=1`) | A imagem leva 6 a 11 min para puxar e hosts sem SSH derrubavam o pedido |

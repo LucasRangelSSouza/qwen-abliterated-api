@@ -1,0 +1,62 @@
+name: GPU image
+# Constroi e publica a imagem enxuta da GPU no GHCR (Spec 14 §5c, V2) e PROVA que ela e a base menos os kernels Blackwell:
+# a arvore de arquivos (caminho, modo, dono, tamanho) tem que ser identica, tirando so flashinfer_cubin/cubins.
+on:
+  workflow_dispatch:
+    inputs:
+      base:
+        description: "Imagem base"
+        default: "vastai/vllm:v0.30.0-cuda-13.0"
+      tag:
+        description: "Tag da imagem nova"
+        default: "v0.30.0-cu13-slim1"
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/lucasrangelssouza/qwen-vllm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Pull da base e geracao do Dockerfile
+        run: |
+          docker pull "${{ inputs.base }}"
+          python3 gpu-image/build.py "${{ inputs.base }}" > Dockerfile.slim
+          cat Dockerfile.slim | cut -c1-200
+      - name: Build e push (camadas gzip, para qualquer Docker de host)
+        run: |
+          docker buildx build -f Dockerfile.slim -t "$IMAGE:${{ inputs.tag }}" --push --provenance=false \
+            --output type=image,name=$IMAGE:${{ inputs.tag }},push=true,compression=gzip,compression-level=6,force-compression=true .
+      - name: Camadas da imagem nova
+        run: |
+          docker buildx imagetools inspect "$IMAGE:${{ inputs.tag }}" --raw | python3 -c "
+          import sys, json
+          m = json.load(sys.stdin)
+          L = m.get('layers', [])
+          print(len(L), 'camadas', round(sum(l['size'] for l in L)/1e9, 2), 'GB compactados')
+          print(sorted([round(l['size']/1e9, 2) for l in L], reverse=True)[:10])"
+      - name: Prova - arvore de arquivos igual a base (menos os cubins)
+        run: |
+          docker pull "$IMAGE:${{ inputs.tag }}"
+          tree() { docker run --rm --entrypoint sh "$1" -c "find / -xdev \\( -type f -o -type l -o -type d \\) -printf '%p %m %U:%G %s %l\\n' 2>/dev/null | sort"; }
+          tree "${{ inputs.base }}" | grep -v "flashinfer_cubin/cubins/" > base.txt
+          tree "$IMAGE:${{ inputs.tag }}" > slim.txt
+          wc -l base.txt slim.txt
+          diff base.txt slim.txt | head -40 && echo "arvores identicas fora dos cubins"
+      - name: Prova - imports e config
+        run: |
+          docker run --rm --entrypoint python3 "$IMAGE:${{ inputs.tag }}" -c "import vllm, torch, flashinfer; print('vllm', vllm.__version__, 'torch', torch.__version__)"
+          diff <(docker image inspect "${{ inputs.base }}" --format '{{json .Config.Entrypoint}} {{json .Config.Cmd}} {{json .Config.WorkingDir}}') <(docker image inspect "$IMAGE:${{ inputs.tag }}" --format '{{json .Config.Entrypoint}} {{json .Config.Cmd}} {{json .Config.WorkingDir}}') && echo "entrypoint, cmd e workdir iguais"
+          diff <(docker image inspect "${{ inputs.base }}" --format '{{range .Config.Env}}{{println .}}{{end}}' | sort) <(docker image inspect "$IMAGE:${{ inputs.tag }}" --format '{{range .Config.Env}}{{println .}}{{end}}' | sort) && echo "env igual"
+      - name: Tamanho do pull a partir do GHCR
+        run: |
+          docker rmi "$IMAGE:${{ inputs.tag }}" >/dev/null
+          /usr/bin/time -v docker pull "$IMAGE:${{ inputs.tag }}" 2>&1 | grep -E "Elapsed" || true

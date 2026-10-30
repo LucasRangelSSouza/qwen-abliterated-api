@@ -271,3 +271,8 @@ async def test_nenhum_texto_de_mensagem_no_banco(rig: Rig):
     import glob
     for f in glob.glob(rig.db + "*"):
         assert segredo.encode() not in open(f, "rb").read()
+
+
+async def test_raiz_redireciona_para_o_painel(rig: Rig):
+    r = await rig.client.get("/", follow_redirects=False)
+    assert r.status_code == 307 and r.headers["location"] == "/admin/"

@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app import admin, proxy
 from app.auth import AdminAuth
@@ -47,6 +47,11 @@ def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = No
     @app.get("/health")
     async def health():
         return {"ok": True}
+
+    @app.get("/", include_in_schema=False)
+    async def raiz():
+        """Quem abre o endereco no navegador cai no painel (as rotas da API continuam em /v1)."""
+        return RedirectResponse("/admin/", status_code=307)
 
     app.include_router(proxy.router)
     app.include_router(admin.api)

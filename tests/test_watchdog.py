@@ -54,17 +54,17 @@ def test_para_quando_ocioso(metrics_server):
 def test_nao_para_com_requisicao_rodando(metrics_server):
     url, st = metrics_server
     st["running"] = 2
-    p = run(url, idle_s=1, timeout=3)
-    time.sleep(2.5)
+    p = run(url, idle_s=3, timeout=5)  # o vigia conta segundos inteiros: limite folgado para nao depender do tique do relogio
+    time.sleep(4.5)
     assert p.poll() is None  # continua vivo: ha trabalho
     p.kill()
 
 
 def test_contador_de_concluidas_mudando_conta_como_atividade(metrics_server):
     url, st = metrics_server
-    p = run(url, idle_s=1, timeout=3)
+    p = run(url, idle_s=3, timeout=5)
     t0 = time.time()
-    while time.time() - t0 < 2.5:
+    while time.time() - t0 < 4.5:
         st["total"] += 1  # pedidos curtos que terminam entre duas leituras
         time.sleep(0.15)
     assert p.poll() is None

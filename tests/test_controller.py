@@ -300,3 +300,30 @@ async def test_sem_saude_inclui_diagnostico_da_instancia_no_alerta(make_ctl):
     assert e.value.reason == "sem_saude"
     assert any(k == "diag_sem_saude" and "unrecognized arguments" in t for k, t in seen)
     assert vast.instances == {}  # destruida depois do diagnostico
+
+
+async def test_tentativas_ficam_registradas_com_o_desfecho(make_ctl):
+    s = fast_settings()
+    cands = _first_cand(s)
+    vast = FakeVast()
+    vast.create_script[cands[0].offer_id] = "gone"
+    vast.create_script[cands[1].offer_id] = "cdi"
+    ctl, vast, _ = await make_ctl(s, vast)
+    ctl.start()
+    await ctl.ensure_ready()
+    outs = [a["outcome"] for a in ctl.status()["attempts"]]
+    assert outs[:2] == ["oferta_sumiu", "erro_gpu"] and outs[-1] == "running", outs
+
+
+async def test_instancia_que_demora_a_aparecer_na_lista_nao_e_dada_como_perdida(make_ctl, redis):
+    ctl, vast, _ = await make_ctl()
+    orig = vast.get_instance
+    state = {"n": 0}
+
+    async def lag(iid):
+        state["n"] += 1
+        return None if state["n"] <= 3 else await orig(iid)  # as 3 primeiras leituras nao enxergam a instancia nova
+    vast.get_instance = lag
+    ctl.start()
+    await ctl.ensure_ready()
+    assert ctl.state == READY and await redis.hlen(K_BAD) == 0

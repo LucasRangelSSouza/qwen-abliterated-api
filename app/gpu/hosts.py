@@ -1,7 +1,7 @@
 """Qualificacao e ordenacao de ofertas da Vast (Spec 13 §6.2). Funcao pura: testada contra as 51 ofertas reais de 30/10."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from app.config import Settings
 
@@ -83,7 +83,9 @@ def _reject_reason(o: dict, s: Settings, ram_min: float, rel_min: float, cap: fl
 
 
 def qualify(offers: list[dict], s: Settings, bad: set, known_good: set, relax: int = 0) -> list[Candidate]:
-    """relax 0 = filtros normais; 1 = RAM minima relaxada; 2 = RAM e confiabilidade relaxadas. Preco nunca e relaxado."""
+    """relax 0 = filtros normais; 1 = RAM minima relaxada; 2 = + confiabilidade; 3 = + download >= 300 Mbps e disco >= 800 MB/s. Preco nunca e relaxado."""
+    if relax >= 3:  # ultimo recurso: download e disco mais lentos (o modelo de 19 GB leva ~8 min a 300 Mbps). O preco nunca e relaxado.
+        s = replace(s, min_inet_down=min(s.min_inet_down, 300.0), min_disk_bw=min(s.min_disk_bw, 800.0))
     ram_min = s.min_ram_gb if relax < 1 else s.min_ram_gb_relaxed
     rel_min = s.min_reliability if relax < 2 else s.min_reliability_relaxed
     cap = s.effective_max_dph

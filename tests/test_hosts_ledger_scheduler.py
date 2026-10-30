@@ -106,3 +106,12 @@ async def test_lane_fila_cheia_e_cancel():
     t = lane.waiting[0]
     await lane.cancel(t)
     assert lane.waiting == [] and lane.inflight == 0
+
+
+def test_relaxamento_3_aceita_download_e_disco_mais_lentos_mas_nunca_preco():
+    s = Settings()
+    n2 = len(H.qualify(real_offers(), s, set(), set(), 2))
+    n3 = len(H.qualify(real_offers(), s, set(), set(), 3))
+    assert n3 > n2  # com as ofertas reais de 30/10, o relaxamento 3 libera hosts de download entre 300 e 600 Mbps
+    assert all(c.allin_dph <= s.effective_max_dph + 1e-9 for c in H.qualify(real_offers(), s, set(), set(), 3))
+    assert H.qualify(real_offers(), Settings(max_allin_dph=0.10), set(), set(), 3) == []

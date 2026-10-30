@@ -98,6 +98,7 @@ class GPUController:
         self.last_cold_s: float | None = None
         self.last_stop_reason: str | None = None
         self.wakes: list[float] = []
+        self.attempts: list[dict] = []
 
     # ------------------------------------------------------------------ API para o resto do servico
     def touch(self) -> None:
@@ -145,7 +146,7 @@ class GPUController:
         return {"state": self.state, "eta_s": eta, "instance_id": (self.inst or {}).get("id"),
                 "stopped": bool(self.inst and self.inst.get("stopped_at")), "inflight": self.inflight,
                 "idle_s": int(now - self.last_activity) if self.state == READY else None,
-                "last_cold_start_s": self.last_cold_s, "last_stop_reason": self.last_stop_reason,
+                "last_cold_start_s": self.last_cold_s, "last_stop_reason": self.last_stop_reason, "attempts": self.attempts[-8:],
                 "fail": {"reason": self.fail.reason, "retry_after": self.fail.retry_after} if self.fail and self.state == OFF else None}
 
     def _eta_for(self, path: str) -> float:
@@ -396,7 +397,7 @@ class GPUController:
             offers = await self.vast.search_offers()
             bad, known = await self._bad_hosts(), await self._known_good()
             cands: list[H.Candidate] = []
-            for relax in (0, 1, 2):
+            for relax in (0, 1, 2, 3):
                 cands = H.qualify(offers, s, bad, known, relax)
                 if cands:
                     break
@@ -420,29 +421,47 @@ class GPUController:
         env, t_start = render_env(s), self.clock()
         res = await self.vast.create_instance(c.offer_id, s.image, s.disk_gb, f"{LABEL}-{int(t_start)}", self.onstart, env)
         if not res.ok:
-            if not res.offer_gone:  # B: oferta que sumiu nao e culpa do host
-                log.warning("criar falhou: %s %s", res.error, res.msg)
+            # B: oferta que sumiu nao e culpa do host (nao marca); qualquer outra recusa e registrada com a mensagem da Vast
+            self._note(c, "oferta_sumiu" if res.offer_gone else "criar_falhou", f"{res.error} {res.msg}")
+            (log.info if res.offer_gone else log.warning)("criar na oferta %s (host %s) falhou: %s %s", c.offer_id, c.machine_id, res.error, res.msg)
             return None
         iid = res.instance_id
         self.inst = {"id": iid, "machine_id": c.machine_id, "dph": c.allin_dph, "storage_h": 0.0, "created_at": t_start, "spec": self.spec_id}
         await self._persist()
         end = t_start + s.running_timeout_s
+        vanished_since: float | None = None
         while self.clock() < end:
             i = await self.vast.get_instance(iid)
             if i is None:
-                break
+                # a lista da Vast pode demorar a mostrar a instancia nova: so conta como sumida depois de 30 s
+                vanished_since = vanished_since or self.clock()
+                if self.clock() - vanished_since > 30.0:
+                    self._note(c, "sumiu_da_lista", f"instancia {iid} nao apareceu na lista por 30 s")
+                    log.warning("instancia %s (host %s) nao aparece na lista da Vast por 30 s", iid, c.machine_id)
+                    break
+                await asyncio.sleep(s.poll_s)
+                continue
+            vanished_since = None
             kind = H.classify_status_msg(i.status_msg)
             if kind:  # C: erro fatal conhecido do host, destroi na hora
                 await self.mark_bad(c.machine_id, s.bad_host_hard_ttl_h if kind in ("gpu", "registry") else s.bad_host_ttl_h, f"{kind}: {(i.status_msg or '')[:80]}")
+                self._note(c, f"erro_{kind}", (i.status_msg or "")[:160])
                 await self._cleanup_failed(iid, i, t_start)
                 return None
             if i.running:
+                self._note(c, "running", f"em {self.clock() - t_start:.0f}s")
                 return i
             await asyncio.sleep(s.poll_s)
         i = await self.vast.get_instance(iid)
         await self.mark_bad(c.machine_id, s.bad_host_ttl_h, "nao chegou a running")
+        self._note(c, "nao_chegou_a_running", f"status={getattr(i, 'actual_status', None)} msg={(getattr(i, 'status_msg', '') or '')[:120]}")
         await self._cleanup_failed(iid, i, t_start)
         return None
+
+    def _note(self, c: "H.Candidate", outcome: str, detail: str = "") -> None:
+        """Registro curto de cada tentativa de criar instancia (aparece em /v1/gpu/status.attempts)."""
+        self.attempts = (self.attempts + [{"t": round(self.clock()), "offer": c.offer_id, "machine": c.machine_id, "geo": c.geo[:14],
+                                           "outcome": outcome, "detail": detail[:200]}])[-20:]
 
     async def _cleanup_failed(self, iid: int, i: Instance | None, t_start: float) -> None:
         await self.vast.destroy(iid)

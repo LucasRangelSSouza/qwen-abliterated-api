@@ -39,3 +39,4 @@ networks:
     external: true
   portfolio:
     external: true
+    name: portfolio_portfolio

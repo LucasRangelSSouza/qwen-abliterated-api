@@ -2,6 +2,7 @@
 # onstart do llm-queue na instancia da Vast (Spec 13 §4 e §5.2). Idempotente: roda em TODA partida do contêiner (criar ou religar).
 # Variaveis (vindas do `env` da criacao): LLM_REPO, EMBED_REPO, EMBED_MODE (off|gpu), LLM_UTIL, EMBED_UTIL, WATCHDOG_IDLE_MIN.
 set -u
+mkdir -p /workspace/models
 exec >> /workspace/llmq-bootstrap.log 2>&1
 echo "== bootstrap $(date -u +%FT%TZ)"
 mkdir -p /workspace/models

@@ -16,10 +16,18 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     env:
       IMAGE: ghcr.io/lucasrangelssouza/qwen-vllm
     steps:
       - uses: actions/checkout@v4
+      - name: Liberar disco (a base tem 23,7 GB e o build faz copias)
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo systemctl stop docker docker.socket
+          sudo mkdir -p /mnt/docker && sudo rsync -a /var/lib/docker/ /mnt/docker/ && sudo rm -rf /var/lib/docker && sudo ln -s /mnt/docker /var/lib/docker
+          sudo systemctl start docker
+          df -h / /mnt | cat
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:

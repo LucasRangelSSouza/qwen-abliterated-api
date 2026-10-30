@@ -346,27 +346,35 @@ class GPUController:
             return await self._fail_cycle(why, retry)
         try:
             inst: Instance | None = None
-            if self.inst and self.inst.get("stopped_at"):
-                inst = await self._restart_stopped()
-            path = "restart" if inst else "new"
-            if not inst:
-                await self._set_state(FALLBACK)
-                inst = await self._provision_new()
-                known = self.inst and self.inst.get("machine_id") in await self._known_good()
-                path = "known" if known else "new"
-            self.cold["path"] = path
-            await self.cycles.mark(path=path, kind="restart" if path == "restart" else "cold", running_at=self.clock(), host=inst.machine_id,
-                                   geo=self._geo.get(inst.id), price_dph=round(inst.dph_total, 4))
-            await self.cycles.stage(image_s=round(self.clock() - t0, 1))
-            await self._set_state(LOADING)
-            if not await self._connect_and_wait(inst, deadline=self.clock() + s.health_timeout_s):
+            path = "new"
+            for attempt in range(1 + s.connect_retries):
+                inst = None
+                if attempt == 0 and self.inst and self.inst.get("stopped_at"):
+                    inst = await self._restart_stopped()
+                path = "restart" if inst else "new"
+                if not inst:
+                    await self._set_state(FALLBACK)
+                    inst = await self._provision_new()
+                    known = self.inst and self.inst.get("machine_id") in await self._known_good()
+                    path = "known" if known else "new"
+                self.cold["path"] = path
+                await self.cycles.mark(path=path, kind="restart" if path == "restart" else "cold", running_at=self.clock(), host=inst.machine_id,
+                                       geo=self._geo.get(inst.id), price_dph=round(inst.dph_total, 4))
+                await self.cycles.stage(image_s=round(self.clock() - t0, 1))
+                await self._set_state(LOADING)
+                if await self._connect_and_wait(inst, deadline=self.clock() + s.health_timeout_s):
+                    break
                 diag = await self._ssh_diag(inst)
                 if diag:
                     log.error("diagnostico da instancia %s (sem saude): %s", inst.id, diag)
                     await self.alerts.notify("diag_sem_saude", "LLM nao ficou saudavel; ultimas linhas do log da instancia: " + diag[-700:])
                 await self._account_waste(inst, "sem_saude")
-                await self._destroy_instance("sem_saude")
-                raise GPUUnavailable("sem_saude", "instancia subiu mas a LLM nao ficou saudavel", 120)
+                last = attempt >= s.connect_retries
+                await self._destroy_instance("sem_saude", close_cycle=last)
+                if last:
+                    raise GPUUnavailable("sem_saude", "instancia subiu mas a LLM nao ficou saudavel", 120)
+                log.warning("host sem saude/SSH: tentando outra oferta no mesmo ciclo (%d/%d)", attempt + 1, s.connect_retries)
+                await self._set_state(FALLBACK)
             await self._become_ready(inst, path=path)
             self.last_cold_s = round(self.clock() - t0, 1)
             await self.r.lpush(K_COLD, f"{path}:{self.last_cold_s}")
@@ -755,7 +763,7 @@ class GPUController:
         await self._destroy_instance(reason)
         await self._set_state(OFF)
 
-    async def _destroy_instance(self, reason: str) -> None:
+    async def _destroy_instance(self, reason: str, close_cycle: bool = True) -> None:
         iid = (self.inst or {}).get("id")
         await self.tunnel.close()
         if iid is not None:
@@ -763,7 +771,8 @@ class GPUController:
             await self.ledger.end("run", iid)
             await self.ledger.end("stopped", iid)
         log.info("instancia %s destruida (%s)", iid, reason)
-        await self._close_cycle(reason, failed=self.state in (STARTING, FALLBACK, LOADING))
+        if close_cycle:
+            await self._close_cycle(reason, failed=self.state in (STARTING, FALLBACK, LOADING))
         self.inst = None
         await self._persist()
         if self.state != OFF:

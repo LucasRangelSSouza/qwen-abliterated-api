@@ -1,0 +1,21 @@
+{
+  "credit_start": 1.9963798267199167,
+  "credit_end": 1.9686077461199147,
+  "results": [
+    {
+      "label": "A_env_e_onstart",
+      "host": 152909,
+      "geo": "California, US",
+      "result": "nao_chegou_a_running"
+    },
+    {
+      "label": "B_so_env",
+      "host": 39772,
+      "geo": "United States, US",
+      "result": "nao_chegou_a_running"
+    },
+    {
+      "erro": "VastError('Vast inacessivel: None')"
+    }
+  ]
+}

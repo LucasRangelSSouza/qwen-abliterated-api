@@ -60,3 +60,38 @@ async def test_estado_expoe_o_caminho_esperado(make_ctl):
     assert ctl.status()["path"] == "new"
     ctl.inst = {"id": 1, "stopped_at": 1.0}
     assert ctl.status()["path"] == "restart"
+
+
+async def test_host_sem_saude_troca_de_oferta_no_mesmo_ciclo(make_ctl):
+    from tests.conftest import Probe
+
+    class SaudeSoNaSegunda(Probe):
+        def __init__(self, vast):
+            super().__init__()
+            self.vast = vast
+
+        async def __call__(self) -> bool:
+            return self.vast.count("create") >= 2
+
+    from tests.fakes import FakeVast
+    vast = FakeVast()
+    ctl, _, _ = await make_ctl(vast=vast, probe=SaudeSoNaSegunda(vast))
+    ctl.start()
+    await ctl.ensure_ready()
+    assert ctl.state == READY and vast.count("create") == 2  # a primeira foi destruida, a segunda ficou
+    rows = await ctl.cycles.list()
+    assert len(rows) == 1 and rows[0]["ready_at"] and not rows[0]["failed"]  # um unico ciclo, sem linha de falha
+
+
+async def test_sem_retentativas_o_ciclo_falha_como_antes(make_ctl):
+    from app.config import Settings  # noqa: F401
+    from tests.conftest import Probe, fast_settings
+    p = Probe()
+    p.ok = False
+    ctl, vast, _ = await make_ctl(settings=fast_settings(connect_retries=0), probe=p)
+    ctl.start()
+    try:
+        await ctl.ensure_ready()
+    except GPUUnavailable as e:
+        assert e.reason == "sem_saude"
+    assert vast.count("create") == 1

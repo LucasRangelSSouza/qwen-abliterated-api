@@ -96,6 +96,7 @@ class Settings:
     running_timeout_s: float = 480.0
     ssh_timeout_s: float = 120.0
     health_timeout_s: float = 900.0
+    connect_retries: int = 1     # host que nao abre SSH nem fica saudavel: troca de oferta no mesmo ciclo (Spec 14, G2) antes de desistir
     wait_max_s: float = 1500.0   # um host que falha ao baixar a imagem custa 8 min antes do proximo; medido: cold start de 18 min no pior caso
     search_retry_s: float = 60.0
     search_window_s: float = 900.0
@@ -174,6 +175,7 @@ class Settings:
             stopped_max_usd=_f("GPU_STOPPED_MAX_USD", cls.stopped_max_usd),
             wait_max_s=_f("GPU_WAIT_MAX_S", cls.wait_max_s),
             running_timeout_s=_f("GPU_RUNNING_TIMEOUT_S", cls.running_timeout_s),
+            connect_retries=_i("GPU_CONNECT_RETRIES", cls.connect_retries),
             batch_enabled=_b("GPU_BATCH_ENABLED", cls.batch_enabled),
             batch_budget_usd=_f("GPU_BATCH_BUDGET_USD", cls.batch_budget_usd),
             hedge_enabled=_b("GPU_HEDGE_ENABLED", cls.hedge_enabled),

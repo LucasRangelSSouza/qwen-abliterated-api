@@ -39,7 +39,7 @@ def env_file(name: str) -> dict:
     for ln in (VAULT / name).read_text(encoding="utf-8").splitlines():
         if "=" in ln and not ln.startswith("#"):
             k, v = ln.split("=", 1)
-            d[k] = v
+            d[k] = v.split(' #')[0].strip()  # o cofre tem comentario na mesma linha
     return d
 
 
@@ -56,6 +56,14 @@ def log(msg: str) -> None:
 def vps(script: str, timeout: int = 300) -> str:
     r = subprocess.run(VPS + ["sudo -n bash -s"], input=script.replace("\r\n", NL).encode(), capture_output=True, timeout=timeout)
     return r.stdout.decode(errors="replace") + r.stderr.decode(errors="replace")
+
+
+def queue_admin(action: str) -> str:
+    """Chama /admin/gpu/<action> do llm-queue por dentro da rede docker (o alias llm-queue.rt so existe la)."""
+    py = ("import urllib.request as u;"
+          f"r=u.Request('http://llm-queue.rt:8000/admin/gpu/{action}',method='POST',headers={{'X-Admin-Key':'{QENV['LLMQ_ADMIN_KEY']}'}});"
+          "print(u.urlopen(r,timeout=60).read().decode())")
+    return vps(f"docker exec llm-access python -c \"{py}\" 2>&1 | tail -2").strip()
 
 
 def set_queue_env(changes: dict[str, str | None]) -> None:
@@ -204,13 +212,7 @@ def vast_credit() -> float:
 
 
 def cleanup() -> None:
-    try:
-        httpx.post("http://llm-queue.rt:8000/admin/gpu/destroy", timeout=1)  # so funciona na rede interna; fallback abaixo
-    except Exception:  # noqa: BLE001
-        pass
-    out = vps(f"curl -s -X POST -H 'X-Admin-Key: {QENV['LLMQ_ADMIN_KEY']}' http://llm-queue.rt:8000/admin/gpu/destroy; "
-              "docker exec llm-access python -c \"print(1)\" >/dev/null 2>&1; echo")
-    log("destroy: " + out.strip()[:120])
+    log("destroy: " + queue_admin("destroy")[:120])
 
 
 def main() -> None:
@@ -236,8 +238,7 @@ def main() -> None:
         return
     deadline = time.time() + a.max_min * 60
     try:
-        destroy_first = vps(f"curl -s -X POST -H 'X-Admin-Key: {QENV['LLMQ_ADMIN_KEY']}' http://llm-queue.rt:8000/admin/gpu/destroy")
-        log("destroy previo: " + destroy_first.strip()[:100])
+        log("destroy previo: " + queue_admin("destroy")[:100])
         set_queue_env(json.loads(a.env))
         c = admin_client()
         OUT["machines_before"] = machines(c)
@@ -270,7 +271,7 @@ def main() -> None:
         if a.cache_up:
             log("cache de compilacao: " + vps("echo (nao implementado nesta versao)").strip()[:80])
         if a.restart_test:
-            vps(f"curl -s -X POST -H 'X-Admin-Key: {QENV['LLMQ_ADMIN_KEY']}' http://llm-queue.rt:8000/admin/gpu/stop")
+            log("stop: " + queue_admin("stop")[:100])
             time.sleep(10)
             t = time.time()
             rs: dict = {}

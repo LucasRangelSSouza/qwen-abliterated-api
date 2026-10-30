@@ -1,0 +1,9 @@
+saldo inicial US$2.093
+151 ofertas candidatas
+sonda ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1 no host 153812 (Norway, NO, 918.4 Mbps)
+  -> running 672.9s 
+sonda ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1 no host 149401 (France, FR, 934.0 Mbps)
+  -> criar_falhou Nones invalid_args error 404/3603: no_such_ask  Instance type by id 49419326 is not available.
+sonda ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1 no host 154794 (France, FR, 709.0 Mbps)
+  -> running 370.5s 
+saldo final US$2.086 (gasto US$0.007)

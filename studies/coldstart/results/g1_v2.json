@@ -1,0 +1,338 @@
+{
+  "credit_start": 2.092584908559971,
+  "credit_end": 2.0857297308599527,
+  "results": [
+    {
+      "image": "ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1",
+      "machine_id": 153812,
+      "geo": "Norway, NO",
+      "inet_down_mbps": 918.4,
+      "dph": 0.030962962962962963,
+      "cost_per_tb": 2.6666666666666665,
+      "events": [
+        {
+          "t": 0.7,
+          "status": null,
+          "msg": ""
+        },
+        {
+          "t": 33.3,
+          "status": "loading",
+          "msg": "8d9eafa6ba97: Download complete\n"
+        },
+        {
+          "t": 39.0,
+          "status": "loading",
+          "msg": "d4e27af5bd02: Verifying Checksum\nd4e27af5bd02: "
+        },
+        {
+          "t": 87.8,
+          "status": "loading",
+          "msg": "2676c348f4a9: Verifying Checksum\n2676c348f4a9: Download complete\n"
+        },
+        {
+          "t": 93.5,
+          "status": "loading",
+          "msg": "bdc157af33d9: Verifying Checksum\n"
+        },
+        {
+          "t": 109.7,
+          "status": "loading",
+          "msg": "e828ba30c555: Download complete\n"
+        },
+        {
+          "t": 115.0,
+          "status": "loading",
+          "msg": "08725c661696: Verifying Checksum\n"
+        },
+        {
+          "t": 120.7,
+          "status": "loading",
+          "msg": "c4e0d1789b0e: Verifying Checksum\nc4e0d1789b0e: Download complete\n"
+        },
+        {
+          "t": 126.0,
+          "status": "loading",
+          "msg": "573620a6ecbf: Verifying Checksum\n573620a6ecbf: Download complete\n"
+        },
+        {
+          "t": 132.1,
+          "status": "loading",
+          "msg": "ba0f6cd763c8: Download complete\n"
+        },
+        {
+          "t": 137.3,
+          "status": "loading",
+          "msg": "81b65839b459: Download complete\n"
+        },
+        {
+          "t": 143.8,
+          "status": "loading",
+          "msg": "6596f51a4ad7: "
+        },
+        {
+          "t": 149.0,
+          "status": "loading",
+          "msg": "4f4fb700ef54: Pull complete\n"
+        },
+        {
+          "t": 154.3,
+          "status": "loading",
+          "msg": "8fe4c16e900e: Pull complete\n"
+        },
+        {
+          "t": 159.5,
+          "status": "loading",
+          "msg": "51b9a07d42b7: Pull complete\n"
+        },
+        {
+          "t": 175.7,
+          "status": "loading",
+          "msg": "37f38cbce67f: Pull complete\n"
+        },
+        {
+          "t": 219.8,
+          "status": "loading",
+          "msg": "bdc157af33d9: Pull complete\n"
+        },
+        {
+          "t": 269.2,
+          "status": "loading",
+          "msg": "2676c348f4a9: Pull complete\n"
+        },
+        {
+          "t": 336.6,
+          "status": "loading",
+          "msg": "ce59b6a53ccd: Pull complete\n"
+        },
+        {
+          "t": 390.6,
+          "status": "loading",
+          "msg": "e828ba30c555: Pull complete\n"
+        },
+        {
+          "t": 440.9,
+          "status": "loading",
+          "msg": "4f078cf74c66: Pull complete\n"
+        },
+        {
+          "t": 464.7,
+          "status": "loading",
+          "msg": "046662402faa: Pull complete\n"
+        },
+        {
+          "t": 481.5,
+          "status": "loading",
+          "msg": "8f7451f008ff: Pull complete\n"
+        },
+        {
+          "t": 487.2,
+          "status": "loading",
+          "msg": "8ba2e81f6cfd: Pull complete\n"
+        },
+        {
+          "t": 526.3,
+          "status": "loading",
+          "msg": "6748d489c477: Pull complete\n"
+        },
+        {
+          "t": 619.7,
+          "status": "loading",
+          "msg": "d4944c3ac230: Pull complete\n"
+        },
+        {
+          "t": 630.6,
+          "status": "loading",
+          "msg": "fa73917fda8a: Pull complete\n"
+        },
+        {
+          "t": 635.8,
+          "status": "loading",
+          "msg": "#0 building with \"default\" instance using docker driver\n\n#1 [internal] load build definition from ghcr.io_lucasrangelssouza_qwen-vllm_v0.30."
+        },
+        {
+          "t": 641.1,
+          "status": "loading",
+          "msg": "\n#4 [1/6] FROM ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1\n"
+        },
+        {
+          "t": 646.4,
+          "status": "loading",
+          "msg": "#6 3.438 Get:17 http://archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1741 kB]\n#6 3.510 Get:18 http://archive.ubuntu.com/ubunt"
+        },
+        {
+          "t": 654.2,
+          "status": "loading",
+          "msg": "#7 5.173 Selecting previously unselected package openssh-client.\r\n"
+        },
+        {
+          "t": 659.9,
+          "status": "loading",
+          "msg": "#7 9.216 Processing triggers for man-db (2.12.0-4build2) ...\r\n"
+        },
+        {
+          "t": 667.7,
+          "status": "loading",
+          "msg": "\n#10 exporting to image\n#10 exporting layers\n"
+        },
+        {
+          "t": 672.9,
+          "status": "running",
+          "msg": "success, running ghcr.io/lucasrangelssouza/qwen-vllm_v0.30.0-cu13-slim1/ssh"
+        }
+      ],
+      "result": "running",
+      "pull_s": 672.9,
+      "destroyed": true
+    },
+    {
+      "image": "ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1",
+      "machine_id": 149401,
+      "geo": "France, FR",
+      "inet_down_mbps": 934.0,
+      "dph": 0.04148148148148148,
+      "cost_per_tb": 2.6666666666666665,
+      "events": [],
+      "result": "criar_falhou",
+      "detail": "invalid_args error 404/3603: no_such_ask  Instance type by id 49419326 is not available."
+    },
+    {
+      "image": "ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1",
+      "machine_id": 154794,
+      "geo": "France, FR",
+      "inet_down_mbps": 709.0,
+      "dph": 0.042222222222222223,
+      "cost_per_tb": 4.0,
+      "events": [
+        {
+          "t": 2.8,
+          "status": null,
+          "msg": ""
+        },
+        {
+          "t": 22.1,
+          "status": "loading",
+          "msg": "8fe4c16e900e: Verifying Checksum\n8fe4c16e900e: Download complete\n"
+        },
+        {
+          "t": 30.1,
+          "status": "loading",
+          "msg": "d4e27af5bd02: Verifying Checksum\nd4e27af5bd02: Download complete\n"
+        },
+        {
+          "t": 70.0,
+          "status": "loading",
+          "msg": "2676c348f4a9: Verifying Checksum\n2676c348f4a9: Download complete\n"
+        },
+        {
+          "t": 77.4,
+          "status": "loading",
+          "msg": "bdc157af33d9: Verifying Checksum\nbdc157af33d9: Download complete\n"
+        },
+        {
+          "t": 88.9,
+          "status": "loading",
+          "msg": "08725c661696: Verifying Checksum\n08725c661696: Download complete\n"
+        },
+        {
+          "t": 97.0,
+          "status": "loading",
+          "msg": "79ec917793b8: Pull complete\n"
+        },
+        {
+          "t": 102.8,
+          "status": "loading",
+          "msg": "64f463222af7: Verifying Checksum\n64f463222af7: Download complete\n"
+        },
+        {
+          "t": 110.2,
+          "status": "loading",
+          "msg": "6748d489c477: Verifying Checksum\n6748d489c477: Download complete\n"
+        },
+        {
+          "t": 115.9,
+          "status": "loading",
+          "msg": "f846838f5382: Verifying Checksum\n"
+        },
+        {
+          "t": 123.3,
+          "status": "loading",
+          "msg": "d7c634624d50: Verifying Checksum\nd7c634624d50: Download complete\n"
+        },
+        {
+          "t": 130.9,
+          "status": "loading",
+          "msg": "bdc157af33d9: Pull complete\n"
+        },
+        {
+          "t": 155.9,
+          "status": "loading",
+          "msg": "2676c348f4a9: Pull complete\n"
+        },
+        {
+          "t": 182.2,
+          "status": "loading",
+          "msg": "ce59b6a53ccd: Pull complete\n"
+        },
+        {
+          "t": 210.6,
+          "status": "loading",
+          "msg": "e828ba30c555: Pull complete\n"
+        },
+        {
+          "t": 223.3,
+          "status": "loading",
+          "msg": "4f078cf74c66: Pull complete\n"
+        },
+        {
+          "t": 230.7,
+          "status": "loading",
+          "msg": "08725c661696: Pull complete\n"
+        },
+        {
+          "t": 243.9,
+          "status": "loading",
+          "msg": "c4e0d1789b0e: Pull complete\n"
+        },
+        {
+          "t": 257.1,
+          "status": "loading",
+          "msg": "ba0f6cd763c8: Pull complete\n"
+        },
+        {
+          "t": 329.5,
+          "status": "loading",
+          "msg": "d4944c3ac230: Pull complete\n"
+        },
+        {
+          "t": 336.9,
+          "status": "loading",
+          "msg": "fa73917fda8a: Pull complete\n"
+        },
+        {
+          "t": 342.6,
+          "status": "loading",
+          "msg": "#0 building with \"default\" instance using docker driver\n\n#1 [internal] load build definition from ghcr.io_lucasrangelssouza_qwen-vllm_v0.30."
+        },
+        {
+          "t": 350.5,
+          "status": "loading",
+          "msg": "\n"
+        },
+        {
+          "t": 356.5,
+          "status": "loading",
+          "msg": "\n#8 [5/6] RUN export DEBIAN_FRONTEND=noninteractive; \t\t\t\tenv >> /etc/environment; \t\t\t\techo VAST_CONTAINERLABEL='\"$(cat ~/.vast_containerlabe"
+        },
+        {
+          "t": 362.3,
+          "status": "created",
+          "msg": "success, running ghcr.io/lucasrangelssouza/qwen-vllm_v0.30.0-cu13-slim1/ssh"
+        }
+      ],
+      "result": "running",
+      "pull_s": 370.5,
+      "destroyed": true
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "image": "ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1",
+  "credit_start": 2.0905419001599626,
+  "host": 150164,
+  "geo": "Norway, NO",
+  "dph": 0.16148148148148148,
+  "running_s": 249.2,
+  "result": "vllm_falhou",
+  "vllm_health_s": null,
+  "healthy": false,
+  "log_flashinfer": "grep: /workspace/vllm_smoke.log: No such file or directory\n",
+  "credit_end": 2.0643264576199414,
+  "spent_usd": 0.026
+}

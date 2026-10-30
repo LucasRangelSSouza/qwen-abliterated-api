@@ -1,0 +1,21 @@
+45 ofertas 1x3090
+criar falhou: invalid_args error 404/3603: no_such_ask  Instance type by id 58397519 is not available.
+criar falhou: invalid_args error 404/3603: no_such_ask  Instance type by id 57519056 is not available.
+running em 249.2s; subindo o vLLM
+iniciado
+bash: line 1: cd: /workspace: No such file or directory
+bash: line 1: /workspace/vllm_smoke.log: No such file or directory
+{
+  "image": "ghcr.io/lucasrangelssouza/qwen-vllm:v0.30.0-cu13-slim1",
+  "credit_start": 2.0905419001599626,
+  "host": 150164,
+  "geo": "Norway, NO",
+  "dph": 0.16148148148148148,
+  "running_s": 249.2,
+  "result": "vllm_falhou",
+  "vllm_health_s": null,
+  "healthy": false,
+  "log_flashinfer": "grep: /workspace/vllm_smoke.log: No such file or directory\n",
+  "credit_end": 2.0643264576199414,
+  "spent_usd": 0.026
+}

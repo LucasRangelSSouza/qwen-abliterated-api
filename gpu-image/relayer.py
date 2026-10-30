@@ -34,6 +34,7 @@ DROP = [f"{DP}/flashinfer_cubin/cubins"]          # filhos removidos; o diretori
 LIMIT_MB = int(os.environ.get("LIMIT_MB", "700"))     # camadas compactadas maiores que isto sao reescritas
 BUCKET_MB = int(os.environ.get("BUCKET_MB", "1800"))  # tamanho descompactado maximo de cada camada nova
 CHUNK = 1 << 20
+UP_CHUNK = 64 << 20
 M_LIST = "application/vnd.docker.distribution.manifest.list.v2+json"
 M_OCI_INDEX = "application/vnd.oci.image.index.v1+json"
 M_V2 = "application/vnd.docker.distribution.manifest.v2+json"
@@ -108,18 +109,44 @@ class Reg:
     def blob_exists(self, digest: str) -> bool:
         return self.req("HEAD", f"blobs/{digest}").status_code == 200
 
-    def put_blob(self, digest: str, size: int, data):
+    def put_blob(self, digest: str, size: int, data, retries: int = 4):
+        """Envio em pedacos (PATCH) e fechamento com PUT; `data` precisa ser um arquivo (reabrivel) ou bytes, para refazer em caso de queda."""
         if self.blob_exists(digest):
             return
+        for attempt in range(retries):
+            try:
+                fh = io.BytesIO(data) if isinstance(data, (bytes, bytearray)) else open(data, "rb")
+                try:
+                    return self._upload(digest, size, fh)
+                finally:
+                    fh.close()
+            except (requests.RequestException, RuntimeError) as e:
+                log(f"  upload de {digest[:19]} falhou ({e!r}); tentativa {attempt + 1}/{retries}")
+                self.refresh()
+                time.sleep(3 * (attempt + 1))
+        raise SystemExit(f"upload de {digest} falhou depois de {retries} tentativas")
+
+    def _upload(self, digest: str, size: int, fh):
         r = self.req("POST", "blobs/uploads/")
         r.raise_for_status()
         loc = r.headers["Location"]
-        if loc.startswith("/"):
-            loc = f"https://{self.host}{loc}"
-        sep = "&" if "?" in loc else "?"
-        r2 = self.s.put(f"{loc}{sep}digest={digest}", data=data, headers={"Content-Length": str(size), "Content-Type": "application/octet-stream"}, timeout=1800)
-        if r2.status_code not in (201, 202):
-            raise RuntimeError(f"upload {digest}: {r2.status_code} {r2.text[:200]}")
+        off = 0
+        while off < size:
+            chunk = fh.read(min(UP_CHUNK, size - off))
+            if not chunk:
+                raise RuntimeError("fim inesperado do arquivo")
+            hdr = {"Content-Type": "application/octet-stream", "Content-Length": str(len(chunk)), "Content-Range": f"{off}-{off + len(chunk) - 1}"}
+            u = loc if loc.startswith("http") else f"https://{self.host}{loc}"
+            r2 = self.s.patch(u, data=chunk, headers=hdr, timeout=900)
+            if r2.status_code not in (202, 201, 204):
+                raise RuntimeError(f"PATCH {r2.status_code} {r2.text[:150]}")
+            loc = r2.headers.get("Location", loc)
+            off += len(chunk)
+        u = loc if loc.startswith("http") else f"https://{self.host}{loc}"
+        sep = "&" if "?" in u else "?"
+        r3 = self.s.put(f"{u}{sep}digest={digest}", data=b"", headers={"Content-Length": "0"}, timeout=900)
+        if r3.status_code not in (201, 202):
+            raise RuntimeError(f"PUT final {r3.status_code} {r3.text[:150]}")
 
 
 class Hasher(io.RawIOBase):
@@ -292,9 +319,15 @@ def main():
         old_diff = cfg["rootfs"]["diff_ids"][li]
         li += 1
         if L["size"] <= LIMIT_MB * (1 << 20):
-            r = src.blob_stream(L["digest"])
-            dst.put_blob(L["digest"], L["size"], r.raw)
-            r.close()
+            if not dst.blob_exists(L["digest"]):
+                tmp = tempfile.NamedTemporaryFile(delete=False)
+                r = src.blob_stream(L["digest"])
+                for b in r.iter_content(CHUNK):
+                    tmp.write(b)
+                r.close()
+                tmp.close()
+                dst.put_blob(L["digest"], L["size"], tmp.name)
+                os.unlink(tmp.name)
             new_layers.append({"mediaType": LAYER_MT, "size": L["size"], "digest": L["digest"]})
             new_diff.append(old_diff)
             out_hist.append(h)
@@ -307,8 +340,7 @@ def main():
         if not proof["equal"] or proof["orig_members"] != proof["new_members"]:
             raise SystemExit("PROVA FALHOU: conjunto de arquivos das camadas novas difere do original")
         for i, o in enumerate(res):
-            with open(o["path"], "rb") as fh:
-                dst.put_blob(o["digest"], o["size"], fh)
+            dst.put_blob(o["digest"], o["size"], o["path"])
             os.unlink(o["path"])
             new_layers.append({"mediaType": LAYER_MT, "size": o["size"], "digest": o["digest"]})
             new_diff.append(o["diff_id"])

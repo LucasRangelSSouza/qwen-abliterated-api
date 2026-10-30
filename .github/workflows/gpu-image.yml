@@ -27,7 +27,9 @@ jobs:
         env:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python3 gpu-image/relayer.py "${{ inputs.base }}" "$IMAGE:${{ inputs.tag }}" | tee relayer.log
+        run: |
+          set -o pipefail
+          python3 -u gpu-image/relayer.py "${{ inputs.base }}" "$IMAGE:${{ inputs.tag }}" 2>&1 | tee relayer.log
       - name: Visibilidade (puxada anonima)
         run: |
           T=$(curl -s "https://ghcr.io/token?service=ghcr.io&scope=repository:lucasrangelssouza/qwen-vllm:pull" | python3 -c "import sys,json;print(json.load(sys.stdin).get('token',''))")

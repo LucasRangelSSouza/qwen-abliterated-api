@@ -1,0 +1,67 @@
+name: Release
+# Publica image.tar.gz + release-manifest.json. NAO faz deploy (so o vps_rt_infra implanta: release-intake gera o .lock, deploy.yml implanta).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versao (ex.: v0.1.0); cria a tag no commit atual"
+        required: true
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Versao
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then V="${{ inputs.version }}"; else V="${GITHUB_REF_NAME}"; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Gate (testes e imagem saudavel)
+        run: bash scripts/verify.sh
+      - name: Build da imagem (mesmo Dockerfile do gate)
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          docker build --build-arg GIT_COMMIT="${GITHUB_SHA}" -t "llm-queue/llm-queue:${V}" .
+          docker save "llm-queue/llm-queue:${V}" | gzip -9 > image.tar.gz
+          echo "IMAGE_ID=sha256:$(gunzip -c image.tar.gz | tar -xO manifest.json | python3 -c "import sys,json,re;print(re.sub(r'^.*/','',json.load(sys.stdin)[0]['Config']).replace('.json',''))")" >> "$GITHUB_ENV"
+          echo "ARCHIVE_SHA=$(sha256sum image.tar.gz | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          ls -l image.tar.gz
+      - name: Manifesto
+        run: |
+          python3 - <<'PY'
+          import json, os, datetime
+          v = "${{ steps.v.outputs.version }}"
+          m = {
+            "schema": 1,
+            "service": "llm-queue",
+            "repo": "RangelTech/luar_llm_queue",
+            "commit": os.environ["GITHUB_SHA"][:7],
+            "version": v,
+            "artifact": {
+              "type": "docker-archive",
+              "asset": "image.tar.gz",
+              "sha256": os.environ["ARCHIVE_SHA"],
+              "image_id": os.environ["IMAGE_ID"],
+              "tag": "llm-queue/llm-queue:" + v
+            },
+            "built_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "healthcheck": {"path": "/health", "expect": 200, "timeout_s": 90, "port": 8000},
+            "env": {"required": ["REDIS_URL", "VAST_API_KEY", "SSH_PRIVATE_KEY_B64", "CONSUMERS_JSON"]},
+            "resources": {"memory": "512m", "cpus": "1"}
+          }
+          json.dump(m, open("release-manifest.json", "w"), indent=2)
+          PY
+          cat release-manifest.json
+      - name: GitHub Release com manifesto e imagem
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="${{ steps.v.outputs.version }}"
+          gh release create "$V" release-manifest.json image.tar.gz --title "$V" --notes "Artefato docker-archive (sha256 no manifesto). Deploy: somente vps_rt_infra." --target "${GITHUB_SHA}" || gh release upload "$V" release-manifest.json image.tar.gz --clobber

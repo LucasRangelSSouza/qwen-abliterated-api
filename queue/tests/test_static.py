@@ -388,3 +388,10 @@ def test_limites_de_concorrencia_vem_do_ambiente(monkeypatch):
     monkeypatch.setenv("EMBED_QUEUE_MAX", "300")
     s = Settings.from_env()
     assert (s.chat_per_consumer, s.chat_queue_max, s.embed_queue_max) == (32, 200, 300)
+
+
+def test_limite_de_contexto_vem_do_ambiente(monkeypatch):
+    """MAX_CONTEXT_TOKENS acompanha o --max-model-len do vLLM (131072 na GPU fixa)."""
+    from app.config import Settings
+    monkeypatch.setenv("MAX_CONTEXT_TOKENS", "131072")
+    assert Settings.from_env().max_context_tokens == 131072

@@ -202,5 +202,6 @@ class Settings:
             chat_queue_max=_i("CHAT_QUEUE_MAX", cls.chat_queue_max),
             embed_max_inflight=_i("EMBED_MAX_INFLIGHT", cls.embed_max_inflight),
             embed_queue_max=_i("EMBED_QUEUE_MAX", cls.embed_queue_max),
+            max_context_tokens=_i("MAX_CONTEXT_TOKENS", cls.max_context_tokens),
         )
         return s

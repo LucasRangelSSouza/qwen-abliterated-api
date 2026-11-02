@@ -262,7 +262,7 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         if kind == "chat":
             approx = len(json.dumps(body.get("messages", []), ensure_ascii=False)) // 3 + int(body.get("max_tokens") or 0)
             if approx > q.s.max_context_tokens * 2:  # folga: a conta de caracteres por 3 superestima
-                raise HTTPException(400, detail=_err("contexto acima do limite de 65536 tokens", "invalid_request_error", "context_length_exceeded"))
+                raise HTTPException(400, detail=_err(f"contexto acima do limite de {q.s.max_context_tokens} tokens", "invalid_request_error", "context_length_exceeded"))
         if request.headers.get("x-queue-wait", "").strip() == "0" and q.ctl.state != READY:
             # cliente que nao quer ficar pendurado: acorda a GPU e responde 202 com o tempo estimado
             q.ctl.request_wake(bool(consumer.get("priority")))

@@ -298,7 +298,8 @@ async def machines(request: Request, limit: int = 50):
         r.raise_for_status()
         j = r.json()
         status = {"state": j.get("state"), "eta_s": j.get("eta_s"), "spend": j.get("spend"), "path": j.get("path"),
-                  "instance": j.get("instance"), "attempts": j.get("attempts") or [], "limits": j.get("limits"), "fail": j.get("fail")}
+                  "instance": j.get("instance"), "attempts": j.get("attempts") or [], "limits": j.get("limits"), "fail": j.get("fail"),
+                  "static": j.get("static"), "degraded": j.get("degraded"), "config": j.get("config")}
     except Exception as e:  # noqa: BLE001
         errors.append(f"status da GPU indisponivel ({type(e).__name__})")
     try:

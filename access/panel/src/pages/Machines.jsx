@@ -188,12 +188,15 @@ export default function Machines() {
               <div className="border-t border-border-subtle">
                 <div className="px-5 py-4 grid gap-4 sm:grid-cols-4">
                   <Stat label="Máquina atual" value={st?.instance ? <span className="font-mono text-base">{st.instance.machine ?? '—'}</span> : 'nenhuma'}
-                    sub={st?.instance ? (st.instance.stopped ? 'parada (disco guardado)' : 'alugada') : 'a fila aluga quando houver pedido'} strong />
+                    sub={st?.instance ? (st.instance.stopped ? 'parada (disco guardado)' : st.static ? 'GPU fixa 24/7' : 'alugada') : 'a fila aluga quando houver pedido'} strong />
                   <Stat label="Região" value={st?.instance?.geo || '—'} />
                   <Stat label="Preço" value={st?.instance?.dph != null ? `${fmtUsd(st.instance.dph)}/h` : '—'} sub={st?.limits?.max_allin_dph != null ? `teto ${fmtUsd(st.limits.max_allin_dph)}/h` : null} />
-                  <Stat label="Subida esperada" value={st?.path === 'restart' ? 'religar (~2 min)' : st?.path ? 'máquina nova (8–20 min)' : '—'}
-                    sub={st?.limits?.idle_min != null ? `desliga após ${st.limits.idle_min} min sem pedidos` : null} />
+                  <Stat label={st?.static ? 'Disponibilidade' : 'Subida esperada'}
+                    value={st?.static ? 'sempre ligada' : st?.path === 'restart' ? 'religar (~2 min)' : st?.path ? 'máquina nova (8–20 min)' : '—'}
+                    sub={st?.config ? (st.config.auto_shutdown ? `desliga após ${st.config.idle_min} min sem pedidos` : 'desligamento automático desativado')
+                      : st?.limits?.idle_min != null ? `desliga após ${st.limits.idle_min} min sem pedidos` : null} />
                 </div>
+                {st?.degraded && <div className="px-5 pb-4"><Notice>GPU fixa com problema: {typeof st.degraded === 'string' ? st.degraded : (st.degraded.detail || st.degraded.reason || 'verificando de novo')}. A máquina não é parada nem destruída.</Notice></div>}
                 {(st?.attempts || []).length === 0 ? <p className="px-5 pb-5 text-sm text-text-muted">Nenhuma tentativa de aluguel registrada desde que a fila subiu.</p> : (
                   <div className="overflow-x-auto border-t border-border-subtle">
                     <table className="w-full text-left text-sm">

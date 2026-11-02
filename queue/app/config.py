@@ -198,6 +198,9 @@ class Settings:
             notice_every_s=_f("NOTICE_EVERY_S", cls.notice_every_s),
             notice_fields=tuple(x.strip() for x in os.environ.get("NOTICE_FIELDS", ",".join(cls.notice_fields)).split(",") if x.strip()),
             chat_max_inflight=_i("CHAT_MAX_INFLIGHT", cls.chat_max_inflight),
+            chat_per_consumer=_i("CHAT_PER_CONSUMER", cls.chat_per_consumer),
+            chat_queue_max=_i("CHAT_QUEUE_MAX", cls.chat_queue_max),
             embed_max_inflight=_i("EMBED_MAX_INFLIGHT", cls.embed_max_inflight),
+            embed_queue_max=_i("EMBED_QUEUE_MAX", cls.embed_queue_max),
         )
         return s

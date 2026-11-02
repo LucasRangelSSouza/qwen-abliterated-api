@@ -378,3 +378,13 @@ async def test_stop_confirmado_em_modo_fixo_repassa_force(redis):
         assert (await c.post("/admin/gpu/destroy", headers=AH, json={"i_know_this_loses_the_host": True})).status_code == 200
         assert ctl.forced == [("destroy", True)]
         await c.aclose()
+
+
+def test_limites_de_concorrencia_vem_do_ambiente(monkeypatch):
+    """CHAT_PER_CONSUMER e CHAT_QUEUE_MAX eram ignorados: todo o trafego chega por um unico consumidor (llm-access)."""
+    from app.config import Settings
+    monkeypatch.setenv("CHAT_PER_CONSUMER", "32")
+    monkeypatch.setenv("CHAT_QUEUE_MAX", "200")
+    monkeypatch.setenv("EMBED_QUEUE_MAX", "300")
+    s = Settings.from_env()
+    assert (s.chat_per_consumer, s.chat_queue_max, s.embed_queue_max) == (32, 200, 300)

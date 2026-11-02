@@ -342,6 +342,56 @@ async def settings(request: Request):
             "retention_days": s.retention_days, "upstream_url": s.upstream_url, "queue": queue}
 
 
+# ---- GPU (so repassa ao llm-queue: o estado vive la, no Redis; aqui nao ha copia no SQLite)
+
+def _gpu_patch(b: dict) -> dict:
+    out: dict = {}
+    for k in ("auto_shutdown", "reserved"):
+        if k in b:
+            if not isinstance(b[k], bool):
+                raise fail(422, f"{k} deve ser true ou false", "invalid_request_error", "invalid_gpu_config")
+            out[k] = b[k]
+    if "idle_min" in b:
+        v = b["idle_min"]
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not 1 <= v <= 1440:
+            raise fail(422, "idle_min deve ser um numero entre 1 e 1440", "invalid_request_error", "invalid_gpu_config")
+        out["idle_min"] = v
+    extra = set(b) - {"auto_shutdown", "reserved", "idle_min"}
+    if extra:
+        raise fail(422, "campos desconhecidos: " + ", ".join(sorted(extra)), "invalid_request_error", "invalid_gpu_config")
+    if not out:
+        raise fail(422, "nada para alterar", "invalid_request_error", "invalid_gpu_config")
+    return out
+
+
+async def _queue_gpu_config(ctx: Ctx, body: dict | None = None) -> dict:
+    url, headers = ctx.s.upstream_base + "/admin/gpu/config", {"X-Admin-Key": ctx.s.upstream_admin_key}
+    try:
+        r = await (ctx.http.get(url, headers=headers, timeout=10) if body is None else ctx.http.post(url, headers=headers, json=body, timeout=10))
+    except Exception as e:  # noqa: BLE001
+        raise fail(502, f"llm-queue indisponivel ({type(e).__name__})", "service_unavailable", "upstream_unavailable")
+    if r.status_code == 422:  # o queue tambem valida: repassa o motivo
+        try:
+            msg = r.json()["detail"]["error"]["message"]
+        except Exception:  # noqa: BLE001
+            msg = "configuracao recusada pelo llm-queue"
+        raise fail(422, msg, "invalid_request_error", "invalid_gpu_config")
+    if r.status_code != 200:
+        raise fail(502, f"llm-queue respondeu HTTP {r.status_code}", "service_unavailable", "upstream_error")
+    return r.json()
+
+
+@api.get("/gpu-config")
+async def gpu_config_get(request: Request):
+    return await _queue_gpu_config(require(request))
+
+
+@api.put("/gpu-config")
+async def gpu_config_put(request: Request):
+    ctx = require(request)
+    return await _queue_gpu_config(ctx, _gpu_patch(await _json(request)))
+
+
 @api.post("/password")
 @_db
 async def password(request: Request):

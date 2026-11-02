@@ -54,6 +54,9 @@ class Upstream:
         self.handler = None
         self.cycles = [{"id": "c1", "kind": "cold", "started_at": "2026-10-30T10:00:00Z", "cold_start_s": 400.0, "cost_usd": 0.12}]
         self.fail_machines = False
+        self.gpu_config = {"auto_shutdown": False, "idle_min": 30.0, "reserved": False, "static": True, "static_instance_id": 1}
+        self.config_calls = []   # corpos recebidos em POST /admin/gpu/config
+        self.config_status = 200
 
     @property
     def ai_calls(self) -> int:
@@ -70,6 +73,15 @@ class Upstream:
             if self.fail_machines or request.headers.get("x-admin-key") != UP_ADMIN:
                 return httpx.Response(403, json={"error": "x"})
             return httpx.Response(200, json={"cycles": self.cycles})
+        if path == "/admin/gpu/config":
+            if request.headers.get("x-admin-key") != UP_ADMIN:
+                return httpx.Response(403, json={"error": "x"})
+            if self.config_status != 200:
+                return httpx.Response(self.config_status, json={"detail": {"error": {"message": "idle_min deve ser um numero entre 1 e 1440"}}})
+            if request.method == "POST":
+                self.config_calls.append(json.loads(request.content))
+                self.gpu_config.update(self.config_calls[-1])
+            return httpx.Response(200, json=self.gpu_config)
         if path == "/v1/models":
             return httpx.Response(200, json={"object": "list", "data": [{"id": "qwen-abliterated"}]})
         body = json.loads(request.content)

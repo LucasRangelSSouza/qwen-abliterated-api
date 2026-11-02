@@ -80,6 +80,8 @@ const settings = {
   qa_mode: true, default_session_seconds: 18000, default_week_seconds: 604800, usage_retention_days: 90,
 }
 
+let gpuConfig = { auto_shutdown: false, idle_min: 30, reserved: false, static: false, static_instance_id: null }
+
 const sessionOf = (p) => ({ used: p.sess.used, limit: p.limits.session_limit_tokens, resets_at: p.sess.resets && p.sess.resets > now() ? iso(p.sess.resets) : null })
 const weekOf = (p) => ({ used: p.week.used, limit: p.limits.week_limit_tokens, resets_at: p.week.resets && p.week.resets > now() ? iso(p.week.resets) : null })
 const view = (p) => ({ id: p.id, name: p.name, note: p.note, status: p.status, key_last4: p.key_last4,
@@ -157,6 +159,13 @@ function handle(method, url, body) {
   }
   if (method === 'GET' && path === '/machines') return json({ status: status(), cycles: cycles.slice(0, +(q.get('limit') || 50)) })
   if (method === 'GET' && path === '/settings') return json(settings)
+  if (path === '/gpu-config') {
+    if (method === 'GET') return json(gpuConfig)
+    if (method === 'PUT') {
+      if (body.idle_min !== undefined && !(body.idle_min >= 1 && body.idle_min <= 1440)) return err(422, 'idle_min deve ser um número entre 1 e 1440')
+      gpuConfig = { ...gpuConfig, ...body }; return json(gpuConfig)
+    }
+  }
   if (method === 'POST' && path === '/password') {
     if (body.current !== password) return err(400, 'Senha atual incorreta.')
     if ((body.new || '').length < 8) return err(422, 'A nova senha precisa ter ao menos 8 caracteres.')

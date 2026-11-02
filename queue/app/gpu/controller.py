@@ -1,12 +1,15 @@
 """Controlador da GPU (Spec 13 §5): OFF -> STARTING -> (FALLBACK) -> LOADING -> READY -> STOPPING -> OFF.
 Liga na primeira requisicao, desliga apos GPU_IDLE_MIN ociosos, para (nao destroi) a instancia e a destroi apos GPU_STOPPED_TTL_H.
-Trata host indisponivel (situacoes A a E), tetos de gasto e adocao de instancia existente apos reinicio do servico."""
+Trata host indisponivel (situacoes A a E), tetos de gasto e adocao de instancia existente apos reinicio do servico.
+Modo fixo (GPU_STATIC_INSTANCE_ID, Spec 15 §4): adota a instancia pelo id e nunca cria, aluga, para nem destroi; falha vira alerta.
+Interruptor em tempo de execucao (config no Redis): com auto_shutdown desligado nenhum caminho automatico para a GPU."""
 from __future__ import annotations
 
 import asyncio
 import hashlib
 import json
 import logging
+import re
 import statistics
 import time
 from pathlib import Path
@@ -18,7 +21,7 @@ from app.gpu import hosts as H
 from app.gpu.cycles import CycleLog
 from app.gpu.ledger import Ledger
 from app.gpu.tunnel import Tunnel
-from app.gpu.vast import Instance, VastAPI
+from app.gpu.vast import Instance, VastAPI, VastError
 
 log = logging.getLogger("llm-queue.gpu")
 
@@ -28,6 +31,7 @@ K_INST = "llmq:instance"
 K_BAD = "llmq:bad_hosts"
 K_GOOD = "llmq:known_good"
 K_COLD = "llmq:cold_starts"
+K_CONFIG = "llmq:config"
 LABEL = "llmq-gpu"
 
 # estimativas de subida por caminho (s), medidas em 30/10 (Spec 13 §7); recalibradas pela mediana dos ultimos cold starts
@@ -62,15 +66,18 @@ def _strip(text: str, keep_shebang: bool = True) -> str:
     return "\n".join(out) + "\n"
 
 
-def load_onstart(path: str | None = None) -> str:
-    """Script de partida da instancia: bootstrap.sh com o vigia (watchdog.sh) embutido no lugar de #__WATCHDOG__."""
+def load_onstart(path: str | None = None, watchdog: bool = True) -> str:
+    """Script de partida da instancia: bootstrap.sh com o vigia (watchdog.sh) embutido no lugar de #__WATCHDOG__.
+    Com watchdog=False o bloco do vigia (entre #__WATCHDOG_INI__ e #__WATCHDOG_FIM__) sai inteiro: a instancia nao ganha como se parar sozinha."""
     base = Path(path).parent if path else Path(__file__).resolve().parents[2] / "remote"
     boot = Path(path) if path else base / "bootstrap.sh"
     wd = base / "watchdog.sh"
     if not boot.exists():
         return "#!/bin/bash\necho bootstrap ausente\n"
     text = boot.read_text(encoding="utf-8")
-    if wd.exists():
+    if not watchdog:
+        text = re.sub(r"#__WATCHDOG_INI__.*?#__WATCHDOG_FIM__\n?", "", text, flags=re.S)
+    elif wd.exists():
         text = text.replace("#__WATCHDOG__", _strip(wd.read_text(encoding="utf-8"), keep_shebang=False).rstrip("\n"))
     return _strip(text)
 
@@ -80,7 +87,9 @@ class GPUController:
                  health_probe: Callable[[], Awaitable[bool]], clock: Callable[[], float] = time.time, onstart: str | None = None):
         self.s, self.vast, self.tunnel, self.ledger, self.alerts, self.r = s, vast, tunnel, ledger, alerts, redis
         self.health_probe, self.clock = health_probe, clock
-        self.onstart = onstart if onstart is not None else load_onstart()
+        self._onstart_arg = onstart
+        self.onstart = onstart if onstart is not None else load_onstart()  # com o vigia: a impressao (spec_id) nao muda com o interruptor
+        self._onstart_sem_vigia: str | None = None
         # impressao do que e gravado na instancia ao criar (onstart + env): a Vast guarda isso, entao religar/adotar instancia com
         # impressao diferente rodaria o script ANTIGO. Impressao diferente => destruir e recriar.
         self.spec_id = hashlib.sha256((self.onstart + json.dumps(render_env(s), sort_keys=True)).encode()).hexdigest()[:12]
@@ -106,6 +115,72 @@ class GPUController:
         self._gone: set[int] = set()  # ofertas recusadas pela Vast (no_such_ask) no ciclo atual
         self.cycles = CycleLog(redis, clock)  # uma linha por ligada, para a tela Maquinas do painel
         self._geo: dict[int, str] = {}  # instancia -> regiao da oferta (so para o log de ciclos)
+        # config em tempo de execucao (fonte da verdade: Redis; o env so da o valor inicial)
+        self.cfg: dict = {"auto_shutdown": bool(s.auto_shutdown), "idle_min": float(s.idle_min), "reserved": bool(s.reserved)}
+        # modo fixo: id da instancia que nunca pode ser parada nem destruida
+        self.static_id: int | None = s.static_instance_id or None
+        self.degraded: dict | None = None  # modo fixo com problema (alerta e retentativa, nunca destruicao)
+        self._static_fails = 0
+        self._static_next = 0.0
+        self._static_power_t = 0.0
+        self._static_paused = False  # so depois de stop/destroy forcado pelo admin
+
+    @property
+    def static(self) -> bool:
+        return self.static_id is not None
+
+    def onstart_for(self, watchdog: bool) -> str:
+        """onstart de uma instancia nova: com o vigia so se o desligamento automatico estiver ligado."""
+        if watchdog or self._onstart_arg is not None:
+            return self.onstart
+        if self._onstart_sem_vigia is None:
+            self._onstart_sem_vigia = load_onstart(watchdog=False)
+        return self._onstart_sem_vigia
+
+    # ------------------------------------------------------------------ config em tempo de execucao
+    @staticmethod
+    def validate_config(patch: dict) -> dict:
+        """Aceita auto_shutdown (bool), reserved (bool) e idle_min (1 a 1440); ValueError com mensagem clara nos outros casos."""
+        out: dict = {}
+        for k in ("auto_shutdown", "reserved"):
+            if k in patch:
+                if not isinstance(patch[k], bool):
+                    raise ValueError(f"{k} deve ser true ou false")
+                out[k] = patch[k]
+        if "idle_min" in patch:
+            v = patch["idle_min"]
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not 1 <= v <= 1440:
+                raise ValueError("idle_min deve ser um numero entre 1 e 1440")
+            out["idle_min"] = float(v)
+        unknown = set(patch) - {"auto_shutdown", "reserved", "idle_min"}
+        if unknown:
+            raise ValueError("campos desconhecidos: " + ", ".join(sorted(unknown)))
+        return out
+
+    def config_view(self) -> dict:
+        return {**self.cfg, "static": self.static, "static_instance_id": self.static_id}
+
+    async def load_config(self) -> None:
+        raw = await self.r.get(K_CONFIG)
+        if not raw:
+            return
+        try:
+            self.cfg.update(self.validate_config(json.loads(raw)))
+        except (ValueError, TypeError):
+            log.warning("config salva no Redis ilegivel: mantendo os valores do ambiente")
+
+    async def set_config(self, patch: dict, who: str = "admin") -> dict:
+        old = dict(self.cfg)
+        self.cfg.update(self.validate_config(patch))
+        await self.r.set(K_CONFIG, json.dumps(self.cfg))
+        if self.cfg != old:
+            log.warning("config da GPU alterada por %s: %s -> %s", who, old, self.cfg)
+            if self.cfg["auto_shutdown"] and not old["auto_shutdown"]:
+                self.touch()  # liga o interruptor com a janela de ociosidade inteira pela frente
+            if old["reserved"] and not self.cfg["reserved"]:
+                self._last_reconcile, self._tunnel_bad = 0.0, 0  # volta ao normal conferindo a saude logo
+                self.touch()
+        return self.config_view()
 
     # ------------------------------------------------------------------ API para o resto do servico
     def touch(self) -> None:
@@ -154,7 +229,7 @@ class GPUController:
                 "stopped": bool(self.inst and self.inst.get("stopped_at")), "inflight": self.inflight,
                 "idle_s": int(now - self.last_activity) if self.state == READY else None,
                 "last_cold_start_s": self.last_cold_s, "last_stop_reason": self.last_stop_reason, "attempts": self.attempts[-8:],
-                "instance": self._instance_info(),
+                "instance": self._instance_info(), "config": self.config_view(), "static": self.static, "degraded": self.degraded,
                 "fail": {"reason": self.fail.reason, "retry_after": self.fail.retry_after} if self.fail and self.state == OFF else None}
 
     def _instance_info(self) -> dict | None:
@@ -226,7 +301,8 @@ class GPUController:
 
     async def run(self) -> None:
         try:
-            await self.adopt()
+            await self.load_config()
+            await (self.adopt_static() if self.static else self.adopt())
         except Exception as e:  # noqa: BLE001
             log.exception("adopt falhou: %r", e)
         while True:
@@ -241,11 +317,15 @@ class GPUController:
 
     async def _tick(self) -> None:
         now = self.clock()
+        if self.cfg["reserved"]:
+            return  # GPU reservada para outra carga: o controlador nao mexe em nada
+        if self.static:
+            return await self._tick_static(now)
         if self.state == OFF:
             if self._wake.is_set():
                 self._wake.clear()
                 await self._start_cycle()
-            elif self.inst and self.inst.get("stopped_at") and now - self.inst["stopped_at"] > self._stopped_ttl_s():
+            elif self.cfg["auto_shutdown"] and self.inst and self.inst.get("stopped_at") and now - self.inst["stopped_at"] > self._stopped_ttl_s():
                 await self._destroy_instance("ttl_parada")
         elif self.state == READY:
             if now - self._last_reconcile >= self.s.reconcile_s:
@@ -308,7 +388,7 @@ class GPUController:
         if credit < s.min_credit_usd:
             await self.alerts.notify("credit_low", f"credito da Vast US${credit:.2f} abaixo do minimo US${s.min_credit_usd:.2f}: GPU nao liga")
             return False, "credito_baixo", 600
-        est = (6.5 + s.idle_min) / 60.0 * s.effective_max_dph
+        est = (6.5 + self.cfg["idle_min"]) / 60.0 * s.effective_max_dph
         month, day = await self.ledger.month_spend(now), await self.ledger.day_spend(now)
         cap = s.monthly_budget_usd * (s.priority_budget_factor if self._priority else 1.0)
         for pct in s.budget_warn_pct:
@@ -342,6 +422,8 @@ class GPUController:
             self._wake.clear()
 
     async def _start_cycle_inner(self) -> None:
+        if self.static:  # defesa: o modo fixo nunca cria nem aluga
+            return await self._fail_cycle("gpu_fixa", 60, "modo fixo: o controlador nao cria instancia")
         s = self.s
         t0 = self.clock()
         self.fail, self.waste = None, 0.0
@@ -463,7 +545,8 @@ class GPUController:
         """Cria a instancia da oferta e espera 'running' com SSH. None = falhou (host ruim ja marcado e instancia destruida)."""
         s = self.s
         env, t_start = render_env(s), self.clock()
-        res = await self.vast.create_instance(c.offer_id, s.image, s.disk_gb, f"{LABEL}-{int(t_start)}", self.onstart, env)
+        wd = bool(self.cfg["auto_shutdown"])  # o vigia interno so entra com o desligamento automatico ligado
+        res = await self.vast.create_instance(c.offer_id, s.image, s.disk_gb, f"{LABEL}-{int(t_start)}", self.onstart_for(wd), env)
         if not res.ok:
             # B: oferta que sumiu nao e culpa do host (nao marca); qualquer outra recusa e registrada com a mensagem da Vast
             if res.offer_gone:
@@ -472,7 +555,7 @@ class GPUController:
             (log.info if res.offer_gone else log.warning)("criar na oferta %s (host %s) falhou: %s %s", c.offer_id, c.machine_id, res.error, res.msg)
             return None
         iid = res.instance_id
-        self.inst = {"id": iid, "machine_id": c.machine_id, "dph": c.allin_dph, "storage_h": 0.0, "created_at": t_start, "spec": self.spec_id}
+        self.inst = {"id": iid, "machine_id": c.machine_id, "dph": c.allin_dph, "storage_h": 0.0, "created_at": t_start, "spec": self.spec_id, "watchdog": wd}
         await self._persist()
         end = t_start + s.running_timeout_s
         vanished_since: float | None = None
@@ -564,7 +647,8 @@ class GPUController:
                     if (i.raw.get("label") or "").startswith(LABEL) and i.id != winner.id:
                         await self.vast.destroy(i.id)
         if winner is not None:
-            self.inst = {"id": winner.id, "machine_id": winner.machine_id, "dph": winner.dph_total, "storage_h": 0.0, "created_at": self.cold.get("t0", self.clock()), "spec": self.spec_id}
+            self.inst = {"id": winner.id, "machine_id": winner.machine_id, "dph": winner.dph_total, "storage_h": 0.0, "created_at": self.cold.get("t0", self.clock()), "spec": self.spec_id,
+                         "watchdog": bool(self.cfg["auto_shutdown"])}
             await self._persist()
         return winner
 
@@ -691,10 +775,123 @@ class GPUController:
         await self._set_state(READY)
         log.info("GPU READY (instancia %s, caminho %s)", inst.id, path)
 
+    # ------------------------------------------------------------------ modo instancia fixa (Spec 15 §4)
+    async def adopt_static(self) -> None:
+        """Adota a instancia pelo id (ignora rotulo e spec), abre o tunel e confere a saude. Nunca cria, para nem destroi."""
+        await self.cycles.restore()
+        await self._set_state(LOADING)
+        await self._static_connect()
+
+    def _static_backoff(self) -> float:
+        return min(self.s.static_retry_s * (2 ** max(0, self._static_fails - 1)), self.s.static_retry_max_s)
+
+    async def _static_degrade(self, reason: str, detail: str) -> None:
+        """Problema na instancia fixa: alerta e nova tentativa depois (recuo exponencial). Nunca destroi nem marca o host como ruim."""
+        now = self.clock()
+        self._static_fails += 1
+        wait = self._static_backoff()
+        self._static_next = now + wait
+        self.degraded = {"reason": reason, "detail": detail[:200], "since": self.degraded["since"] if self.degraded else now,
+                         "attempts": self._static_fails, "retry_in_s": int(wait)}
+        self.fail = GPUUnavailable("gpu_fixa_" + reason, f"GPU fixa indisponivel: {detail}", retry_after=max(5, int(wait)))
+        self.fail_ts, self.fail_seq = now, self.fail_seq + 1
+        log.error("GPU fixa %s: %s (%s); nova tentativa em %.0fs", self.static_id, reason, detail, wait)
+        await self.alerts.notify(f"static_{reason}", f"GPU fixa {self.static_id}: {detail}. So alerta: a maquina nao e parada nem destruida")
+        if self.state != LOADING:
+            await self._set_state(LOADING)
+
+    async def _static_connect(self) -> bool:
+        s, iid = self.s, self.static_id
+        try:
+            i = await self.vast.get_instance(iid)
+        except VastError as e:
+            await self._static_degrade("vast_inacessivel", f"API da Vast inacessivel: {e!r}")
+            return False
+        if i is None:
+            await self._static_degrade("instancia_ausente", f"instancia {iid} nao aparece na API da Vast")
+            return False
+        if i.actual_status != "running":
+            await self._static_degrade("instancia_parada", f"instancia {iid} esta {i.actual_status}")
+            await self._static_religar(i)
+            return False
+        if s.tunnel_mode != "none":
+            if not (i.ssh_host and i.ssh_port):
+                await self._static_degrade("sem_ssh", "a API da Vast nao informa host/porta de SSH")
+                return False
+            if not await self.tunnel.open(i.ssh_host, int(i.ssh_port)):
+                await self._static_degrade("tunel", "o tunel SSH nao abriu")
+                return False
+        if not await self.health_probe():
+            await self._static_degrade("sem_saude", "a LLM nao responde a saude")
+            return False
+        await self._static_ready(i)
+        return True
+
+    async def _static_religar(self, i: Instance) -> None:
+        """Instancia parada por fora (credito, host): religar e permitido (parar nunca), no maximo uma vez a cada static_retry_max_s."""
+        now = self.clock()
+        if i.actual_status not in ("exited", "stopped") or now - self._static_power_t < self.s.static_retry_max_s:
+            return
+        self._static_power_t = now
+        res = await self.vast.power(i.id, "running")
+        await self.alerts.notify("static_religar", f"GPU fixa {i.id}: pedido de religar enviado ({'ok' if res.ok else f'{res.error} {res.msg}'})", "info")
+
+    async def _static_ready(self, i: Instance) -> None:
+        was_degraded = self.degraded is not None
+        # nao entra no livro-razao nem em K_INST: a maquina fixa tem custo proprio, fora dos tetos do llm-queue
+        self.inst = {"id": i.id, "machine_id": i.machine_id, "dph": i.dph_total, "storage_h": i.storage_total_cost, "created_at": self.clock(), "static": True}
+        self.degraded, self.fail, self._tunnel_bad, self._static_fails = None, None, 0, 0
+        if self.cycles.cur is None:
+            await self.cycles.open("adopt")
+        await self.cycles.mark(ready_at=self.clock(), running_at=self.clock(), host=i.machine_id, price_dph=round(i.dph_total, 4))
+        self._last_reconcile = self.clock()
+        self.touch()
+        await self._set_state(READY)
+        log.info("GPU fixa READY (instancia %s)", i.id)
+        if was_degraded:
+            await self.alerts.notify("static_recuperada", f"GPU fixa {i.id} voltou a responder", "info")
+
+    async def _tick_static(self, now: float) -> None:
+        if self._static_paused:
+            return
+        if self.state == READY:
+            if now - self._last_reconcile >= self.s.reconcile_s:
+                self._last_reconcile = now
+                await self._reconcile_static()
+        elif now >= self._static_next:
+            await self._static_connect()
+
+    async def _reconcile_static(self) -> None:
+        try:
+            i = await self.vast.get_instance(self.static_id)
+        except VastError:
+            return  # a API da Vast falhou: nao diz nada sobre a maquina
+        if i is None or i.actual_status != "running":
+            await self._static_degrade("host_caiu", f"instancia {self.static_id} caiu ({getattr(i, 'actual_status', 'sumiu')})")
+            if i is not None:
+                await self._static_religar(i)
+            return
+        if self.s.tunnel_mode != "none" and not await self.tunnel.healthy():
+            self._tunnel_bad += 1
+            if i.ssh_host and i.ssh_port and await self.tunnel.open(i.ssh_host, int(i.ssh_port)):
+                self._tunnel_bad = 0
+        if not await self.health_probe():
+            self._tunnel_bad += 1
+        else:
+            self._tunnel_bad = 0 if await self.tunnel.healthy() else self._tunnel_bad
+        if self._tunnel_bad >= 3:
+            await self._static_degrade("sem_saude", "LLM ou tunel sem saude por 3 verificacoes")
+
     # ------------------------------------------------------------------ manutencao em READY
     async def _guards(self, now: float) -> None:
         s = self.s
-        if self.inflight == 0 and now - self.last_activity >= s.idle_min * 60:
+        if self.static:
+            return  # modo fixo: nada para a GPU
+        if not self.cfg["auto_shutdown"]:  # interruptor desligado: nem ociosidade, nem sessao maxima, nem teto diario param a GPU
+            if (self.inst or {}).get("watchdog"):
+                await self.alerts.notify("watchdog_ativo", f"instancia {(self.inst or {}).get('id')} foi criada com o vigia interno, que ainda a para por ociosidade", "info")
+            return
+        if self.inflight == 0 and now - self.last_activity >= self.cfg["idle_min"] * 60:
             return await self.stop_now("ociosa")
         if (await self.ledger.open_run_hours(now)) > s.max_session_h:
             await self.alerts.notify("session_max", f"GPU ligada ha mais de {s.max_session_h:.0f} h: parando")
@@ -737,14 +934,21 @@ class GPUController:
             await self._set_state(OFF)
 
     # ------------------------------------------------------------------ parar e destruir
-    async def stop_now(self, reason: str) -> None:
+    async def stop_now(self, reason: str, force: bool = False) -> None:
         iid = (self.inst or {}).get("id")
+        if self.static and not force:
+            log.error("modo fixo: pedido de parar a instancia (%s) recusado", reason)
+            return await self.alerts.notify("static_stop_recusado", f"modo fixo: pedido de parar a GPU ({reason}) recusado")
         if iid is None:
             return await self._set_state(OFF)
         await self._set_state(STOPPING)
         self.last_stop_reason = reason
         await self.tunnel.close()
         res = await self.vast.power(iid, "stopped")
+        if self.static:  # parada forcada pelo admin: o laco fixo fica em pausa (so um reinicio do servico retoma)
+            self._static_paused = True
+            await self.alerts.notify("static_forcado", f"modo fixo: instancia {iid} parada por ordem do admin ({'ok' if res.ok else res.error}); controlador em pausa")
+            return await self._set_state(OFF)
         if not res.ok:
             await self.alerts.notify("stop_failed", f"nao consegui parar {iid}: {res.error} {res.msg}; destruindo")
             return await self._destroy_instance("parar_falhou")
@@ -768,13 +972,20 @@ class GPUController:
         log.info("GPU parada (%s); instancia %s guardada ate %.0f h", reason, iid, self.s.stopped_ttl_h)
         await self._set_state(OFF)
 
-    async def destroy_now(self, reason: str) -> None:
+    async def destroy_now(self, reason: str, force: bool = False) -> None:
         """Destroi a instancia atual a pedido (rota de admin); nao mexe em requisicoes em voo alem de derruba-las."""
-        await self._destroy_instance(reason)
+        if self.static and not force:
+            return await self._destroy_instance(reason)  # recusa e alerta
+        await self._destroy_instance(reason, force=force)
+        if self.static:
+            self._static_paused = True
         await self._set_state(OFF)
 
-    async def _destroy_instance(self, reason: str, close_cycle: bool = True) -> None:
+    async def _destroy_instance(self, reason: str, close_cycle: bool = True, force: bool = False) -> None:
         iid = (self.inst or {}).get("id")
+        if self.static and not force:  # ultima barreira: nenhum caminho destroi a instancia fixa
+            log.error("modo fixo: destruir a instancia %s (%s) recusado", iid, reason)
+            return await self.alerts.notify("static_destroy_recusado", f"modo fixo: pedido de destruir a GPU ({reason}) recusado")
         await self.tunnel.close()
         if iid is not None:
             await self.vast.destroy(iid)

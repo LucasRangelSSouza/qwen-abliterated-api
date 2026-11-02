@@ -77,6 +77,7 @@ if [ "$EMBED_MODE" = gpu ] && [ -s "$EMBED_DIR/config.json" ] && ! pgrep -f "por
   echo "embedding iniciado (util $EMBED_UTIL)"
 fi
 
+#__WATCHDOG_INI__
 # vigia independente da VPS: sem atividade por WATCHDOG_IDLE_MIN, para a propria instancia pela API da Vast
 if ! pgrep -f llmq-watchdog >/dev/null; then
   cat > /workspace/llmq-watchdog.sh <<'WATCHDOG_EOF'
@@ -84,4 +85,5 @@ if ! pgrep -f llmq-watchdog >/dev/null; then
 WATCHDOG_EOF
   nohup bash /workspace/llmq-watchdog.sh > /workspace/llmq-watchdog.log 2>&1 &
 fi
+#__WATCHDOG_FIM__
 echo "== bootstrap fim"

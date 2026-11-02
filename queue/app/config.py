@@ -87,6 +87,11 @@ class Settings:
     batch_budget_usd: float = 12.0
     # --- tempos (segundos, Spec 13 §5)
     idle_min: float = 30.0
+    auto_shutdown: bool = False     # valor inicial do interruptor (GPU_AUTO_SHUTDOWN); em execucao vale o que estiver no Redis (/admin/gpu/config)
+    reserved: bool = False          # valor inicial do modo "reservada" (GPU_RESERVED)
+    static_instance_id: int = 0     # GPU_STATIC_INSTANCE_ID: instancia fixa 24/7 (0 = desligado); o controlador nunca cria, para nem destroi
+    static_retry_s: float = 15.0    # modo fixo: primeira espera entre tentativas de reconectar; dobra ate static_retry_max_s
+    static_retry_max_s: float = 300.0
     stopped_ttl_h: float = 24.0
     stopped_max_usd: float = 0.30   # custo maximo do disco de uma instancia parada: o TTL efetivo e o menor entre stopped_ttl_h e este teto / preco do disco
     watchdog_idle_min: float = 45.0
@@ -124,6 +129,10 @@ class Settings:
         if self.max_allin_dph_override > self.max_allin_dph and self.override_until > time.time():
             return self.max_allin_dph_override
         return self.max_allin_dph
+
+    @property
+    def static_mode(self) -> bool:
+        return self.static_instance_id > 0
 
     @property
     def embed_enabled(self) -> bool:
@@ -171,6 +180,11 @@ class Settings:
             disk_gb=_i("GPU_DISK_GB", cls.disk_gb),
             max_dl_usd_tb=_f("GPU_MAX_DL_USD_TB", cls.max_dl_usd_tb),
             idle_min=_f("GPU_IDLE_MIN", cls.idle_min),
+            auto_shutdown=_b("GPU_AUTO_SHUTDOWN", cls.auto_shutdown),
+            reserved=_b("GPU_RESERVED", cls.reserved),
+            static_instance_id=int(os.environ.get("GPU_STATIC_INSTANCE_ID", "").strip() or 0),
+            static_retry_s=_f("GPU_STATIC_RETRY_S", cls.static_retry_s),
+            static_retry_max_s=_f("GPU_STATIC_RETRY_MAX_S", cls.static_retry_max_s),
             stopped_ttl_h=_f("GPU_STOPPED_TTL_H", cls.stopped_ttl_h),
             stopped_max_usd=_f("GPU_STOPPED_MAX_USD", cls.stopped_max_usd),
             wait_max_s=_f("GPU_WAIT_MAX_S", cls.wait_max_s),

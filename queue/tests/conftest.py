@@ -16,7 +16,7 @@ def fast_settings(**kw) -> Settings:
     base = dict(tunnel_mode="none", poll_s=0.01, reconcile_s=0.05, scheduling_timeout_s=0.3, running_timeout_s=0.6, ssh_timeout_s=0.3,
                 health_timeout_s=1.5, wait_max_s=4.0, search_retry_s=0.05, search_window_s=0.3, idle_min=0.002, stopped_ttl_h=1.0,
                 keepalive_s=0.05, hedge_max_s=0.5, hedge_enabled=False, max_waste_per_wake_usd=5.0, min_credit_usd=1.0,
-                monthly_budget_usd=1000.0, max_daily_usd=1000.0)
+                monthly_budget_usd=1000.0, max_daily_usd=1000.0, auto_shutdown=True)
     base.update(kw)
     return Settings(**base)
 

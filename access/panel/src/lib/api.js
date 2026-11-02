@@ -54,5 +54,7 @@ export const api = {
   machines: (limit = 50) => request('GET', '/machines' + qs({ limit })),
   queue: () => request('GET', '/queue'),
   settings: () => request('GET', '/settings'),
+  gpuConfig: () => request('GET', '/gpu-config'),
+  setGpuConfig: (b) => request('PUT', '/gpu-config', b),
   password: (current, next) => request('POST', '/password', { current, new: next }),
 }

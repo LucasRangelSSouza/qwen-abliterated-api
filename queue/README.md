@@ -3,7 +3,8 @@
 Fila de IA com **GPU sob demanda** para o LUAR e os demais negócios (Spec 13, `new_ragente/specs/13_FILA_LLM_GPU_SOB_DEMANDA.md`).
 API compatível com OpenAI (`/v1/chat/completions`, `/v1/embeddings`) na frente de 2×RTX 3090 alugadas na Vast.ai. **Nada fica ligado
 24/7**: a GPU liga na primeira requisição, desliga depois de `GPU_IDLE_MIN` (30) minutos sem uso, e a instância parada é destruída
-depois de `GPU_STOPPED_TTL_H` (24) horas.
+depois de `GPU_STOPPED_TTL_H` (24) horas. Isso vale com o desligamento automático ligado; o padrão é desligado, e existe o modo de
+instância fixa (`GPU_STATIC_INSTANCE_ID`), que nunca para nem destrói a máquina: ver `docs/OPERACAO.md`, seção "GPU fixa e interruptor".
 
 ```
 LUAR ─▶ llm-gateway ─┐

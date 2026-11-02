@@ -7,7 +7,7 @@ import pytest
 import pytest_asyncio
 
 from app.config import Settings
-from app.gpu.controller import GPUUnavailable
+from app.gpu.controller import GPUController, GPUUnavailable
 from app.main import create_app
 
 KEY = "sk-teste-123"
@@ -29,6 +29,9 @@ class StubCtl:
         self.error: GPUUnavailable | None = None
         self.begun = self.ended = 0
         self.ledger = _Ledger()
+        self.cfg = {"auto_shutdown": False, "idle_min": 30.0, "reserved": False}
+        self.static = False
+        self.forced = []
 
     async def ensure_ready(self, priority=False, timeout=None):
         if self.delay:
@@ -39,7 +42,15 @@ class StubCtl:
     def begin_request(self): self.begun += 1
     def end_request(self): self.ended += 1
     def touch(self): pass
-    def status(self): return {"state": self.state, "eta_s": 240 if self.state != "READY" else None, "path": "restart"}
+    def status(self): return {"state": self.state, "eta_s": 240 if self.state != "READY" else None, "path": "restart", "config": self.config_view()}
+    def config_view(self): return {**self.cfg, "static": self.static, "static_instance_id": 777 if self.static else None}
+
+    async def set_config(self, patch, who="admin"):
+        self.cfg.update(GPUController.validate_config(patch))
+        return self.config_view()
+
+    async def stop_now(self, reason, force=False): self.forced.append(("stop", force))
+    async def destroy_now(self, reason, force=False): self.forced.append(("destroy", force))
     def request_wake(self, priority=False): self.woken = True
     woken = False
 

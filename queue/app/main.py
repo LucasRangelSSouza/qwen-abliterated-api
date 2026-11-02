@@ -125,9 +125,16 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
     async def gpu_status(request: Request):
         q: App = request.app.state.q
         q.auth(request)
+        return await _status(q)
+
+    @app.get("/admin/gpu/status")
+    async def admin_status(request: Request):
+        return await _status(_admin(request))
+
+    async def _status(q: App) -> dict:
         st = q.ctl.status()
         led = await q.ctl.ledger.snapshot()
-        st.update({"limits": {"idle_min": q.s.idle_min, "max_daily_usd": q.s.max_daily_usd, "monthly_budget_usd": q.s.monthly_budget_usd,
+        st.update({"limits": {"idle_min": st["config"]["idle_min"], "max_daily_usd": q.s.max_daily_usd, "monthly_budget_usd": q.s.monthly_budget_usd,
                               "max_allin_dph": q.s.effective_max_dph, "min_credit_usd": q.s.min_credit_usd, "wait_max_s": q.s.wait_max_s,
                               "stopped_ttl_h": q.s.stopped_ttl_h, "embed_mode": q.s.embed_mode},
                    "queue": {"chat": q.chat.stats(), "embed": q.embed.stats()},
@@ -167,20 +174,54 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             raise HTTPException(403, detail=_err("chave de admin invalida", "invalid_request_error", "forbidden"))
         return q
 
+    @app.get("/admin/gpu/config")
+    async def admin_config_get(request: Request):
+        """Config em tempo de execucao (auto_shutdown, idle_min, reserved). A fonte da verdade e o Redis; o env so da o valor inicial."""
+        return _admin(request).ctl.config_view()
+
+    @app.post("/admin/gpu/config")
+    async def admin_config_set(request: Request):
+        q = _admin(request)
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            body = None
+        if not isinstance(body, dict):
+            raise HTTPException(400, detail=_err("JSON invalido", "invalid_request_error", "invalid_json"))
+        try:
+            return await q.ctl.set_config(body, who="admin")
+        except ValueError as e:
+            raise HTTPException(422, detail=_err(str(e), "invalid_request_error", "invalid_config"))
+
+    async def _confirmed(request: Request) -> bool:
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001
+            return False
+        return isinstance(body, dict) and body.get("i_know_this_loses_the_host") is True
+
+    def _static_locked() -> HTTPException:
+        return HTTPException(409, detail=_err("GPU fixa: parar ou destruir perde a maquina. Para forcar, envie {\"i_know_this_loses_the_host\": true}",
+                                              "invalid_request_error", "static_instance_protected"))
+
     @app.post("/admin/gpu/stop")
     async def admin_stop(request: Request):
-        """Parada de emergencia: para a instancia (guarda o disco). `docker stop llm-queue` NAO desliga a GPU."""
+        """Parada de emergencia: para a instancia (guarda o disco). `docker stop llm-queue` NAO desliga a GPU. Em modo fixo exige confirmacao."""
         q = _admin(request)
+        if q.ctl.static and not await _confirmed(request):
+            raise _static_locked()
         if q.ctl.state != READY:
             return {"ok": False, "state": q.ctl.state}
-        await q.ctl.stop_now("admin")
+        await (q.ctl.stop_now("admin", force=True) if q.ctl.static else q.ctl.stop_now("admin"))
         return {"ok": True, "state": q.ctl.state}
 
     @app.post("/admin/gpu/destroy")
     async def admin_destroy(request: Request):
-        """Destroi a instancia atual (para de pagar disco). A proxima requisicao cria outra do zero."""
+        """Destroi a instancia atual (para de pagar disco). A proxima requisicao cria outra do zero. Em modo fixo exige confirmacao."""
         q = _admin(request)
-        await q.ctl.destroy_now("admin")
+        if q.ctl.static and not await _confirmed(request):
+            raise _static_locked()
+        await (q.ctl.destroy_now("admin", force=True) if q.ctl.static else q.ctl.destroy_now("admin"))
         return {"ok": True, "state": q.ctl.state}
 
     @app.get("/metrics")
@@ -206,6 +247,9 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
     async def _handle(request: Request, kind: str, path: str):
         q: App = request.app.state.q
         consumer = q.auth(request)
+        if q.ctl.cfg["reserved"]:  # o Lucas parou o LLM para usar a GPU: nada de acordar nem religar
+            raise HTTPException(503, detail=_err("GPU reservada para outra carga; tente de novo mais tarde", "service_unavailable", "gpu_reserved"),
+                                headers={"Retry-After": "300"})
         try:
             body = await request.json()
         except Exception:  # noqa: BLE001

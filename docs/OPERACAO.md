@@ -61,3 +61,10 @@ O provedor `qq` do `llm-gateway` (tenant `platform`) aponta para `http://llm-acc
 
 ## Testar uma acordada completa (gasta saldo)
 `studies/coldstart/wake_test.py --label x --env '{...}' --hermes --limits [--embed] --out resultado.json`: liga a GPU pela cadeia real, mede o aviso de espera, roda o Hermes e os limites reais, captura as etapas e **destroi a máquina no fim**. Tem guarda de saldo e teto de tempo. Hosts tchecos recusaram SSH em 3 de 3 tentativas em 30/10/2026.
+
+## GPU fixa: afinação e armadilhas (02/11/2026)
+- `CHAT_MAX_INFLIGHT`, `CHAT_PER_CONSUMER`, `CHAT_QUEUE_MAX`, `EMBED_QUEUE_MAX` e `MAX_CONTEXT_TOKENS` valem de verdade desde a v0.3.2. Todo o tráfego chega ao llm-queue por **um** consumidor (o llm-access): `CHAT_PER_CONSUMER` precisa ser igual a `CHAT_MAX_INFLIGHT` (32 em produção), senão só 3 chats rodam juntos. `MAX_CONTEXT_TOKENS` acompanha o `--max-model-len` do vLLM (131072).
+- Valores de produção da GPU fixa: `CHAT_MAX_INFLIGHT=32`, `CHAT_PER_CONSUMER=32`, `CHAT_QUEUE_MAX=200`, `MAX_CONTEXT_TOKENS=131072`, `GPU_STATIC_INSTANCE_ID=<id>`, `GPU_AUTO_SHUTDOWN=false`.
+- O `kernel-harness` usa por padrão janela de 200 mil tokens e comprime aos 60 % (120 mil); como o vLLM aceita 131 mil, a compressão acontece antes do limite. A janela do harness é global (vale para todos os modelos): não baixar para o contexto do Qwen.
+- Reiniciar o vLLM por dentro: `kill -9` no servidor deixa `VLLM::EngineCore` e `VLLM::Worker_*` segurando a memória das placas; matar também esses processos (pelo PID do contêiner, não pelo do `nvidia-smi`). Durante o experimento, ligar o modo **reservada** no painel (Configurações → GPU) para a fila não alertar nem devolver erro aos usuários.
+- Antes de alugar uma 2×3090 para tensor parallel, ver `bw_nvlink` na oferta (0 = sem NVLink e sem P2P) e `cuda_max_good` (≥ 13 para a imagem atual).

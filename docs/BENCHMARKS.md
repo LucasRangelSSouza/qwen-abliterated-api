@@ -68,3 +68,50 @@ Medida à parte (Spec 13, Vast real, 30/10/2026), vLLM 0.30, tensor-parallel 2, 
 
 H100 NVL: 13 células só estimadas (excluída por custo). Comportamento do AWQ com auditoria humana contra o NVFP4 (o cumprimento de pedidos de limite muda entre abliterações:
 ~81 % no AWQ base Colletti, ~24 % no NVFP4 Blackfrost, ~43 % em FP8/BF16). Soak de 24 h com a imagem enxuta. Embedding convivendo com a LLM (medição no estudo de cold start, ver `DECISOES.md`).
+
+## 6. GPU fixa 2×RTX 3090 (Rep. Tcheca, 02/11/2026): capacidade medida
+
+Máquina: 2×RTX 3090, driver 610 (CUDA 13), PCIe 4.0 x16, **sem P2P** entre as placas (`nvidia-smi topo -p2p r` = GNS; o vLLM desliga o all-reduce customizado e usa a memória do host), ~US$ 0,29/h com disco de 50 GB. vLLM 0.30.0, AWQ 4 bits, TP=2, `--gpu-memory-utilization 0.94`, `--max-num-seqs 48`, `--max-num-batched-tokens 32768`, `--max-model-len 131072` (cache de KV de ~301 mil tokens; 2,3 pedidos de 131 mil ao mesmo tempo). Ferramenta de carga: `studies/coldstart/capacity.py` (lê só métricas; roda dentro da GPU contra o vLLM). SLA: primeiro token (p95) ≤ 3 s e ≥ 20 tok/s por usuário.
+
+**Prompt curto (~70 tokens), direto no vLLM**
+
+| Usuários | tok/s por usuário | Total tok/s | 1º token p95 | SLA |
+|---|---|---|---|---|
+| 1 | 71 | 69 | 0,11 s | sim |
+| 8 | 44 | 331 | 0,5 s | sim |
+| 16 | 32 | 489 | 1,0 s | sim |
+| 24 | 23,6 | 537 | 1,2 s | sim |
+| 32 | 20,8 | 626 | 1,8 s | sim (limite) |
+| 48 | 15,3 | 685 | 2,7 s | não |
+| 64 | 15,0 | 684 | 12 s | não (fila) |
+
+Com `--max-num-seqs 24` o limite ficava em 24 usuários (532 tok/s); subir para 48 deu +17 % de vazão com 32 usuários dentro do SLA. O cache de KV só chega a 25 %: o teto é a quantidade de sequências, não a memória. Potência das duas placas: 650 a 725 W sob carga, 78 °C no máximo.
+
+**Prefill (prompt longo): o ponto fraco, ~1,2 a 1,3 mil tokens/s**
+
+| Prompt | Usuários | 1º token (mediana) |
+|---|---|---|
+| ~9,6 mil | 1 / 4 / 8 / 16 | 7,4 s / 15 s / 59 s / 81 s |
+| ~38 mil | 1 / 2 / 4 / 8 | 31 s / 52 s / 117 s / 170 s |
+| ~57 mil | 1 / 2 | 50 s / 77 s |
+| ~90 mil (com busca de um código no meio do texto: acertou) | 1 | 91 s |
+
+O prefill funciona como uma fila: o último usuário espera ≈ (usuários × tokens do prompt) ÷ 1,3 mil. O cache de prefixo reduz isso para o trecho repetido (instruções e ferramentas dos agentes, ~5,9 mil tokens); o ganho real ainda não foi medido.
+
+**TP=1 (uma réplica por placa) foi testado e descartado.** Sem all-reduce o prefill de 9,6 mil tokens levou 7,7 s (igual aos 7,4 s da TP=2) e a geração caiu de 71 para 47 tok/s. O contexto máximo por placa é ~21 mil tokens (32k pede 2,15 GiB de cache e só há 1,41 GiB). Conclusão: manter TP=2.
+
+**Pelo serviço de fila (llm-access → llm-queue → túnel → vLLM), 64 k de contexto e 48 sequências**
+
+| Clientes simultâneos (256 tokens) | Todos prontos em | 1º token mediana | Total tok/s |
+|---|---|---|---|
+| 20 | 11 a 12 s | 2,8 a 3,2 s | ~385 |
+| 32 | 13,5 s | 4,0 s | 513 |
+| 48 | 22 s | 5,0 s | 488 |
+
+Antes da correção (limite por consumidor em 3, que valia por todo o tráfego do `llm-access`) a fila de 20 levava 30 a 33 s e a de 40 devolvia 429. A linha de base da máquina anterior era 43 s.
+
+**Custo:** a US$ 0,289/h, com 32 usuários (626 tok/s) saem ~2,25 milhões de tokens por hora, **~US$ 0,13 por milhão de tokens**; com 1 usuário, US$ 1,13.
+
+**Pelo LUAR (agentes do tenant auto-center, prompts reais de 5,9 a 10,3 mil tokens):** 8 clientes simultâneos no agente de atendimento (com chamada de ferramenta) receberam a resposta completa em 56 a 194 s (mediana 129 s), em configuração anterior (limite por consumidor em 3).
+
+**Cold start desta máquina:** pesos do Drive em ~13 min (~40 MB/s, 18,2 GB); vLLM sobe em ~3 a 4,5 min depois dos pesos.

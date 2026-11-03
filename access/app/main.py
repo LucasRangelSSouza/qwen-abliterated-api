@@ -8,7 +8,7 @@ import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from app import admin, proxy
+from app import admin, enroll, proxy
 from app.auth import AdminAuth
 from app.config import Settings
 from app.ctx import Ctx
@@ -54,6 +54,7 @@ def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = No
         return RedirectResponse("/admin/", status_code=307)
 
     app.include_router(proxy.router)
+    app.include_router(enroll.router)
     app.include_router(admin.api)
     app.include_router(admin.static)  # por ultimo: o catch-all /admin/{path} nao pode engolir /admin/api
     return app

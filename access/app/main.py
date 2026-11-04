@@ -25,6 +25,7 @@ async def _rotina_vms(ctx) -> None:
         await asyncio.sleep(600)
         try:
             if vms.credenciais_configuradas(ctx):
+                await vms.provisionar_pagas(ctx)
                 await vms.sincronizar(ctx)
                 await vms.varredura(ctx)
         except Exception:  # noqa: BLE001  a rotina nunca derruba o servico

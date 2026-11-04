@@ -81,6 +81,9 @@ class PgStore:
             c.execute(_ddl())
             c.execute("ALTER TABLE keys ADD COLUMN IF NOT EXISTS label TEXT")
             c.execute("ALTER TABLE people ADD COLUMN IF NOT EXISTS safety_level BIGINT NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2))")
+            c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS external_id TEXT")
+            c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS billing_status TEXT")
+            c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS next_payment_at DOUBLE PRECISION")
             self._c = c
         return self._c
 

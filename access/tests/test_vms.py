@@ -178,3 +178,72 @@ async def test_painel_exige_login(rig):
     r, _ctx, _fake = rig
     assert (await r.client.get("/admin/api/vms")).status_code == 401
     assert (await r.client.post("/admin/api/vms/1/provision")).status_code == 401
+
+
+# ---------------------------------------------------------------- produto "maquina virtual" vindo da Cakto
+
+SEG = "seg-cakto-teste"
+
+
+async def cakto(r, evento, email="ana@x.com", produto="Máquina virtual Segundo Cérebro", sub="vm-sub-1", ev="e1", proximo="2026-12-04T10:00:00Z"):
+    corpo = {"event": evento, "data": {"id": ev, "customer": {"name": "Ana", "email": email}, "product": {"name": produto}, "amount": 399.0,
+                                       "subscription": {"id": sub, "next_payment_date": proximo}}}
+    return await r.client.post("/v1/billing/cakto", content=json.dumps(corpo), headers={"content-type": "application/json", "x-webhook-secret": SEG})
+
+
+@pytest.fixture
+async def rig2(make_rig):
+    r = await make_rig(secrets_key="chave-mestra-de-teste", cakto_webhook_secret=SEG)
+    ctx = r.app.state.ctx
+    fake = FakeContabo()
+    ctx.contabo_transport = httpx.MockTransport(fake.handler)
+    V.salvar_credenciais(ctx, CRED)
+    ctx.store.set_setting("vm_product_id", "V-BARATO")
+    return r, ctx, fake
+
+
+async def test_compra_da_vm_abre_pedido_sem_mexer_no_plano_e_renovacao_nao_duplica(rig2):
+    r, ctx, fake = rig2
+    assert (await cakto(r, "purchase_approved", produto="Segundo Cérebro Max", sub="plano-1", ev="p1")).status_code == 200  # plano primeiro
+    plano_antes = dict(ctx.store.one("SELECT plan,status FROM subscriptions"))
+    assert (await cakto(r, "purchase_approved")).status_code == 200  # a VM (order bump)
+    vms = ctx.store.query("SELECT * FROM vms")
+    assert len(vms) == 1 and vms[0]["status"] == "requested" and vms[0]["billing_status"] == "active" and vms[0]["external_id"] == "vm-sub-1"
+    assert dict(ctx.store.one("SELECT plan,status FROM subscriptions")) == plano_antes  # o plano da conta nao mudou
+    assert ctx.store.one("SELECT COUNT(*) n FROM subscriptions")["n"] == 1  # a VM nao virou assinatura de plano
+    await cakto(r, "subscription_renewed", ev="e2")  # renovacao da VM
+    assert ctx.store.one("SELECT COUNT(*) n FROM vms")["n"] == 1
+    assert fake.mutacoes() == []  # nada foi criado na Contabo (auto_provision desligado)
+
+
+async def test_atraso_da_vm_desliga_mesmo_com_plano_em_dia(rig2):
+    r, ctx, fake = rig2
+    await cakto(r, "purchase_approved", produto="Segundo Cérebro Max", sub="plano-1", ev="p1")
+    await cakto(r, "purchase_approved")
+    vm_id = ctx.store.one("SELECT id FROM vms")["id"]
+    await V.provisionar(ctx, vm_id)
+    await V.sincronizar(ctx)
+    await cakto(r, "subscription_late", ev="e3", proximo="2000-01-01T00:00:00Z")  # VM vencida ha muito tempo; plano segue ativo
+    assert ctx.store.one("SELECT status FROM subscriptions")["status"] == "active"
+    assert (await V.varredura(ctx))["suspensas"] == 1
+    await cakto(r, "purchase_approved", ev="e4", proximo="2099-01-01T00:00:00Z")  # pagou a VM
+    assert (await V.varredura(ctx))["religadas"] == 1
+
+
+async def test_auto_provision_so_cria_vm_paga_e_so_se_ligado(rig2):
+    r, ctx, fake = rig2
+    await cakto(r, "purchase_approved")
+    assert await V.provisionar_pagas(ctx) == 0 and fake.mutacoes() == []  # desligado por padrao
+    ctx.store.set_setting("vm_auto_provision", "1")
+    assert await V.provisionar_pagas(ctx) == 1
+    assert [p for m, p in fake.mutacoes() if p == "/v1/compute/instances"]
+    assert ctx.store.one("SELECT status FROM vms")["status"] == "provisioning"
+    assert await V.provisionar_pagas(ctx) == 0  # nao cria de novo
+
+
+async def test_pedido_pendente_de_pagamento_nao_cria_vm(rig2):
+    r, ctx, fake = rig2
+    ctx.store.set_setting("vm_auto_provision", "1")
+    await cakto(r, "purchase_created")  # pendente: so um boleto/pix aguardando
+    assert ctx.store.one("SELECT COUNT(*) n FROM vms")["n"] == 0
+    assert await V.provisionar_pagas(ctx) == 0

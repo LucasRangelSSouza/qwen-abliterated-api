@@ -249,6 +249,10 @@ def _apply(ctx: Ctx, ev: dict, now: float) -> None:
     if acc is None:
         acc, token = create_account(ctx, ev["email"], ev["name"], plan_id)
         _notify_new_account(ctx, acc, token)
+    from app import vms  # produto "maquina virtual": cobranca propria da VM, nao mexe no plano nem no acesso da conta
+    if vms.eh_produto_vm(ctx, ev["plan_hint"]):
+        vms.registrar_pagamento(ctx, acc["id"], ev)
+        return
     plan = get_plan(ctx, plan_id) if plan_id else None
     sub = ctx.store.one("SELECT * FROM subscriptions WHERE account_id=? AND (external_id=? OR ?='') ORDER BY id DESC LIMIT 1", (acc["id"], ev["external_id"], ev["external_id"]))
     with ctx.store.tx() as c:

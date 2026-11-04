@@ -268,6 +268,39 @@ def deve_ficar_desligada(ctx: Ctx, sub) -> bool:
     return sub["status"] == "late" and dias_de_atraso(ctx, sub) > cfg["grace_days"]
 
 
+def _cobranca(vm, sub):
+    """A VM tem cobranca propria quando foi vendida como produto da Cakto (billing_status); senao vale o plano da conta."""
+    if vm["billing_status"]:
+        return {"status": vm["billing_status"], "next_payment_at": vm["next_payment_at"], "updated_at": vm["updated_at"]}
+    return sub
+
+
+# ---------------------------------------------------------------- webhook da Cakto (produto "maquina virtual")
+
+def eh_produto_vm(ctx: Ctx, hint: str) -> bool:
+    h = (hint or "").lower()
+    extra = (ctx.store.get_setting("vm_product_hint") or "").strip().lower()
+    return any(t in h for t in ("maquina virtual", "máquina virtual", "vps")) or bool(extra and extra in h)
+
+
+def registrar_pagamento(ctx: Ctx, account_id: int, ev: dict) -> int | None:
+    """Evento de pagamento do produto VM: cria o pedido na primeira compra paga e acompanha o estado da cobranca da VM."""
+    now = ctx.clock()
+    vm = None
+    if ev.get("external_id"):
+        vm = ctx.store.one("SELECT * FROM vms WHERE external_id=?", (ev["external_id"],))
+    if vm is None:
+        vm = ctx.store.one("SELECT * FROM vms WHERE account_id=? AND status!='canceled' AND external_id IS NULL ORDER BY id DESC LIMIT 1", (account_id,))
+    if vm is None:
+        if ev["status"] != "active":
+            return None  # so uma compra paga abre pedido
+        vm_id = solicitar(ctx, account_id)
+        vm = ctx.store.one("SELECT * FROM vms WHERE id=?", (vm_id,))
+    _mudar(ctx, vm["id"], external_id=ev.get("external_id") or vm["external_id"], billing_status=ev["status"],
+           next_payment_at=ev.get("next_payment_at") or vm["next_payment_at"])
+    return vm["id"]
+
+
 async def varredura(ctx: Ctx, contabo: Contabo | None = None) -> dict:
     """Desliga a VM de quem passou da carencia e religa a de quem voltou a pagar. Idempotente; roda de tempos em tempos."""
     feito = {"suspensas": 0, "religadas": 0, "erros": 0}
@@ -277,7 +310,7 @@ async def varredura(ctx: Ctx, contabo: Contabo | None = None) -> dict:
     c = contabo or cliente(ctx)
     try:
         for vm in vms:
-            sub = current_sub(ctx, vm["account_id"])
+            sub = _cobranca(vm, current_sub(ctx, vm["account_id"]))
             try:
                 if vm["status"] != "suspended" and deve_ficar_desligada(ctx, sub):
                     await suspender(ctx, vm["id"], c)
@@ -316,4 +349,19 @@ async def sincronizar(ctx: Ctx, contabo: Contabo | None = None) -> int:
     finally:
         if contabo is None:
             await c.aclose()
+    return n
+
+
+async def provisionar_pagas(ctx: Ctx, contabo: Contabo | None = None) -> int:
+    """Se o dono ligou vm_auto_provision: cria na Contabo as VMs cujo pagamento foi confirmado (billing_status active)."""
+    cfg = config(ctx)
+    if not (cfg["auto_provision"] and cfg["product_id"]):
+        return 0
+    n = 0
+    for vm in ctx.store.query("SELECT id FROM vms WHERE status='requested' AND billing_status='active'"):
+        try:
+            await provisionar(ctx, vm["id"], contabo)
+            n += 1
+        except ContaboError:
+            pass  # fica com status error e last_error; o painel mostra
     return n

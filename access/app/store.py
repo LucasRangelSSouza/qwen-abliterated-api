@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS vms(
   id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL REFERENCES accounts(id), name TEXT NOT NULL UNIQUE, contabo_id TEXT,
   status TEXT NOT NULL CHECK(status IN ('requested','provisioning','running','suspended','canceled','error')), product_id TEXT, region TEXT, ip TEXT,
   cost_cents INTEGER NOT NULL DEFAULT 0, price_cents INTEGER NOT NULL DEFAULT 0, cores INTEGER, ram_mb INTEGER, disk_mb INTEGER,
-  created_at REAL NOT NULL, updated_at REAL NOT NULL, suspended_at REAL, last_error TEXT);
+  created_at REAL NOT NULL, updated_at REAL NOT NULL, suspended_at REAL, last_error TEXT,
+  external_id TEXT, billing_status TEXT, next_payment_at REAL);
 CREATE INDEX IF NOT EXISTS vms_account ON vms(account_id);
 CREATE TABLE IF NOT EXISTS billing_events(
   id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, event_id TEXT NOT NULL, kind TEXT NOT NULL, received_at REAL NOT NULL,
@@ -75,6 +76,10 @@ class Store:
                 c.execute("ALTER TABLE keys ADD COLUMN label TEXT")  # "app:<computador>" nas chaves emitidas no login
             if "safety_level" not in {r["name"] for r in c.execute("PRAGMA table_info(people)").fetchall()}:
                 c.execute("ALTER TABLE people ADD COLUMN safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2))")
+            cols_vms = {r["name"] for r in c.execute("PRAGMA table_info(vms)").fetchall()}
+            for col, tipo in (("external_id", "TEXT"), ("billing_status", "TEXT"), ("next_payment_at", "REAL")):  # cobranca propria da VM (produto da Cakto)
+                if col not in cols_vms:
+                    c.execute(f"ALTER TABLE vms ADD COLUMN {col} {tipo}")
             self._c = c
         return self._c
 

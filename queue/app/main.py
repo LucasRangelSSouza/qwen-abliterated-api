@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 import httpx
 import redis.asyncio as aioredis
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
 from app import notice
@@ -25,6 +25,7 @@ from app.gpu.controller import READY, GPUController, GPUUnavailable
 from app.gpu.ledger import Ledger
 from app.gpu.tunnel import NoTunnel, SshTunnel
 from app.gpu.vast import RealVast
+from app.media import Media, MediaError
 from app.scheduler import Lane, QueueFull
 
 log = logging.getLogger("llm-queue")
@@ -48,6 +49,7 @@ class App:
         self.embed = Lane("embed", s.embed_max_inflight, s.embed_queue_max, s.embed_max_inflight)
         self.consumers = self._load_consumers()
         self.recent: collections.deque = collections.deque(maxlen=60)  # ultimos pedidos encerrados (so metadados)
+        self.media: Media | None = None
 
     def _load_consumers(self) -> dict:
         try:
@@ -73,7 +75,7 @@ class App:
 
 
 def create_app(s: Settings | None = None, *, controller: GPUController | None = None, redis=None, http: httpx.AsyncClient | None = None,
-               consumers: dict | None = None) -> FastAPI:
+               consumers: dict | None = None, media: Media | None = None) -> FastAPI:
     s = s or Settings.from_env()
 
     @asynccontextmanager
@@ -96,6 +98,12 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             ctl = GPUController(s, vast, tun, Ledger(r), alerts, r, health_probe=_make_probe(s, client))
             ctl.start()
         app.state.q = App(s, ctl, r, client, alerts)
+        if media is not None:
+            app.state.q.media = media
+        elif s.media_enabled:
+            mvast = RealVast(s.vast_api_key, s.vast_base, "RTX 3090", 1)
+            mtun = NoTunnel() if s.tunnel_mode == "none" else SshTunnel(s.ssh_key_path, [(s.media_local_port, 8188)])
+            app.state.q.media = Media(s, mvast, mtun, r, client)
         if consumers is not None:
             app.state.q.consumers = consumers
         try:
@@ -160,6 +168,87 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         waiting.sort(key=lambda r: r["enq"])
         return {"gpu_state": q.ctl.state, "lanes": {"chat": q.chat.stats(), "embed": q.embed.stats()}, "waiting": waiting, "running": running,
                 "recent": list(q.recent)}
+
+    # ---- midia (imagem): fila propria, uma por vez, na GPU de midia
+    def _media(q: App) -> Media:
+        if q.media is None:
+            raise HTTPException(503, detail=_err("geracao de imagem nao esta habilitada", "service_unavailable", "media_disabled"))
+        return q.media
+
+    @app.post("/v1/images/generations")
+    async def images_generations(request: Request):
+        q: App = request.app.state.q
+        c = q.auth(request)
+        m = _media(q)
+        try:
+            body = await request.json()
+            assert isinstance(body, dict)
+        except Exception:  # noqa: BLE001
+            raise HTTPException(400, detail=_err("corpo invalido", "invalid_request_error", "invalid_body"))
+        cls = request.headers.get("x-queue-class", "interactive")
+        end_user = request.headers.get("x-end-user", "")[:60]
+        try:
+            job = await m.submit(c["name"], end_user, body, cls if cls in ("interactive", "batch") else "interactive")
+        except QueueFull as e:
+            raise HTTPException(429, detail=_err("fila de imagem cheia", "rate_limit_error", "queue_full"), headers={"Retry-After": str(e.retry_after)})
+        except MediaError as e:
+            raise HTTPException(422, detail=_err(str(e), "invalid_request_error", "invalid_media_request"))
+        REQS.labels(c["name"], "image", "accepted").inc()
+        if body.get("async") or request.headers.get("prefer", "").lower() == "respond-async":
+            return JSONResponse({"id": job["id"], "status": job["state"], "poll": f"/v1/jobs/{job['id']}"}, status_code=202)
+        job = await m.wait(job["id"], q.s.media_sync_wait_s) or job
+        if job["state"] == "done":
+            img = await m.image(job["id"])
+            fmt = body.get("response_format", "b64_json")
+            item = {"b64_json": m.b64(img)} if fmt == "b64_json" else {"url": f"/v1/jobs/{job['id']}/image"}
+            return {"created": int(time.time()), "id": job["id"], "seconds": job["seconds"], "size": job["size"], "data": [item]}
+        if job["state"] == "failed":
+            unavailable = (job.get("error") or "").startswith(("maquina", "nao consegui abrir", "ComfyUI inacessivel"))
+            raise HTTPException(503 if unavailable else 502, detail=_err(job.get("error") or "falha ao gerar", "service_unavailable" if unavailable else "server_error", "media_failed"))
+        return JSONResponse({"id": job["id"], "status": job["state"], "poll": f"/v1/jobs/{job['id']}"}, status_code=202)
+
+    @app.get("/v1/jobs/{job_id}")
+    async def job_get(job_id: str, request: Request):
+        q: App = request.app.state.q
+        c = q.auth(request)
+        job = await _media(q).get(job_id)
+        if not job or job.get("consumer") != c["name"]:
+            raise HTTPException(404, detail=_err("pedido nao encontrado", "invalid_request_error", "not_found"))
+        return {k: v for k, v in job.items() if k != "consumer"}
+
+    @app.get("/v1/jobs/{job_id}/image")
+    async def job_image(job_id: str, request: Request):
+        q: App = request.app.state.q
+        c = q.auth(request)
+        m = _media(q)
+        job = await m.get(job_id)
+        img = await m.image(job_id) if job and job.get("consumer") == c["name"] else None
+        if not img:
+            raise HTTPException(404, detail=_err("imagem nao encontrada (ou expirou, 48 h)", "invalid_request_error", "not_found"))
+        return Response(content=img, media_type="image/png")
+
+    @app.get("/admin/media/status")
+    async def admin_media_status(request: Request):
+        q = _admin(request)
+        if q.media is None:
+            return {"enabled": False}
+        return await q.media.status()
+
+    @app.get("/admin/media/jobs")
+    async def admin_media_jobs(request: Request, limit: int = 40):
+        q = _admin(request)
+        if q.media is None:
+            return {"enabled": False, "waiting": [], "running": [], "recent": [], "lane": None}
+        return {"enabled": True, **await q.media.jobs(max(1, min(limit, 100)))}
+
+    @app.get("/admin/media/image/{job_id}")
+    async def admin_media_image(job_id: str, request: Request):
+        """Miniatura/imagem de um pedido para o painel (so admin). O resto da API so entrega a imagem a quem pediu."""
+        q = _admin(request)
+        img = await q.media.image(job_id) if q.media else None
+        if not img:
+            raise HTTPException(404, detail=_err("imagem nao encontrada (ou expirou, 48 h)", "invalid_request_error", "not_found"))
+        return Response(content=img, media_type="image/png", headers={"Cache-Control": "private, max-age=3600"})
 
     @app.get("/admin/gpu/cycles")
     async def admin_cycles(request: Request, limit: int = 50):

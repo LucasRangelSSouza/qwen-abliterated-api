@@ -53,6 +53,8 @@ export const api = {
   usage: (o) => request('GET', '/usage' + qs(o)),
   machines: (limit = 50) => request('GET', '/machines' + qs({ limit })),
   queue: () => request('GET', '/queue'),
+  mediaStatus: () => request('GET', '/media/status'),
+  mediaJobs: (limit = 40) => request('GET', '/media/jobs' + qs({ limit })),
   settings: () => request('GET', '/settings'),
   gpuConfig: () => request('GET', '/gpu-config'),
   setGpuConfig: (b) => request('PUT', '/gpu-config', b),

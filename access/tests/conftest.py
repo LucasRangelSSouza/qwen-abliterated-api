@@ -84,12 +84,28 @@ class Upstream:
             return httpx.Response(200, json=self.gpu_config)
         if path == "/v1/models":
             return httpx.Response(200, json={"object": "list", "data": [{"id": "qwen-abliterated"}]})
+        if path.startswith("/admin/media/"):
+            if request.headers.get("x-admin-key") != UP_ADMIN:
+                return httpx.Response(403, json={"error": "x"})
+            if path.endswith("/status"):
+                return httpx.Response(200, json={"enabled": True, "state": "ready", "instance": {"id": 7, "dph": 0.128}})
+            if path.endswith("/jobs"):
+                return httpx.Response(200, json={"enabled": True, "waiting": [], "running": [], "recent": [{"id": "j1", "state": "done"}], "lane": {"limit": 1}})
+            if "/image/" in path:
+                return httpx.Response(200, content=b"PNGfake", headers={"content-type": "image/png"})
+        if path.startswith("/v1/jobs/"):
+            self.calls.append((path, {}, dict(request.headers)))
+            if path.endswith("/image"):
+                return httpx.Response(200, content=b"PNGfake", headers={"content-type": "image/png"})
+            return httpx.Response(200, json={"id": "j1", "state": "done"})
         body = json.loads(request.content)
         self.calls.append((path, body, dict(request.headers)))
         if self.delay:
             await asyncio.sleep(self.delay)
         if self.handler:
             return await self.handler(request, body)
+        if path == "/v1/images/generations":
+            return httpx.Response(200, json={"id": "j1", "data": [{"b64_json": "AAAA"}], "seconds": 4.2, "size": "1024x1024"})
         if path == "/v1/embeddings":
             return httpx.Response(200, json={"data": [{"embedding": [0.1]}], "usage": {"prompt_tokens": 7, "total_tokens": 7}})
         if body.get("stream"):

@@ -157,6 +157,22 @@ function handle(method, url, body) {
         { id: 127, kind: 'embed', consumer: 'llm-access', end_user: 'platform', cls: 'batch', enq: n - 900, start: null, end: n - 850, code: '503' }],
       error: null })
   }
+  if (method === 'GET' && path === '/media/status') {
+    return json({ enabled: true, state: process_state === 'off' ? 'off' : process_state === 'ready' ? 'ready' : 'starting', tunnel: process_state === 'ready',
+      instance: { id: 59106171, status: 'running', dph: 0.1276, gpu: 'RTX 3090', num_gpus: 1, location: 'Brazil, BR', label: 'midia-gpu-1', disk_gb: 80, cpu_ram_gb: 16 },
+      comfy: { version: '0.3.68', gpu: 'NVIDIA GeForce RTX 3090', vram_total: 25769803776, vram_free: 9437184000 }, lane: { waiting: 1, inflight: 1, limit: 1, served: 87 },
+      recipes: [{ id: 'flux-schnell', kind: 'image', title: 'Flux schnell (rápido, boa qualidade)' }],
+      today: { done: 54, failed: 2, avg_seconds: 7.8 }, monthly_cost_usd: 91.87, error: null })
+  }
+  if (method === 'GET' && path === '/media/jobs') {
+    const n = nowS()
+    const P = ['um hambúrguer suculento com queijo derretido, fundo escuro, fotografia de estúdio', 'capa de curso de Excel, mesa de escritório, tons de azul', 'caricatura de um chef sorrindo, estilo cartoon', 'avatar de uma professora, ilustração limpa', 'propaganda de café gelado em copo alto, luz de manhã', 'logo minimalista de uma padaria, fundo claro']
+    const mk = (i, who, st, ago, sec) => ({ id: 'img' + i, state: st, recipe: 'flux-schnell', kind: 'image', consumer: 'llm-access', end_user: who, cls: 'interactive', prompt: P[i % P.length], size: '1024x1024', enq: n - ago, started: n - ago + 1, finished: st === 'done' || st === 'failed' ? n - ago + sec : null, seconds: sec, error: st === 'failed' ? 'o ComfyUI recusou o pedido: out of memory' : null })
+    return json({ enabled: true, lane: { waiting: 1, inflight: 1, limit: 1, served: 87 },
+      waiting: [{ ...mk(7, 'Paulo Henrique', 'na_fila', 6, null), waited_s: 6 }],
+      running: [{ ...mk(8, 'Marina Duarte', 'executando', 5, null), running_s: 4.6 }],
+      recent: [mk(1, 'dono', 'done', 40, 7.4), mk(2, 'Marina Duarte', 'done', 70, 8.1), mk(3, 'platform', 'done', 120, 6.9), mk(4, 'Paulo Henrique', 'failed', 180, 3.2), mk(5, 'dono', 'done', 260, 7.7), mk(6, 'Marina Duarte', 'done', 340, 8.5), mk(9, 'platform', 'done', 420, 7.2), mk(10, 'dono', 'done', 520, 7.9), mk(11, 'Paulo Henrique', 'done', 640, 8.8), mk(12, 'Marina Duarte', 'done', 800, 7.1)] })
+  }
   if (method === 'GET' && path === '/machines') return json({ status: status(), cycles: cycles.slice(0, +(q.get('limit') || 50)) })
   if (method === 'GET' && path === '/settings') return json(settings)
   if (path === '/gpu-config') {

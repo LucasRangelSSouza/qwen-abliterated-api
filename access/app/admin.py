@@ -325,6 +325,39 @@ async def queue(request: Request):
         return {"gpu_state": None, "lanes": {}, "waiting": [], "running": [], "recent": [], "error": f"fila indisponivel ({type(e).__name__})"}
 
 
+# ---- imagem (vem do llm-queue)
+
+async def _queue_admin_get(ctx: Ctx, path: str, params: dict | None = None):
+    try:
+        return await ctx.http.get(ctx.s.upstream_base + path, params=params, headers={"X-Admin-Key": ctx.s.upstream_admin_key}, timeout=10)
+    except Exception as e:  # noqa: BLE001
+        raise fail(502, f"llm-queue indisponivel ({type(e).__name__})", "service_unavailable", "upstream_unavailable")
+
+
+@api.get("/media/status")
+async def media_status(request: Request):
+    r = await _queue_admin_get(require(request), "/admin/media/status")
+    if r.status_code != 200:
+        return {"enabled": False, "error": f"status da maquina de imagem indisponivel (HTTP {r.status_code})"}
+    return r.json()
+
+
+@api.get("/media/jobs")
+async def media_jobs(request: Request, limit: int = 40):
+    r = await _queue_admin_get(require(request), "/admin/media/jobs", {"limit": max(1, min(limit, 100))})
+    if r.status_code != 200:
+        return {"enabled": False, "waiting": [], "running": [], "recent": [], "error": f"fila de imagem indisponivel (HTTP {r.status_code})"}
+    return r.json()
+
+
+@api.get("/media/image/{job_id}")
+async def media_image(job_id: str, request: Request):
+    r = await _queue_admin_get(require(request), f"/admin/media/image/{job_id}")
+    if r.status_code != 200:
+        raise fail(404, "imagem nao encontrada", "invalid_request_error", "not_found")
+    return Response(content=r.content, media_type="image/png", headers={"Cache-Control": "private, max-age=3600"})
+
+
 # ---- configuracao
 
 @api.get("/settings")

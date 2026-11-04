@@ -211,3 +211,49 @@ async def usage(request: Request):
     except sqlite3.Error:
         raise fail(503, "banco de chaves indisponivel", "service_unavailable", "database_unavailable")
     return {"person": p.name, "session": w["session"], "week": w["week"]}
+
+
+# ---- imagem: fila propria (uma por vez) no llm-queue; nao gasta tokens da janela, so autentica, mostra quem pediu e registra o uso
+
+def _media_headers(ctx: Ctx, p: Principal) -> dict:
+    h = {"Authorization": f"Bearer {ctx.s.upstream_key}"} if ctx.s.upstream_key else {}
+    h["x-end-user"] = ("dono" if p.kind == "owner" else p.name).encode("ascii", "replace").decode()[:60]
+    return h
+
+
+@router.post("/v1/images/generations")
+async def images_generations(request: Request):
+    ctx = _ctx(request)
+    p = authenticate(ctx, request)
+    try:
+        body = await request.json()
+        assert isinstance(body, dict)
+    except Exception:  # noqa: BLE001
+        raise fail(400, "JSON invalido", "invalid_request_error", "invalid_json")
+    headers = {**_media_headers(ctx, p), "Content-Type": "application/json"}
+    for h in ("x-queue-class", "prefer"):
+        if h in request.headers:
+            headers[h] = request.headers[h]
+    try:
+        r = await ctx.http.post(ctx.s.upstream_base + "/v1/images/generations", json=body, headers=headers, timeout=240)
+    except httpx.HTTPError:
+        _log(ctx, p, "image", 0, 0, 0, "upstream_error", None)
+        return JSONResponse(err("falha ao falar com o servico de imagem", "server_error", "upstream_error"), status_code=502)
+    _log(ctx, p, "image", 0, 0, 0, "ok" if r.status_code in (200, 202) else "upstream_error", None)
+    return Response(r.content, status_code=r.status_code, headers=_pass_headers(r.headers), media_type=r.headers.get("content-type", "application/json"))
+
+
+@router.get("/v1/jobs/{job_id}")
+async def job_status(job_id: str, request: Request):
+    ctx = _ctx(request)
+    p = authenticate(ctx, request)
+    r = await ctx.http.get(ctx.s.upstream_base + f"/v1/jobs/{job_id}", headers=_media_headers(ctx, p), timeout=15)
+    return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
+
+
+@router.get("/v1/jobs/{job_id}/image")
+async def job_image(job_id: str, request: Request):
+    ctx = _ctx(request)
+    p = authenticate(ctx, request)
+    r = await ctx.http.get(ctx.s.upstream_base + f"/v1/jobs/{job_id}/image", headers=_media_headers(ctx, p), timeout=30)
+    return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))

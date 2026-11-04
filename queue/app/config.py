@@ -121,6 +121,15 @@ class Settings:
     embed_queue_max: int = 200
     max_context_tokens: int = 65536
     request_timeout_s: float = 1800.0
+    # --- midia (imagem; ComfyUI numa GPU fixa propria, alcancada por tunel SSH)
+    media_instance_id: int = 0       # MEDIA_INSTANCE_ID: instancia Vast da GPU de midia (0 = sem midia)
+    media_local_port: int = 18188    # porta local do tunel ate o ComfyUI (8188 na maquina)
+    media_queue_max: int = 30
+    media_per_consumer: int = 4
+    media_job_timeout_s: float = 300.0
+    media_sync_wait_s: float = 150.0  # quanto o pedido sincrono espera antes de devolver 202 com o id
+    media_poll_s: float = 0.5
+    media_ckpt: str = "flux1-schnell-fp8.safetensors"
     extra: dict = field(default_factory=dict)
 
     @property
@@ -133,6 +142,10 @@ class Settings:
     @property
     def static_mode(self) -> bool:
         return self.static_instance_id > 0
+
+    @property
+    def media_enabled(self) -> bool:
+        return self.media_instance_id > 0
 
     @property
     def embed_enabled(self) -> bool:
@@ -183,6 +196,13 @@ class Settings:
             auto_shutdown=_b("GPU_AUTO_SHUTDOWN", cls.auto_shutdown),
             reserved=_b("GPU_RESERVED", cls.reserved),
             static_instance_id=int(os.environ.get("GPU_STATIC_INSTANCE_ID", "").strip() or 0),
+            media_instance_id=int(os.environ.get("MEDIA_INSTANCE_ID", "").strip() or 0),
+            media_local_port=_i("MEDIA_LOCAL_PORT", cls.media_local_port),
+            media_queue_max=_i("MEDIA_QUEUE_MAX", cls.media_queue_max),
+            media_per_consumer=_i("MEDIA_PER_CONSUMER", cls.media_per_consumer),
+            media_job_timeout_s=_f("MEDIA_JOB_TIMEOUT_S", cls.media_job_timeout_s),
+            media_sync_wait_s=_f("MEDIA_SYNC_WAIT_S", cls.media_sync_wait_s),
+            media_ckpt=os.environ.get("MEDIA_CKPT", cls.media_ckpt),
             static_retry_s=_f("GPU_STATIC_RETRY_S", cls.static_retry_s),
             static_retry_max_s=_f("GPU_STATIC_RETRY_MAX_S", cls.static_retry_max_s),
             stopped_ttl_h=_f("GPU_STOPPED_TTL_H", cls.stopped_ttl_h),

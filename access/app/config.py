@@ -41,6 +41,7 @@ class Settings:
     session_ttl_s: float = 12 * 3600
     request_timeout_s: float = 1800.0
     cakto_webhook_secret: str = ""  # CAKTO_WEBHOOK_SECRET: sem ele o webhook responde 503 (nunca fica aberto)
+    secrets_key: str = ""           # SECRETS_KEY: chave mestra que cifra credenciais guardadas no banco (Contabo); sem ela nao guarda
 
     @property
     def upstream_base(self) -> str:
@@ -68,4 +69,5 @@ class Settings:
             platform_key_sha256=e("PLATFORM_KEY_SHA256", "").strip().lower(),
             panel_dir=e("ACCESS_PANEL_DIR", cls.panel_dir),
             cakto_webhook_secret=_secret("CAKTO_WEBHOOK_SECRET"),
+            secrets_key=_secret("SECRETS_KEY"),
         )

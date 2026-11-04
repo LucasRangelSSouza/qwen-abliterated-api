@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+import asyncio
 from contextlib import asynccontextmanager
 
 import httpx
@@ -14,6 +15,19 @@ from app.config import Settings
 from app.ctx import Ctx
 from app.ledger import Ledger
 from app.store import Store
+
+
+async def _rotina_vms(ctx) -> None:
+    """De 10 em 10 minutos: atualiza as VMs de clientes e desliga/religa conforme o pagamento. So roda com a Contabo configurada."""
+    from app import vms
+    while True:
+        await asyncio.sleep(600)
+        try:
+            if vms.credenciais_configuradas(ctx):
+                await vms.sincronizar(ctx)
+                await vms.varredura(ctx)
+        except Exception:  # noqa: BLE001  a rotina nunca derruba o servico
+            pass
 
 
 def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = None, clock=time.time) -> FastAPI:
@@ -33,9 +47,11 @@ def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = No
             ctx.ledger.purge()  # retencao de 90 dias
         except Exception:  # noqa: BLE001  banco fora do ar nao impede subir (chaves OWNER/PLATFORM)
             pass
+        tarefa = asyncio.create_task(_rotina_vms(ctx))
         try:
             yield
         finally:
+            tarefa.cancel()
             if http is None:
                 await client.aclose()
             store.close()
@@ -62,6 +78,7 @@ def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = No
     app.include_router(accounts_routes.router)
     app.include_router(enroll.router)
     app.include_router(admin.api)
+    from app import vms_routes  # noqa: F401  (registra as rotas em admin.api)
     app.include_router(admin.static)  # por ultimo: o catch-all /admin/{path} nao pode engolir /admin/api
     return app
 

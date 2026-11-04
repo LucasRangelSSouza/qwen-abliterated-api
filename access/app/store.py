@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS subscriptions(
   status TEXT NOT NULL CHECK(status IN ('pending','active','late','canceled','refunded','chargeback')), provider TEXT NOT NULL DEFAULT 'cakto',
   external_id TEXT, next_payment_at REAL, amount_cents INTEGER, started_at REAL, updated_at REAL NOT NULL, blocked_by_billing INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS subscriptions_account ON subscriptions(account_id);
+CREATE TABLE IF NOT EXISTS vms(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL REFERENCES accounts(id), name TEXT NOT NULL UNIQUE, contabo_id TEXT,
+  status TEXT NOT NULL CHECK(status IN ('requested','provisioning','running','suspended','canceled','error')), product_id TEXT, region TEXT, ip TEXT,
+  cost_cents INTEGER NOT NULL DEFAULT 0, price_cents INTEGER NOT NULL DEFAULT 0, cores INTEGER, ram_mb INTEGER, disk_mb INTEGER,
+  created_at REAL NOT NULL, updated_at REAL NOT NULL, suspended_at REAL, last_error TEXT);
+CREATE INDEX IF NOT EXISTS vms_account ON vms(account_id);
 CREATE TABLE IF NOT EXISTS billing_events(
   id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, event_id TEXT NOT NULL, kind TEXT NOT NULL, received_at REAL NOT NULL,
   processed INTEGER NOT NULL DEFAULT 0, error TEXT, payload TEXT NOT NULL, UNIQUE(provider, event_id));

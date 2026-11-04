@@ -129,6 +129,7 @@ class Settings:
     media_job_timeout_s: float = 300.0
     media_sync_wait_s: float = 150.0  # quanto o pedido sincrono espera antes de devolver 202 com o id
     media_poll_s: float = 0.5
+    media_keepalive_s: float = 20.0   # vigia: se o tunel cair e a maquina estiver de pe, reabre sozinho
     media_ckpt: str = "flux1-schnell-fp8.safetensors"
     extra: dict = field(default_factory=dict)
 

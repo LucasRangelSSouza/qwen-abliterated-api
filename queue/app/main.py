@@ -104,11 +104,14 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             mvast = RealVast(s.vast_api_key, s.vast_base, "RTX 3090", 1)
             mtun = NoTunnel() if s.tunnel_mode == "none" else SshTunnel(s.ssh_key_path, [(s.media_local_port, 8188)])
             app.state.q.media = Media(s, mvast, mtun, r, client)
+            app.state.q.media.start()
         if consumers is not None:
             app.state.q.consumers = consumers
         try:
             yield
         finally:
+            if media is None and app.state.q.media is not None:
+                await app.state.q.media.stop()
             if controller is None:
                 await ctl.stop_loop()
             if http is None:

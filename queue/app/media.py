@@ -86,6 +86,33 @@ class Media:
         self._inst_cache: tuple[float, object] | None = None
         self._tun_lock = asyncio.Lock()
         self.comfy = f"http://127.0.0.1:{s.media_local_port}"
+        self._keep: asyncio.Task | None = None
+
+    # ---- vigia do tunel
+    def start(self) -> None:
+        if self._keep is None:
+            self._keep = asyncio.create_task(self._keeper())
+
+    async def stop(self) -> None:
+        k, self._keep = self._keep, None
+        if k:
+            k.cancel()
+            await asyncio.gather(k, return_exceptions=True)
+        await self.tun.close()
+
+    async def _keeper(self) -> None:
+        """Mantem o tunel ate o ComfyUI aberto enquanto a maquina de imagem estiver de pe (24/7), para o painel mostrar a verdade e o 1o pedido nao pagar a abertura."""
+        while True:
+            try:
+                if not await self.tun.healthy():
+                    inst = await self.instance(fresh=True)
+                    if inst is not None and inst.running:
+                        await self._ensure_tunnel()
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:  # noqa: BLE001
+                log.warning("media: vigia do tunel: %r", e)
+            await asyncio.sleep(self.s.media_keepalive_s)
 
     # ---- maquina
     async def instance(self, fresh: bool = False):

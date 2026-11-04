@@ -202,3 +202,42 @@ def test_rotas_http(redis):
         # async
         r2 = c.post("/v1/images/generations", json={"prompt": "x", "async": True}, headers=h)
         assert r2.status_code == 202 and r2.json()["poll"].startswith("/v1/jobs/")
+
+
+@pytest.mark.asyncio
+async def test_vigia_reabre_o_tunel_sozinho(make_media):
+    class Tun(NoTunnel):
+        def __init__(self):
+            super().__init__()
+            self.ok = False
+
+        async def healthy(self):
+            return self.ok
+
+        async def open(self, host, port):
+            self.opened.append((host, port))
+            self.ok = True
+            return True
+    m, _ = await make_media(media_keepalive_s=0.02)
+    m.tun = Tun()
+    assert (await m.status())["tunnel"] is False
+    m.start()
+    await asyncio.sleep(0.2)
+    assert m.tun.opened == [("h.vast.ai", 2222)] and (await m.status())["tunnel"] is True
+    m.tun.ok = False                      # o tunel cai...
+    await asyncio.sleep(0.2)
+    assert len(m.tun.opened) == 2         # ...e o vigia abre de novo
+    await m.stop()
+
+
+@pytest.mark.asyncio
+async def test_vigia_nao_abre_com_a_maquina_parada(make_media):
+    class Tun(NoTunnel):
+        async def healthy(self):
+            return False
+    m, _ = await make_media(vast=FakeVastMedia(status="exited"), media_keepalive_s=0.02)
+    m.tun = Tun()
+    m.start()
+    await asyncio.sleep(0.15)
+    assert m.tun.opened == []
+    await m.stop()

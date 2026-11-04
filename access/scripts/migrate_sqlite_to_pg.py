@@ -15,13 +15,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 TABLES = [  # ordem respeita as chaves estrangeiras
+    ("plans", ["id", "name", "session_limit_tokens", "week_limit_tokens", "image_quota_month", "safety_level", "max_devices", "price_cents"], False),
     ("people", ["id", "name", "note", "status", "created_at", "safety_level"], True),
-    ("keys", ["id", "person_id", "key_hash", "key_last4", "created_at", "revoked_at"], True),
+    ("keys", ["id", "person_id", "key_hash", "key_last4", "created_at", "revoked_at", "label"], True),
     ("limits", ["person_id", "session_limit_tokens", "week_limit_tokens", "session_seconds", "week_seconds"], False),
     ("windows", ["person_id", "kind", "start_ts", "end_ts", "used_tokens", "reserved_tokens"], False),
     ("usage_log", ["id", "ts", "person_id", "key_id", "actor", "route", "in_tokens", "out_tokens", "total_tokens", "status", "limits_json"], True),
     ("settings", ["key", "value"], False),
     ("safety_log", ["id", "ts", "classifier", "person_id", "category", "score", "route", "source"], True),
+    ("accounts", ["id", "email", "name", "pw_hash", "status", "person_id", "setup_hash", "setup_expires", "created_at", "last_login"], True),
+    ("subscriptions", ["id", "account_id", "plan", "status", "provider", "external_id", "next_payment_at", "amount_cents", "started_at", "updated_at", "blocked_by_billing"], True),
+    ("billing_events", ["id", "provider", "event_id", "kind", "received_at", "processed", "error", "payload"], True),
 ]
 
 
@@ -62,7 +66,8 @@ def migrate(sqlite_path: str, dsn: str, schema: str, apply: bool) -> dict:
                 c.execute(f"SELECT setval(pg_get_serial_sequence('{name}','id'), GREATEST(1, COALESCE((SELECT MAX(id) FROM {name}), 1)))")
     with store.tx() as c:
         dst = {t: c.execute(f"SELECT COUNT(*) n FROM {t}").fetchone()["n"] for t, _, _ in TABLES}
-        soma_src = sum(r[4] for r in data["windows"]) + sum(r[8] for r in data["usage_log"])
+        idx = lambda t, col: dict(zip([x[0] for x in TABLES], [x[1] for x in TABLES]))[t].index(col)  # noqa: E731
+        soma_src = sum(r[idx("windows", "used_tokens")] for r in data["windows"]) + sum(r[idx("usage_log", "total_tokens")] for r in data["usage_log"])
         soma_dst = c.execute("SELECT COALESCE(SUM(used_tokens),0) n FROM windows").fetchone()["n"] + c.execute("SELECT COALESCE(SUM(total_tokens),0) n FROM usage_log").fetchone()["n"]
     ok = dst == src and soma_src == soma_dst
     report.update(aplicado=True, destino=dst, soma_origem=soma_src, soma_destino=soma_dst, conferido=ok)

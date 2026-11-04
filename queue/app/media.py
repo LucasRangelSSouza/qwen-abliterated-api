@@ -70,8 +70,48 @@ def recipe_flux_schnell(p: dict, ckpt: str) -> dict:
     }
 
 
+VIDEO_SIZES = {"paisagem": (768, 512), "retrato": (512, 768), "quadrado": (576, 576)}
+NEG_VIDEO = "worst quality, inconsistent motion, blurry, jittery, distorted, watermark, text, deformed"
+
+
+def _video_size(p: dict) -> tuple[int, int]:
+    w, h = VIDEO_SIZES.get(str(p.get("format") or p.get("formato") or "paisagem"), VIDEO_SIZES["paisagem"])
+    sz = str(p.get("size") or "")
+    if "x" in sz:
+        try:
+            a, b = sz.lower().split("x", 1)
+            w, h = max(256, min(832, round(int(a) / 32) * 32)), max(256, min(832, round(int(b) / 32) * 32))
+        except ValueError:
+            pass
+    return w, h
+
+
+def recipe_ltx_video(p: dict, _ckpt: str) -> dict:
+    """Texto para video (LTX-Video 2B): clipes curtos de 2 a 6 s a 25 quadros por segundo."""
+    w, h = _video_size(p)
+    secs = max(1.0, min(6.0, float(p.get("seconds") or p.get("segundos") or 4)))
+    frames = int(round(secs * 25 / 8)) * 8 + 1  # o modelo pede 8n+1 quadros
+    seed = int(p["seed"]) if p.get("seed") is not None else random.randint(0, 2**53)
+    return {
+        "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "ltx-video-2b-v0.9.5.safetensors"}},
+        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": "t5xxl_fp8_e4m3fn_scaled.safetensors", "type": "ltxv"}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": str(p["prompt"]), "clip": ["2", 0]}},
+        "4": {"class_type": "CLIPTextEncode", "inputs": {"text": NEG_VIDEO, "clip": ["2", 0]}},
+        "5": {"class_type": "LTXVConditioning", "inputs": {"positive": ["3", 0], "negative": ["4", 0], "frame_rate": 25.0}},
+        "6": {"class_type": "EmptyLTXVLatentVideo", "inputs": {"width": w, "height": h, "length": frames, "batch_size": 1}},
+        "7": {"class_type": "LTXVScheduler", "inputs": {"steps": 30, "max_shift": 2.05, "base_shift": 0.95, "stretch": True, "terminal": 0.1, "latent": ["6", 0]}},
+        "8": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
+        "9": {"class_type": "SamplerCustom", "inputs": {"model": ["1", 0], "add_noise": True, "noise_seed": seed, "cfg": 3.0, "positive": ["5", 0], "negative": ["5", 1],
+                                                       "sampler": ["8", 0], "sigmas": ["7", 0], "latent_image": ["6", 0]}},
+        "10": {"class_type": "VAEDecode", "inputs": {"samples": ["9", 0], "vae": ["1", 2]}},
+        "11": {"class_type": "CreateVideo", "inputs": {"images": ["10", 0], "fps": 25.0}},
+        "12": {"class_type": "SaveVideo", "inputs": {"video": ["11", 0], "filename_prefix": "video/midia", "format": "mp4", "codec": "h264"}},
+    }
+
+
 RECIPES = {
     "flux-schnell": {"kind": "image", "title": "Flux schnell (rapido, boa qualidade)", "build": recipe_flux_schnell, "default": True},
+    "ltx-video": {"kind": "video", "title": "LTX-Video 2B (texto para video, 2 a 6 s)", "build": recipe_ltx_video, "default_video": True, "timeout": 900},
 }
 
 
@@ -174,19 +214,19 @@ class Media:
         return {"done": len(ok), "failed": len(day) - len(ok), "avg_seconds": avg}
 
     # ---- jobs
-    async def submit(self, consumer: str, end_user: str, params: dict, cls: str = "interactive") -> dict:
-        recipe = params.get("recipe") or next(k for k, v in RECIPES.items() if v.get("default"))
-        if recipe not in RECIPES:
+    async def submit(self, consumer: str, end_user: str, params: dict, cls: str = "interactive", kind: str = "image") -> dict:
+        recipe = params.get("recipe") or next(k for k, v in RECIPES.items() if v.get("default" if kind == "image" else "default_video"))
+        if recipe not in RECIPES or RECIPES[recipe]["kind"] != kind:
             raise MediaError(f"receita desconhecida: {recipe}")
         prompt = str(params.get("prompt") or "").strip()
         if not prompt:
             raise MediaError("o pedido precisa de um prompt")
         params = {**params, "prompt": prompt[:MAX_PROMPT_CHARS]}
         t = self.lane.admit(consumer, cls, self.now())  # QueueFull sobe para o chamador (429)
-        t.end_user, t.kind = end_user, "image"
+        t.end_user, t.kind = end_user, kind
         jid = uuid.uuid4().hex[:12]
-        w, h = _size(params)
-        job = {"id": jid, "state": "na_fila", "recipe": recipe, "kind": "image", "consumer": consumer, "end_user": end_user, "cls": cls,
+        w, h = _video_size(params) if kind == "video" else _size(params)
+        job = {"id": jid, "state": "na_fila", "recipe": recipe, "kind": kind, "consumer": consumer, "end_user": end_user, "cls": cls,
                "prompt": prompt[:300], "size": f"{w}x{h}", "enq": self.now(), "started": None, "finished": None, "seconds": None, "error": None}
         self.live[jid] = job
         await self._save(job)
@@ -200,9 +240,9 @@ class Media:
             await self._save(job)
             await self._ensure_tunnel()
             wf = RECIPES[job["recipe"]]["build"](params, self.s.media_ckpt)
-            img = await self._comfy_run(wf, job)
+            img, mime = await self._comfy_run(wf, job, RECIPES[job["recipe"]].get("timeout"))
             await self.r.setex(f"llmq:media:img:{job['id']}", JOB_TTL_S, img)
-            job.update(state="done", finished=self.now(), bytes=len(img))
+            job.update(state="done", finished=self.now(), bytes=len(img), mime=mime)
         except (MediaUnavailable, MediaError) as e:
             job.update(state="failed", finished=self.now(), error=str(e))
         except asyncio.CancelledError:
@@ -217,13 +257,13 @@ class Media:
                 job["seconds"] = round(job["finished"] - job["started"], 1)
             await self._save(job)
             await self.r.lpush("llmq:media:recent", job["id"])
-            await metrics.log_job(self.r, "image", "image", job["consumer"], job["end_user"], job["enq"], job.get("started"), job["finished"] or self.now(),
+            await metrics.log_job(self.r, "image", job.get("kind", "image"), job["consumer"], job["end_user"], job["enq"], job.get("started"), job["finished"] or self.now(),
                                   "200" if job["state"] == "done" else "500", job.get("cls", "interactive"))
             await self.r.ltrim("llmq:media:recent", 0, RECENT_MAX - 1)
             self.live.pop(job["id"], None)
             self.tasks.pop(job["id"], None)
 
-    async def _comfy_run(self, wf: dict, job: dict) -> bytes:
+    async def _comfy_run(self, wf: dict, job: dict, timeout: float | None = None) -> tuple[bytes, str]:
         try:
             r = await self.http.post(self.comfy + "/prompt", json={"prompt": wf, "client_id": "llm-queue"}, timeout=30)
         except httpx.HTTPError as e:
@@ -231,7 +271,8 @@ class Media:
         if r.status_code != 200:
             raise MediaError("o ComfyUI recusou o pedido: " + r.text[:200])
         pid = r.json()["prompt_id"]
-        deadline = self.now() + self.s.media_job_timeout_s
+        limit = max(self.s.media_job_timeout_s, timeout or 0)
+        deadline = self.now() + limit
         while self.now() < deadline:
             await asyncio.sleep(self.s.media_poll_s)
             try:
@@ -250,10 +291,10 @@ class Media:
                 for im in out.get("images", []):
                     v = await self.http.get(f"{self.comfy}/view", params={"filename": im["filename"], "subfolder": im.get("subfolder", ""), "type": im.get("type", "output")}, timeout=60)
                     if v.status_code == 200 and v.content:
-                        return v.content
+                        return v.content, (v.headers.get("content-type") or "image/png").split(";")[0]
             if st.get("completed"):
                 raise MediaError("o ComfyUI terminou sem devolver imagem")
-        raise MediaError(f"tempo esgotado ({int(self.s.media_job_timeout_s)} s)")
+        raise MediaError(f"tempo esgotado ({int(limit)} s)")
 
     # ---- persistencia / consultas
     async def _save(self, job: dict) -> None:
@@ -289,7 +330,7 @@ class Media:
     async def jobs(self, limit: int = 40) -> dict:
         now = self.now()
         live = sorted(self.live.values(), key=lambda j: j["enq"])
-        shape = lambda j: {k: j.get(k) for k in ("id", "state", "recipe", "kind", "consumer", "end_user", "cls", "prompt", "size", "enq", "started", "finished", "seconds", "error")}
+        shape = lambda j: {k: j.get(k) for k in ("id", "state", "recipe", "kind", "mime", "consumer", "end_user", "cls", "prompt", "size", "enq", "started", "finished", "seconds", "error")}
         waiting = [{**shape(j), "waited_s": round(now - j["enq"], 1)} for j in live if j["state"] == "na_fila"]
         running = [{**shape(j), "running_s": round(now - j["started"], 1) if j.get("started") else None} for j in live if j["state"] == "executando"]
         recent = [shape(j) for j in await self._recent_rows(limit)]

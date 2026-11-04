@@ -235,8 +235,17 @@ def _media_headers(ctx: Ctx, p: Principal) -> dict:
     return h
 
 
+@router.post("/v1/videos/generations")
+async def videos_generations(request: Request):
+    return await _media_generate(request, "/v1/videos/generations", "video")
+
+
 @router.post("/v1/images/generations")
 async def images_generations(request: Request):
+    return await _media_generate(request, "/v1/images/generations", "image")
+
+
+async def _media_generate(request: Request, path: str, route: str):
     ctx = _ctx(request)
     p = authenticate(ctx, request)
     try:
@@ -244,7 +253,7 @@ async def images_generations(request: Request):
         assert isinstance(body, dict)
     except Exception:  # noqa: BLE001
         raise fail(400, "JSON invalido", "invalid_request_error", "invalid_json")
-    if _safety_level(ctx, p) == 2:
+    if _safety_level(ctx, p) == 2:  # vale para imagem e video
         from app.safety.flow import gate_image
         refused = await gate_image(ctx, p, body)
         if refused is not None:
@@ -254,11 +263,11 @@ async def images_generations(request: Request):
         if h in request.headers:
             headers[h] = request.headers[h]
     try:
-        r = await ctx.http.post(ctx.s.upstream_base + "/v1/images/generations", json=body, headers=headers, timeout=240)
+        r = await ctx.http.post(ctx.s.upstream_base + path, json=body, headers=headers, timeout=240)
     except httpx.HTTPError:
-        _log(ctx, p, "image", 0, 0, 0, "upstream_error", None)
+        _log(ctx, p, route, 0, 0, 0, "upstream_error", None)
         return JSONResponse(err("falha ao falar com o servico de imagem", "server_error", "upstream_error"), status_code=502)
-    _log(ctx, p, "image", 0, 0, 0, "ok" if r.status_code in (200, 202) else "upstream_error", None)
+    _log(ctx, p, route, 0, 0, 0, "ok" if r.status_code in (200, 202) else "upstream_error", None)
     return Response(r.content, status_code=r.status_code, headers=_pass_headers(r.headers), media_type=r.headers.get("content-type", "application/json"))
 
 
@@ -270,9 +279,10 @@ async def job_status(job_id: str, request: Request):
     return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
 
 
+@router.get("/v1/jobs/{job_id}/file")
 @router.get("/v1/jobs/{job_id}/image")
 async def job_image(job_id: str, request: Request):
     ctx = _ctx(request)
     p = authenticate(ctx, request)
-    r = await ctx.http.get(ctx.s.upstream_base + f"/v1/jobs/{job_id}/image", headers=_media_headers(ctx, p), timeout=30)
+    r = await ctx.http.get(ctx.s.upstream_base + f"/v1/jobs/{job_id}/image", headers=_media_headers(ctx, p), timeout=120)
     return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))

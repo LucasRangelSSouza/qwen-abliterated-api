@@ -23,6 +23,10 @@ def sqlite_antigo(path: str) -> None:
     c.execute("INSERT INTO windows VALUES(7,'session',1.0,99.0,120,30)")
     c.execute("INSERT INTO usage_log(id,ts,person_id,key_id,actor,route,in_tokens,out_tokens,total_tokens,status) VALUES(5,10.0,7,3,NULL,'chat',10,20,30,'ok')")
     c.execute("INSERT INTO settings VALUES('admin_password_hash','x')")
+    c.execute("INSERT INTO plans VALUES('pro','Pro',1000,NULL,5,2,0,24700)")
+    c.execute("INSERT INTO accounts(id,email,name,pw_hash,status,person_id,created_at) VALUES(4,'ana@x.com','Ana','scrypt$x','active',7,1.0)")
+    c.execute("INSERT INTO subscriptions(id,account_id,plan,status,provider,updated_at,blocked_by_billing) VALUES(2,4,'pro','active','cakto',1.0,0)")
+    c.execute("INSERT INTO billing_events(id,provider,event_id,kind,received_at,processed,payload) VALUES(8,'cakto','e1:x','compra',1.0,1,'{}')")
     c.commit()
     c.close()
 
@@ -38,6 +42,7 @@ def test_migra_confere_e_continua_funcionando(tmp_path):
         assert ensaio["aplicado"] is False and ensaio["origem"]["people"] == 2
         r = migrate(origem, DSN, schema, apply=True)
         assert r["conferido"] and r["destino"]["people"] == 2 and r["destino"]["keys"] == 2 and r["soma_origem"] == r["soma_destino"] == 150
+        assert r["destino"]["accounts"] == 1 and r["destino"]["subscriptions"] == 1 and r["destino"]["billing_events"] == 1 and r["destino"]["plans"] == 1
         s = PgStore(DSN, schema)
         assert s.one("SELECT safety_level FROM people WHERE id=7")["safety_level"] == 1  # quem ja existia segue sem trava
         assert s.one("SELECT key_last4 FROM keys WHERE id=3")["key_last4"] == "abcd"   # os ids (e as chaves) continuam os mesmos

@@ -178,8 +178,16 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             raise HTTPException(503, detail=_err("geracao de imagem nao esta habilitada", "service_unavailable", "media_disabled"))
         return q.media
 
+    @app.post("/v1/videos/generations")
+    async def videos_generations(request: Request):
+        """Video: leva de 1 a varios minutos, entao a resposta padrao e 202 com o id (acompanhe em /v1/jobs/{id}). Entra na fila como `batch`: imagem passa na frente."""
+        return await _generate(request, "video")
+
     @app.post("/v1/images/generations")
     async def images_generations(request: Request):
+        return await _generate(request, "image")
+
+    async def _generate(request: Request, kind: str):
         q: App = request.app.state.q
         c = q.auth(request)
         m = _media(q)
@@ -191,13 +199,14 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         cls = request.headers.get("x-queue-class", "interactive")
         end_user = request.headers.get("x-end-user", "")[:60]
         try:
-            job = await m.submit(c["name"], end_user, body, cls if cls in ("interactive", "batch") else "interactive")
+            cls = "batch" if kind == "video" else (cls if cls in ("interactive", "batch") else "interactive")
+            job = await m.submit(c["name"], end_user, body, cls, kind)
         except QueueFull as e:
-            raise HTTPException(429, detail=_err("fila de imagem cheia", "rate_limit_error", "queue_full"), headers={"Retry-After": str(e.retry_after)})
+            raise HTTPException(429, detail=_err("fila de midia cheia", "rate_limit_error", "queue_full"), headers={"Retry-After": str(e.retry_after)})
         except MediaError as e:
             raise HTTPException(422, detail=_err(str(e), "invalid_request_error", "invalid_media_request"))
         REQS.labels(c["name"], "image", "accepted").inc()
-        if body.get("async") or request.headers.get("prefer", "").lower() == "respond-async":
+        if kind == "video" or body.get("async") or request.headers.get("prefer", "").lower() == "respond-async":
             return JSONResponse({"id": job["id"], "status": job["state"], "poll": f"/v1/jobs/{job['id']}"}, status_code=202)
         job = await m.wait(job["id"], q.s.media_sync_wait_s) or job
         if job["state"] == "done":
@@ -228,7 +237,11 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         img = await m.image(job_id) if job and job.get("consumer") == c["name"] else None
         if not img:
             raise HTTPException(404, detail=_err("imagem nao encontrada (ou expirou, 48 h)", "invalid_request_error", "not_found"))
-        return Response(content=img, media_type="image/png")
+        return Response(content=img, media_type=(job or {}).get("mime") or "image/png")
+
+    @app.get("/v1/jobs/{job_id}/file")
+    async def job_file(job_id: str, request: Request):
+        return await job_image(job_id, request)
 
     @app.get("/admin/media/status")
     async def admin_media_status(request: Request):
@@ -251,7 +264,7 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         img = await q.media.image(job_id) if q.media else None
         if not img:
             raise HTTPException(404, detail=_err("imagem nao encontrada (ou expirou, 48 h)", "invalid_request_error", "not_found"))
-        return Response(content=img, media_type="image/png", headers={"Cache-Control": "private, max-age=3600"})
+        return Response(content=img, media_type=((await q.media.get(job_id)) or {}).get("mime") or "image/png", headers={"Cache-Control": "private, max-age=3600"})
 
     @app.get("/admin/metrics")
     async def admin_metrics(request: Request, machine: str = "llm", hours: int = 24, days: int = 14):

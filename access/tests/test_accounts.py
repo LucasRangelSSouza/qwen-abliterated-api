@@ -291,3 +291,23 @@ async def test_plano_sem_limite_e_computadores_ilimitados(make_rig):
     assert codigos == [200] * 6  # nenhuma chave foi derrubada
     # o admin pode tirar o limite de um plano que tinha
     assert (await r.client.put("/admin/api/plans/pro", json={"session_limit_tokens": None})).json()["session_limit_tokens"] is None
+
+
+async def test_verify_e_whoami_nao_gastam_computador(make_rig):
+    """Acesso web remoto: verify confere e-mail+senha sem emitir chave; whoami liga a chave do app a conta."""
+    r = await make_rig(cakto_webhook_secret=SEG)
+    await webhook(r, compra())
+    await r.login()
+    sid = (await lista(r))["rows"][0]["id"]
+    await definir_senha(r, sid)
+    await liberar(r, sid)
+    antes = (await lista(r))["rows"][0]["devices"]
+    v = await r.client.post("/v1/auth/verify", json={"email": "ana@exemplo.com", "password": "senha-forte-123"})
+    assert v.status_code == 200 and v.json()["email"] == "ana@exemplo.com" and v.json()["account_id"]
+    assert (await lista(r))["rows"][0]["devices"] == antes  # nao emitiu chave
+    ruim = await r.client.post("/v1/auth/verify", json={"email": "ana@exemplo.com", "password": "errada-123"})
+    assert ruim.status_code == 401
+    key = (await login(r)).json()["api_key"]
+    w = await r.client.get("/v1/auth/whoami", headers={"Authorization": f"Bearer {key}"})
+    assert w.status_code == 200 and w.json()["account_id"] == v.json()["account_id"]
+    assert (await r.client.get("/v1/auth/whoami", headers={"Authorization": "Bearer sk-invalida"})).status_code == 401

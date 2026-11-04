@@ -67,13 +67,9 @@ async def cakto_webhook(request: Request):
 
 # ---------------------------------------------------------------- login do app e senha
 
-@router.post("/v1/auth/login")
-@_db
-async def auth_login(request: Request):
-    ctx = request.app.state.ctx
+def _check_login(ctx, request: Request, email: str, pw: str):
+    """Confere e-mail+senha e se a conta pode usar o produto. Devolve (conta, pessoa, assinatura, plano) ou levanta o erro certo."""
     now = ctx.clock()
-    b = await _json(request)
-    email, pw, device = A.norm_email(b.get("email")), str(b.get("password") or ""), str(b.get("device") or "")
     if not (_limit(request, "ip:" + _ip(request), 30, 600, now) and _limit(request, "em:" + email, 10, 600, now)):
         raise fail(429, "muitas tentativas; aguarde alguns minutos", "rate_limit_error", "too_many_attempts", headers={"Retry-After": "600"})
     acc = A.find_account(ctx, email)
@@ -89,11 +85,47 @@ async def auth_login(request: Request):
     if person["status"] != "active":
         raise fail(403, "sua conta ainda nao foi liberada; avisaremos assim que estiver pronta", "invalid_request_error", "awaiting_release")
     plan = A.get_plan(ctx, sub["plan"])
+    return acc, person, sub, plan
+
+
+@router.post("/v1/auth/login")
+@_db
+async def auth_login(request: Request):
+    ctx = request.app.state.ctx
+    now = ctx.clock()
+    b = await _json(request)
+    email, pw, device = A.norm_email(b.get("email")), str(b.get("password") or ""), str(b.get("device") or "")
+    acc, person, sub, plan = _check_login(ctx, request, email, pw)
     key = A.device_key(ctx, person["id"], device, int(plan["max_devices"] or 0) if plan else 0)
     with ctx.store.tx() as c:
         c.execute("UPDATE accounts SET last_login=? WHERE id=?", (now, acc["id"]))
     return {"api_key": key, "account": {"email": acc["email"], "name": acc["name"]}, "plan": {"id": sub["plan"], "name": plan["name"] if plan else sub["plan"]},
             "next_payment_at": iso(sub["next_payment_at"])}
+
+
+@router.post("/v1/auth/verify")
+@_db
+async def auth_verify(request: Request):
+    """Confere e-mail+senha SEM emitir chave de maquina (nao gasta o limite de computadores). Usada pelo acesso web remoto."""
+    ctx = request.app.state.ctx
+    b = await _json(request)
+    acc, _person, sub, plan = _check_login(ctx, request, A.norm_email(b.get("email")), str(b.get("password") or ""))
+    return {"account_id": acc["id"], "email": acc["email"], "name": acc["name"], "plan": {"id": sub["plan"], "name": plan["name"] if plan else sub["plan"]}}
+
+
+@router.get("/v1/auth/whoami")
+@_db
+async def auth_whoami(request: Request):
+    """Diz a qual conta pertence a chave de API de um computador (o app se identifica assim na ponte remota)."""
+    from app.proxy import authenticate
+    ctx = request.app.state.ctx
+    p = authenticate(ctx, request)
+    acc = ctx.store.one("SELECT id,email,name,status FROM accounts WHERE person_id=?", (p.person_id,)) if p.kind == "person" else None
+    if acc is None or acc["status"] != "active":
+        raise fail(403, "esta chave nao pertence a uma conta ativa", "invalid_request_error", "no_account")
+    if not A.sub_allows_use(ctx, A.current_sub(ctx, acc["id"])):
+        raise fail(403, "sua assinatura nao esta ativa", "invalid_request_error", "subscription_inactive")
+    return {"account_id": acc["id"], "email": acc["email"], "name": acc["name"]}
 
 
 @router.post("/v1/auth/set-password")

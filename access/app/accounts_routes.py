@@ -89,7 +89,7 @@ async def auth_login(request: Request):
     if person["status"] != "active":
         raise fail(403, "sua conta ainda nao foi liberada; avisaremos assim que estiver pronta", "invalid_request_error", "awaiting_release")
     plan = A.get_plan(ctx, sub["plan"])
-    key = A.device_key(ctx, person["id"], device, int(plan["max_devices"] or 3) if plan else 3)
+    key = A.device_key(ctx, person["id"], device, int(plan["max_devices"] or 0) if plan else 0)
     with ctx.store.tx() as c:
         c.execute("UPDATE accounts SET last_login=? WHERE id=?", (now, acc["id"]))
     return {"api_key": key, "account": {"email": acc["email"], "name": acc["name"]}, "plan": {"id": sub["plan"], "name": plan["name"] if plan else sub["plan"]},
@@ -270,9 +270,13 @@ async def plans_put(pid: str, request: Request):
     extra = set(b) - set(cols)
     if extra:
         raise fail(422, "campos desconhecidos: " + ", ".join(sorted(extra)), "invalid_request_error", "invalid_plan")
+    nullable = {"session_limit_tokens", "week_limit_tokens"}  # null = sem limite
     with ctx.store.tx() as c:
         for k, v in b.items():
-            if cols[k] is int and (isinstance(v, bool) or not isinstance(v, int) or v < 0 or (k == "safety_level" and v not in (1, 2)) or (k == "max_devices" and v < 1)):
+            if v is None and k in nullable:
+                c.execute(f"UPDATE plans SET {k}=NULL WHERE id=?", (pid,))
+                continue
+            if cols[k] is int and (isinstance(v, bool) or not isinstance(v, int) or v < 0 or (k == "safety_level" and v not in (1, 2))):  # max_devices 0 = ilimitado
                 raise fail(422, f"{k} invalido", "invalid_request_error", "invalid_plan")
             if cols[k] is str and not (isinstance(v, str) and v.strip()):
                 raise fail(422, f"{k} invalido", "invalid_request_error", "invalid_plan")

@@ -153,25 +153,25 @@ function PlansCard() {
   const save = async (p) => {
     const c = edit[p.id] || {}
     const body = {}
-    for (const [k, v] of Object.entries(c)) body[k] = k === 'name' ? v : Math.round(+v * (k === 'price_cents' ? 100 : 1))
+    for (const [k, v] of Object.entries(c)) body[k] = k === 'name' ? v : v === '' && /limit_tokens/.test(k) ? null : Math.round(+v * (k === 'price_cents' ? 100 : 1))
     try { await api.putPlan(p.id, body); toast.success(`Plano ${p.name} salvo.`); setEdit((e) => ({ ...e, [p.id]: {} })); refresh() } catch (e) { toast.error(e.message) }
   }
   return (
     <Card>
       <CardHeader icon={ListChecks} title="Planos" subtitle="Limites de cada plano. Mudar vale para os próximos assinantes e quando a pessoa trocar de plano" />
-      <div className="px-5 pb-5 grid gap-4 lg:grid-cols-3">
-        {loading && !data ? <Skeleton className="h-40 lg:col-span-3" /> : (data?.plans || []).map((p) => {
+      <div className="px-5 pb-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        {loading && !data ? <Skeleton className="h-40 lg:col-span-4" /> : (data?.plans || []).map((p) => {
           const c = edit[p.id] || {}
           const val = (k, base) => c[k] ?? base
           return (
             <div key={p.id} className="rounded-[12px] border border-border-subtle p-4 flex flex-col gap-3">
               <div className="flex items-center justify-between"><span className="font-semibold text-text-main">{p.name}</span><Badge variant="primary">{p.id.toUpperCase()}</Badge></div>
               <Field label="Preço por mês (R$)" htmlFor={`pp-${p.id}`}><Input id={`pp-${p.id}`} type="number" min="0" value={val('price_cents', p.price_cents / 100)} onChange={(e) => set(p.id, 'price_cents', e.target.value)} /></Field>
-              <Field label="Tokens por sessão (5 h)" htmlFor={`ps-${p.id}`}><Input id={`ps-${p.id}`} type="number" min="0" value={val('session_limit_tokens', p.session_limit_tokens ?? 0)} onChange={(e) => set(p.id, 'session_limit_tokens', e.target.value)} /></Field>
-              <Field label="Tokens por semana" htmlFor={`pw-${p.id}`}><Input id={`pw-${p.id}`} type="number" min="0" value={val('week_limit_tokens', p.week_limit_tokens ?? 0)} onChange={(e) => set(p.id, 'week_limit_tokens', e.target.value)} /></Field>
+              <Field label="Tokens por sessão (5 h)" htmlFor={`ps-${p.id}`}><Input id={`ps-${p.id}`} type="number" min="0" placeholder="vazio = sem limite" value={val('session_limit_tokens', p.session_limit_tokens ?? '')} onChange={(e) => set(p.id, 'session_limit_tokens', e.target.value)} /></Field>
+              <Field label="Tokens por semana" htmlFor={`pw-${p.id}`}><Input id={`pw-${p.id}`} type="number" min="0" placeholder="vazio = sem limite" value={val('week_limit_tokens', p.week_limit_tokens ?? '')} onChange={(e) => set(p.id, 'week_limit_tokens', e.target.value)} /></Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Imagens por mês" htmlFor={`pi-${p.id}`}><Input id={`pi-${p.id}`} type="number" min="0" value={val('image_quota_month', p.image_quota_month)} onChange={(e) => set(p.id, 'image_quota_month', e.target.value)} /></Field>
-                <Field label="Computadores" htmlFor={`pd-${p.id}`}><Input id={`pd-${p.id}`} type="number" min="1" value={val('max_devices', p.max_devices)} onChange={(e) => set(p.id, 'max_devices', e.target.value)} /></Field>
+                <Field label="Computadores (0 = ilimitado)" htmlFor={`pd-${p.id}`}><Input id={`pd-${p.id}`} type="number" min="0" value={val('max_devices', p.max_devices)} onChange={(e) => set(p.id, 'max_devices', e.target.value)} /></Field>
               </div>
               <Button icon={Save} variant="secondary" disabled={!Object.keys(c).length} onClick={() => save(p)}>Salvar plano</Button>
             </div>

@@ -20,11 +20,12 @@ from datetime import datetime, timezone
 from app.auth import new_api_key, sha256
 from app.ctx import Ctx
 
-DEFAULT_PLANS = [  # editaveis no painel; os numeros sao um ponto de partida
+DEFAULT_PLANS = [  # editaveis no painel. tokens None = sem limite; max_devices 0 = computadores ilimitados; safety_level = padrao da pessoa nova
     # id, nome, tokens/sessao (5 h), tokens/semana, imagens/mes, nivel de seguranca, computadores, preco (centavos)
-    ("pro", "Pro", 1_000_000, 10_000_000, 300, 1, 3, 25000),
-    ("max", "Max", 3_000_000, 30_000_000, 1000, 1, 3, 50000),
-    ("ultra", "Ultra", 10_000_000, 100_000_000, 4000, 1, 3, 150000),
+    ("pro", "Pro", 1_000_000, 10_000_000, 300, 2, 0, 24700),
+    ("max", "Max", 3_000_000, 30_000_000, 1000, 1, 0, 49700),
+    ("ultra", "Ultra", None, None, 4000, 2, 0, 149700),
+    ("infinity", "Infinity", None, None, 10000, 1, 0, 199700),
 ]
 SUB_STATUS = ("pending", "active", "late", "canceled", "refunded", "chargeback")
 GRACE_DAYS_DEFAULT = 3
@@ -66,10 +67,13 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # ---------------------------------------------------------------- planos
 
 def ensure_plans(ctx: Ctx) -> None:
-    if ctx.store.one("SELECT COUNT(*) n FROM plans")["n"]:
+    """Cria os planos padrao que ainda nao existem (os que o admin ja editou nao sao tocados)."""
+    have = {r["id"] for r in ctx.store.query("SELECT id FROM plans")}
+    falta = [p for p in DEFAULT_PLANS if p[0] not in have]
+    if not falta:
         return
     with ctx.store.tx() as c:
-        for p in DEFAULT_PLANS:
+        for p in falta:
             c.execute("INSERT INTO plans(id,name,session_limit_tokens,week_limit_tokens,image_quota_month,safety_level,max_devices,price_cents) VALUES(?,?,?,?,?,?,?,?)", p)
 
 
@@ -209,7 +213,7 @@ def plan_from_hint(ctx: Ctx, hint: str) -> str | None:
     for frag, pid in mapping.items():
         if frag.lower() in hint:
             return pid
-    for pid in ("ultra", "max", "pro"):  # ultra antes de max antes de pro: "Ultra Max" nao vira Pro
+    for pid in ("infinity", "ultra", "max", "pro"):  # do maior para o menor: "Ultra Max" nao vira Pro
         if pid in hint:
             return pid
     return None
@@ -300,8 +304,9 @@ def device_key(ctx: Ctx, person_id: int, device: str, max_devices: int) -> str:
     now = ctx.clock()
     label = "app:" + (device or "computador")[:40]
     with ctx.store.tx() as c:
-        antigas = c.execute("SELECT id FROM keys WHERE person_id=? AND revoked_at IS NULL AND label LIKE 'app:%' ORDER BY id ASC", (person_id,)).fetchall()
-        for k in antigas[: max(0, len(antigas) - (max_devices - 1))]:
-            c.execute("UPDATE keys SET revoked_at=? WHERE id=?", (now, k["id"]))
+        if max_devices and max_devices > 0:  # 0 = ilimitado: nao revoga nada
+            antigas = c.execute("SELECT id FROM keys WHERE person_id=? AND revoked_at IS NULL AND label LIKE 'app:%' ORDER BY id ASC", (person_id,)).fetchall()
+            for k in antigas[: max(0, len(antigas) - (max_devices - 1))]:
+                c.execute("UPDATE keys SET revoked_at=? WHERE id=?", (now, k["id"]))
         c.execute("INSERT INTO keys(person_id,key_hash,key_last4,created_at,label) VALUES(?,?,?,?,?)", (person_id, sha256(key), key[-4:], now, label))
     return key

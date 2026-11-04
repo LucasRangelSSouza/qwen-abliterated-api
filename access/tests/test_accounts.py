@@ -248,9 +248,10 @@ async def test_cadastro_manual_busca_e_filtro(make_rig):
 async def test_planos_editaveis_e_validados(rig: Rig):
     await rig.login()
     planos = (await rig.client.get("/admin/api/plans")).json()["plans"]
-    assert [p["id"] for p in planos] == ["pro", "max", "ultra"] and planos[0]["price_cents"] == 25000
+    assert [p["id"] for p in planos] == ["pro", "max", "ultra", "infinity"] and planos[0]["price_cents"] == 24700
+    assert planos[2]["session_limit_tokens"] is None and planos[3]["safety_level"] == 1 and all(p["max_devices"] == 0 for p in planos)
     assert (await rig.client.put("/admin/api/plans/pro", json={"price_cents": 29900, "week_limit_tokens": 12_000_000})).json()["price_cents"] == 29900
-    for ruim in ({"safety_level": 3}, {"max_devices": 0}, {"price_cents": -1}, {"nome": "x"}, {"name": "  "}):
+    for ruim in ({"safety_level": 3}, {"max_devices": -1}, {"price_cents": -1}, {"nome": "x"}, {"name": "  "}):
         assert (await rig.client.put("/admin/api/plans/pro", json=ruim)).status_code == 422
     assert (await rig.client.put("/admin/api/plans/nao-existe", json={"price_cents": 1})).status_code == 404
 
@@ -272,3 +273,21 @@ async def test_esqueci_a_senha_nao_revela_se_existe(make_rig):
     a = await r.client.post("/v1/auth/forgot", json={"email": "ana@exemplo.com"})
     b = await r.client.post("/v1/auth/forgot", json={"email": "ninguem@x.com"})
     assert a.status_code == b.status_code == 200 and a.json() == b.json()
+
+
+async def test_plano_sem_limite_e_computadores_ilimitados(make_rig):
+    r = await make_rig(cakto_webhook_secret=SEG)
+    await webhook(r, compra(plano="Plano Infinity"))
+    await r.login()
+    sid = (await lista(r))["rows"][0]["id"]
+    assert (await lista(r))["rows"][0]["plan"] == "infinity"
+    pessoa = (await r.client.get("/admin/api/people")).json()[0]
+    assert pessoa["limits"]["session_limit_tokens"] is None and pessoa["limits"]["week_limit_tokens"] is None  # token a vontade
+    await definir_senha(r, sid)
+    await liberar(r, sid)
+    chaves = [(await login(r, device=f"PC {i}")).json()["api_key"] for i in range(6)]
+    chat = lambda k: r.client.post("/v1/chat/completions", json=BODY, headers={"Authorization": f"Bearer {k}"})  # noqa: E731
+    codigos = [(await chat(k)).status_code for k in chaves]
+    assert codigos == [200] * 6  # nenhuma chave foi derrubada
+    # o admin pode tirar o limite de um plano que tinha
+    assert (await r.client.put("/admin/api/plans/pro", json={"session_limit_tokens": None})).json()["session_limit_tokens"] is None

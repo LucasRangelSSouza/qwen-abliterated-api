@@ -74,6 +74,9 @@ const status = () => ({ state: process_state, eta_s: process_state === 'starting
     { t: nowS() - 600, offer: 4, machine: 150100, geo: 'Bulgaria, BG', dph: 0.4236, down_mbps: 870, known: false, outcome: 'running', detail: 'em 818s' },
   ] })
 let safetyMock = null
+let subsMock = null
+let plansMock = null
+let billMock = null
 let process_state = 'ready'
 
 const settings = {
@@ -164,6 +167,32 @@ function handle(method, url, body) {
     if (method === 'GET' && path === '/safety') return json({ people: { level1: people.filter((p) => (p.safety_level || 1) === 1).length, level2: people.filter((p) => p.safety_level === 2).length }, input: safetyMock.input, output: safetyMock.output })
     if (method === 'PUT') { const w = path.endsWith('/input') ? 'input' : 'output'; const { model_key, ...rest } = body; safetyMock[w] = { ...safetyMock[w], ...rest, model_key_set: safetyMock[w].model_key_set || !!model_key }; return json(safetyMock[w]) }
     if (method === 'GET' && path === '/safety/log') { const n = nowS(); return json({ classifier: q.get('classifier'), rows: [{ ts: n - 600, person: 'Marina Duarte', category: q.get('classifier') === 'input' ? 'cbrn' : 'destructive_action', route: 'chat', source: 'rules' }, { ts: n - 7200, person: 'Paulo Henrique', category: q.get('classifier') === 'input' ? 'fraud' : 'destructive_action', route: 'chat', source: 'model' }] }) }
+  }
+  if (path === '/subscribers' || path.startsWith('/subscribers/') || path === '/plans' || path.startsWith('/plans/') || path.startsWith('/billing/')) {
+    const n = nowS(), iso = (t) => new Date(t * 1000).toISOString()
+    subsMock = subsMock || [
+      { id: 1, email: 'marina@duarte.com', name: 'Marina Duarte', plan: 'max', status: 'active', status_label: 'Assinando', next_payment_at: iso(n + 12 * 86400), amount_cents: 50000, enabled: true, blocked_by_billing: false, blocked: false, safety_level: 1, devices: 2, has_password: true, person_id: 21 },
+      { id: 2, email: 'paulo@agencia.com', name: 'Paulo Henrique', plan: 'ultra', status: 'active', status_label: 'Assinando', next_payment_at: iso(n + 3 * 86400), amount_cents: 150000, enabled: false, blocked_by_billing: false, blocked: false, safety_level: 1, devices: 0, has_password: false, person_id: 22 },
+      { id: 3, email: 'bea@loja.com', name: 'Beatriz Nogueira', plan: 'pro', status: 'late', status_label: 'Em atraso', next_payment_at: iso(n - 2 * 86400), amount_cents: 25000, enabled: true, blocked_by_billing: false, blocked: false, safety_level: 2, devices: 1, has_password: true, person_id: 23 },
+      { id: 4, email: 'juliana@prado.com', name: 'Juliana Prado', plan: 'pro', status: 'canceled', status_label: 'Cancelado', next_payment_at: null, amount_cents: 25000, enabled: false, blocked_by_billing: true, blocked: false, safety_level: 1, devices: 0, has_password: true, person_id: 24 }]
+    plansMock = plansMock || [
+      { id: 'pro', name: 'Pro', session_limit_tokens: 1000000, week_limit_tokens: 10000000, image_quota_month: 300, safety_level: 1, max_devices: 3, price_cents: 25000 },
+      { id: 'max', name: 'Max', session_limit_tokens: 3000000, week_limit_tokens: 30000000, image_quota_month: 1000, safety_level: 1, max_devices: 3, price_cents: 50000 },
+      { id: 'ultra', name: 'Ultra', session_limit_tokens: 10000000, week_limit_tokens: 100000000, image_quota_month: 4000, safety_level: 1, max_devices: 3, price_cents: 150000 }]
+    if (path === '/subscribers' && method === 'GET') {
+      const ql = (q.get('q') || '').toLowerCase(), st = q.get('status') || ''
+      let rows = subsMock.filter((r) => !ql || r.email.includes(ql) || r.name.toLowerCase().includes(ql))
+      if (st) rows = rows.filter((r) => (st === 'awaiting' ? r.status === 'active' && !r.enabled : (r.status || 'none') === st))
+      const a = subsMock.filter((r) => r.status === 'active')
+      return json({ summary: { total: subsMock.length, active: a.length, late: subsMock.filter((r) => r.status === 'late').length, ended: subsMock.filter((r) => ['canceled', 'refunded', 'chargeback'].includes(r.status)).length, awaiting: a.filter((r) => !r.enabled).length, mrr_cents: a.reduce((x, r) => x + r.amount_cents, 0) }, rows, smtp: false })
+    }
+    let m
+    if (path === '/subscribers' && method === 'POST') { const r = { id: subsMock.length + 1, email: body.email, name: body.name, plan: body.plan, status: 'active', status_label: 'Assinando', next_payment_at: null, amount_cents: null, enabled: !!body.enable, blocked_by_billing: false, blocked: false, safety_level: body.safety_level || 1, devices: 0, has_password: false, person_id: 99 }; subsMock.unshift(r); return json({ subscriber: r, setup_link: 'https://brain.rangeltech.net/definir-senha?token=EXEMPLO-abc123', email_sent: false }) }
+    if ((m = path.match(/^\/subscribers\/(\d+)\/(enable|disable|password-link)$/))) { const r = subsMock.find((x) => x.id === +m[1]); if (m[2] === 'password-link') return json({ setup_link: 'https://brain.rangeltech.net/definir-senha?token=EXEMPLO-' + m[1] }); r.enabled = m[2] === 'enable'; r.blocked_by_billing = false; return json(r) }
+    if (path === '/plans' && method === 'GET') return json({ plans: plansMock })
+    if ((m = path.match(/^\/plans\/(\w+)$/)) && method === 'PUT') { const p = plansMock.find((x) => x.id === m[1]); Object.assign(p, body); return json(p) }
+    if (path === '/billing/settings') { if (method === 'PUT') billMock = { ...(billMock || {}), ...body }; return json({ grace_days: 3, auto_enable: false, plan_map: {}, webhook_configured: false, smtp_configured: false, site_url: 'https://brain.rangeltech.net', ...(billMock || {}) }) }
+    if (path === '/billing/events') return json({ rows: [{ id: 3, provider: 'cakto', kind: 'purchase_approved', at: iso(n - 3600), processed: true, error: null }, { id: 2, provider: 'cakto', kind: 'subscription_late', at: iso(n - 86400), processed: true, error: null }, { id: 1, provider: 'cakto', kind: 'novo_evento', at: iso(n - 2 * 86400), processed: false, error: 'KeyError: x' }] })
   }
   if (method === 'GET' && path === '/billing') {
     const n = nowS(), mk = (id, label, gpu, ng, dph, gpuDph, st, loc, ram, disk, start, end) => ({ id, label, status: 'running', gpu, num_gpus: ng, location: loc, dph, dph_gpu: gpuDph, storage_dph: st, disk_gb: disk, cpu_ram_gb: ram, started: start, offer_end: end, running: true, monthly_usd: +(dph * 720).toFixed(2) })

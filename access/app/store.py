@@ -30,6 +30,21 @@ CREATE TABLE IF NOT EXISTS safety_log(
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, classifier TEXT NOT NULL CHECK(classifier IN ('input','output')),
   person_id INTEGER, category TEXT, score REAL, route TEXT, source TEXT);
 CREATE INDEX IF NOT EXISTS safety_log_ts ON safety_log(ts);
+CREATE TABLE IF NOT EXISTS plans(
+  id TEXT PRIMARY KEY, name TEXT NOT NULL, session_limit_tokens INTEGER, week_limit_tokens INTEGER, image_quota_month INTEGER NOT NULL DEFAULT 0,
+  safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2)), max_devices INTEGER NOT NULL DEFAULT 3, price_cents INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS accounts(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL DEFAULT '', pw_hash TEXT,
+  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','blocked')), person_id INTEGER NOT NULL REFERENCES people(id),
+  setup_hash TEXT, setup_expires REAL, created_at REAL NOT NULL, last_login REAL);
+CREATE TABLE IF NOT EXISTS subscriptions(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER NOT NULL REFERENCES accounts(id), plan TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('pending','active','late','canceled','refunded','chargeback')), provider TEXT NOT NULL DEFAULT 'cakto',
+  external_id TEXT, next_payment_at REAL, amount_cents INTEGER, started_at REAL, updated_at REAL NOT NULL, blocked_by_billing INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS subscriptions_account ON subscriptions(account_id);
+CREATE TABLE IF NOT EXISTS billing_events(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, event_id TEXT NOT NULL, kind TEXT NOT NULL, received_at REAL NOT NULL,
+  processed INTEGER NOT NULL DEFAULT 0, error TEXT, payload TEXT NOT NULL, UNIQUE(provider, event_id));
 """
 
 
@@ -50,6 +65,8 @@ class Store:
             c.execute("PRAGMA foreign_keys=ON")
             c.executescript(SCHEMA)
             # migracao: nivel de seguranca por pessoa. DEFAULT 1 = sem trava: quem ja existe nao muda de comportamento
+            if "label" not in {r["name"] for r in c.execute("PRAGMA table_info(keys)").fetchall()}:
+                c.execute("ALTER TABLE keys ADD COLUMN label TEXT")  # "app:<computador>" nas chaves emitidas no login
             if "safety_level" not in {r["name"] for r in c.execute("PRAGMA table_info(people)").fetchall()}:
                 c.execute("ALTER TABLE people ADD COLUMN safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2))")
             self._c = c

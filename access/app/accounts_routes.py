@@ -1,0 +1,317 @@
+"""Rotas de contas: webhook da Cakto, login do app, definir senha (publicas) e CRM de assinantes/planos (painel)."""
+from __future__ import annotations
+
+import hashlib
+import hmac
+import json
+from collections import defaultdict, deque
+
+from fastapi import APIRouter, Request
+
+from app import accounts as A
+from app import mailer
+from app.admin import _db, _ip, _json, api, require
+from app.auth import sha256
+from app.ctx import fail
+from app.ledger import iso
+
+router = APIRouter()
+
+
+def _limit(request: Request, key: str, max_n: int, window_s: float, now: float) -> bool:
+    t = getattr(request.app.state, "auth_throttle", None)
+    if t is None:  # por instancia do app (nao compartilhado entre processos de teste nem entre apps)
+        t = request.app.state.auth_throttle = defaultdict(deque)
+    q = t[key]
+    while q and now - q[0] > window_s:
+        q.popleft()
+    if len(q) >= max_n:
+        return False
+    q.append(now)
+    return True
+
+
+# ---------------------------------------------------------------- webhook da Cakto (publico, so com o segredo)
+
+def _webhook_ok(secret: str, request: Request, raw: bytes, payload: dict) -> bool:
+    if not secret:
+        return False
+    h = request.headers
+    candidates = [h.get("x-webhook-secret", ""), h.get("x-cakto-secret", ""), (h.get("authorization", "")[7:] if h.get("authorization", "").lower().startswith("bearer ") else ""),
+                  str(payload.get("secret") or payload.get("token") or "")]
+    if any(c and hmac.compare_digest(c, secret) for c in candidates):
+        return True
+    sig = (h.get("x-signature") or h.get("x-cakto-signature") or "").lower().removeprefix("sha256=")
+    return bool(sig) and hmac.compare_digest(sig, hmac.new(secret.encode(), raw, hashlib.sha256).hexdigest())
+
+
+@router.post("/v1/billing/cakto")
+async def cakto_webhook(request: Request):
+    ctx = request.app.state.ctx
+    raw = await request.body()
+    try:
+        payload = json.loads(raw or b"{}")
+        assert isinstance(payload, dict)
+    except Exception:  # noqa: BLE001
+        raise fail(400, "JSON invalido", "invalid_request_error", "invalid_json")
+    secret = ctx.s.cakto_webhook_secret
+    if not secret:
+        raise fail(503, "webhook da Cakto nao configurado", "service_unavailable", "billing_not_configured")
+    if not _webhook_ok(secret, request, raw, payload):
+        raise fail(401, "segredo do webhook invalido", "invalid_request_error", "invalid_webhook_secret")
+    try:
+        return A.process_billing(ctx, "cakto", raw.decode("utf-8", "replace"), payload)
+    except RuntimeError as e:  # a Cakto tenta de novo quando recebe erro; o evento ja ficou registrado com o motivo
+        raise fail(500, "falha ao processar o evento", "server_error", "billing_processing_failed", detail=str(e)[:120])
+
+
+# ---------------------------------------------------------------- login do app e senha
+
+@router.post("/v1/auth/login")
+@_db
+async def auth_login(request: Request):
+    ctx = request.app.state.ctx
+    now = ctx.clock()
+    b = await _json(request)
+    email, pw, device = A.norm_email(b.get("email")), str(b.get("password") or ""), str(b.get("device") or "")
+    if not (_limit(request, "ip:" + _ip(request), 30, 600, now) and _limit(request, "em:" + email, 10, 600, now)):
+        raise fail(429, "muitas tentativas; aguarde alguns minutos", "rate_limit_error", "too_many_attempts", headers={"Retry-After": "600"})
+    acc = A.find_account(ctx, email)
+    if not A.verify_password(pw, acc["pw_hash"] if acc else None) or acc is None:
+        raise fail(401, "e-mail ou senha incorretos", "invalid_request_error", "invalid_credentials")
+    if acc["status"] != "active":
+        raise fail(403, "conta bloqueada; fale com o suporte", "invalid_request_error", "account_blocked")
+    A.lapse_sweep(ctx)
+    sub = A.current_sub(ctx, acc["id"])
+    if not A.sub_allows_use(ctx, sub):
+        raise fail(403, "sua assinatura nao esta ativa; renove para continuar", "invalid_request_error", "subscription_inactive")
+    person = ctx.store.one("SELECT id,status FROM people WHERE id=?", (acc["person_id"],))
+    if person["status"] != "active":
+        raise fail(403, "sua conta ainda nao foi liberada; avisaremos assim que estiver pronta", "invalid_request_error", "awaiting_release")
+    plan = A.get_plan(ctx, sub["plan"])
+    key = A.device_key(ctx, person["id"], device, int(plan["max_devices"] or 3) if plan else 3)
+    with ctx.store.tx() as c:
+        c.execute("UPDATE accounts SET last_login=? WHERE id=?", (now, acc["id"]))
+    return {"api_key": key, "account": {"email": acc["email"], "name": acc["name"]}, "plan": {"id": sub["plan"], "name": plan["name"] if plan else sub["plan"]},
+            "next_payment_at": iso(sub["next_payment_at"])}
+
+
+@router.post("/v1/auth/set-password")
+@_db
+async def auth_set_password(request: Request):
+    ctx = request.app.state.ctx
+    now = ctx.clock()
+    if not _limit(request, "sp:" + _ip(request), 20, 600, now):
+        raise fail(429, "muitas tentativas; aguarde alguns minutos", "rate_limit_error", "too_many_attempts", headers={"Retry-After": "600"})
+    b = await _json(request)
+    problema = A.weak_password(str(b.get("password") or ""))
+    if problema:
+        raise fail(422, problema, "invalid_request_error", "weak_password")
+    acc = ctx.store.one("SELECT * FROM accounts WHERE setup_hash=?", (sha256(str(b.get("token") or "")),))
+    if acc is None or (acc["setup_expires"] or 0) < now:
+        raise fail(400, "link invalido ou vencido; peca um novo", "invalid_request_error", "invalid_token")
+    with ctx.store.tx() as c:
+        c.execute("UPDATE accounts SET pw_hash=?, setup_hash=NULL, setup_expires=NULL WHERE id=?", (A.hash_password(str(b["password"])), acc["id"]))
+    return {"ok": True}
+
+
+@router.post("/v1/auth/forgot")
+@_db
+async def auth_forgot(request: Request):
+    """Sempre responde igual (nao revela se o e-mail existe). Com SMTP configurado manda o link; sem SMTP o admin gera o link no painel."""
+    ctx = request.app.state.ctx
+    if not _limit(request, "fg:" + _ip(request), 10, 3600, ctx.clock()):
+        raise fail(429, "muitas tentativas; tente mais tarde", "rate_limit_error", "too_many_attempts", headers={"Retry-After": "3600"})
+    acc = A.find_account(ctx, str((await _json(request)).get("email") or ""))
+    if acc is not None and acc["status"] == "active":
+        tok = A.new_setup_token(ctx, acc["id"])
+        mailer.send(acc["email"], "Redefinir a senha do Segundo Cérebro", f"Use este link para definir uma nova senha (vale por 7 dias):\n{mailer.setup_link(tok)}\n")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- CRM (painel)
+
+STATUS_LABEL = {"active": "Assinando", "late": "Em atraso", "canceled": "Cancelado", "refunded": "Reembolsado", "chargeback": "Chargeback", "pending": "Pendente", None: "Sem assinatura"}
+
+_SUB_SQL = ("SELECT a.id, a.email, a.name, a.status acc_status, a.person_id, a.created_at, a.last_login, (a.pw_hash IS NOT NULL) has_password,"
+            " p.status person_status, p.safety_level,"
+            " s.plan, s.status sub_status, s.next_payment_at, s.amount_cents, s.blocked_by_billing,"
+            " (SELECT COUNT(*) FROM keys k WHERE k.person_id=a.person_id AND k.revoked_at IS NULL AND k.label LIKE 'app:%') devices"
+            " FROM accounts a JOIN people p ON p.id=a.person_id"
+            " LEFT JOIN subscriptions s ON s.id=(SELECT s2.id FROM subscriptions s2 WHERE s2.account_id=a.id ORDER BY s2.updated_at DESC, s2.id DESC LIMIT 1)")
+
+
+def _sub_view(r) -> dict:
+    return {"id": r["id"], "email": r["email"], "name": r["name"], "plan": r["plan"], "status": r["sub_status"], "status_label": STATUS_LABEL.get(r["sub_status"], r["sub_status"]),
+            "next_payment_at": iso(r["next_payment_at"]), "amount_cents": r["amount_cents"], "enabled": r["person_status"] == "active", "blocked_by_billing": bool(r["blocked_by_billing"]),
+            "blocked": r["acc_status"] != "active", "safety_level": r["safety_level"], "devices": r["devices"], "has_password": bool(r["has_password"]), "person_id": r["person_id"],
+            "created_at": iso(r["created_at"]), "last_login": iso(r["last_login"])}
+
+
+def _one(ctx, sid: int) -> dict:
+    r = ctx.store.one(_SUB_SQL + " WHERE a.id=?", (sid,))
+    if r is None:
+        raise fail(404, "assinante nao encontrado", "invalid_request_error", "not_found")
+    return _sub_view(r)
+
+
+@api.get("/subscribers")
+@_db
+def subscribers_list(request: Request, q: str = "", status: str = ""):
+    ctx = require(request)
+    A.lapse_sweep(ctx)
+    rows = ctx.store.query(_SUB_SQL + " ORDER BY a.created_at DESC")
+    out = [_sub_view(r) for r in rows]
+    summary = {"total": len(out), "active": sum(1 for x in out if x["status"] == "active"), "late": sum(1 for x in out if x["status"] == "late"),
+               "ended": sum(1 for x in out if x["status"] in ("canceled", "refunded", "chargeback")), "awaiting": sum(1 for x in out if x["status"] == "active" and not x["enabled"]),
+               "mrr_cents": sum(x["amount_cents"] or 0 for x in out if x["status"] == "active")}
+    ql = q.strip().lower()
+    if ql:
+        out = [x for x in out if ql in (x["email"] or "").lower() or ql in (x["name"] or "").lower()]
+    if status:
+        out = [x for x in out if (x["status"] or "none") == status or (status == "awaiting" and x["status"] == "active" and not x["enabled"])]
+    return {"summary": summary, "rows": out, "smtp": mailer.configured()}
+
+
+@api.post("/subscribers")
+@_db
+async def subscribers_create(request: Request):
+    """Cadastro manual (teste, cortesia ou venda fora da Cakto): cria conta + pessoa desabilitada e devolve o link de senha."""
+    ctx = require(request)
+    b = await _json(request)
+    email = A.norm_email(b.get("email"))
+    if not A.EMAIL_RE.match(email):
+        raise fail(422, "e-mail invalido", "invalid_request_error", "invalid_email")
+    if A.find_account(ctx, email):
+        raise fail(409, "ja existe uma conta com este e-mail", "invalid_request_error", "email_taken")
+    plan_id = str(b.get("plan") or "pro")
+    if A.get_plan(ctx, plan_id) is None:
+        raise fail(422, "plano desconhecido", "invalid_request_error", "invalid_plan")
+    lvl = b.get("safety_level")
+    acc, tok = A.create_account(ctx, email, str(b.get("name") or ""), plan_id, lvl if lvl in (1, 2) else None)
+    now = ctx.clock()
+    with ctx.store.tx() as c:
+        c.execute("INSERT INTO subscriptions(account_id,plan,status,provider,external_id,next_payment_at,amount_cents,started_at,updated_at,blocked_by_billing) VALUES(?,?,?,?,?,?,?,?,?,0)",
+                  (acc["id"], plan_id, "active" if b.get("active", True) else "pending", "manual", None, None, None, now, now))
+    A.apply_plan_limits(ctx, acc["person_id"], A.get_plan(ctx, plan_id))
+    if b.get("enable"):
+        A.set_person_status(ctx, acc["person_id"], "active")
+    return {"subscriber": _one(ctx, acc["id"]), "setup_link": mailer.setup_link(tok), "email_sent": mailer.send_welcome(ctx, email, str(b.get("name") or ""), tok)}
+
+
+def _set_enabled(ctx, sid: int, enabled: bool) -> dict:
+    acc = ctx.store.one("SELECT person_id FROM accounts WHERE id=?", (sid,))
+    if acc is None:
+        raise fail(404, "assinante nao encontrado", "invalid_request_error", "not_found")
+    A.set_person_status(ctx, acc["person_id"], "active" if enabled else "suspended")
+    with ctx.store.tx() as c:  # liberar/bloquear na mao substitui o bloqueio automatico por pagamento
+        c.execute("UPDATE subscriptions SET blocked_by_billing=0 WHERE account_id=?", (sid,))
+    return _one(ctx, sid)
+
+
+@api.post("/subscribers/{sid}/enable")
+@_db
+async def subscribers_enable(sid: int, request: Request):
+    return _set_enabled(require(request), sid, True)
+
+
+@api.post("/subscribers/{sid}/disable")
+@_db
+async def subscribers_disable(sid: int, request: Request):
+    return _set_enabled(require(request), sid, False)
+
+
+@api.post("/subscribers/{sid}/password-link")
+@_db
+async def subscribers_password_link(sid: int, request: Request):
+    ctx = require(request)
+    _one(ctx, sid)
+    return {"setup_link": mailer.setup_link(A.new_setup_token(ctx, sid))}
+
+
+@api.patch("/subscribers/{sid}")
+@_db
+async def subscribers_patch(sid: int, request: Request):
+    ctx = require(request)
+    b = await _json(request)
+    cur = _one(ctx, sid)
+    if "name" in b:
+        with ctx.store.tx() as c:
+            c.execute("UPDATE accounts SET name=? WHERE id=?", (str(b["name"])[:80], sid))
+    if "blocked" in b:
+        with ctx.store.tx() as c:
+            c.execute("UPDATE accounts SET status=? WHERE id=?", ("blocked" if b["blocked"] else "active", sid))
+    if "plan" in b:
+        plan = A.get_plan(ctx, str(b["plan"]))
+        if plan is None:
+            raise fail(422, "plano desconhecido", "invalid_request_error", "invalid_plan")
+        with ctx.store.tx() as c:
+            c.execute("UPDATE subscriptions SET plan=?, updated_at=? WHERE account_id=? AND id=(SELECT MAX(id) FROM subscriptions WHERE account_id=?)", (plan["id"], ctx.clock(), sid, sid))
+        A.apply_plan_limits(ctx, cur and ctx.store.one("SELECT person_id FROM accounts WHERE id=?", (sid,))["person_id"], plan)
+    return _one(ctx, sid)
+
+
+@api.get("/plans")
+@_db
+def plans_list(request: Request):
+    ctx = require(request)
+    A.ensure_plans(ctx)
+    return {"plans": [dict(r) for r in ctx.store.query("SELECT * FROM plans ORDER BY price_cents")]}
+
+
+@api.put("/plans/{pid}")
+@_db
+async def plans_put(pid: str, request: Request):
+    ctx = require(request)
+    b = await _json(request)
+    if A.get_plan(ctx, pid) is None:
+        raise fail(404, "plano nao encontrado", "invalid_request_error", "not_found")
+    cols = {"name": str, "session_limit_tokens": int, "week_limit_tokens": int, "image_quota_month": int, "safety_level": int, "max_devices": int, "price_cents": int}
+    extra = set(b) - set(cols)
+    if extra:
+        raise fail(422, "campos desconhecidos: " + ", ".join(sorted(extra)), "invalid_request_error", "invalid_plan")
+    with ctx.store.tx() as c:
+        for k, v in b.items():
+            if cols[k] is int and (isinstance(v, bool) or not isinstance(v, int) or v < 0 or (k == "safety_level" and v not in (1, 2)) or (k == "max_devices" and v < 1)):
+                raise fail(422, f"{k} invalido", "invalid_request_error", "invalid_plan")
+            if cols[k] is str and not (isinstance(v, str) and v.strip()):
+                raise fail(422, f"{k} invalido", "invalid_request_error", "invalid_plan")
+            c.execute(f"UPDATE plans SET {k}=? WHERE id=?", (v.strip() if isinstance(v, str) else v, pid))
+    return dict(A.get_plan(ctx, pid))
+
+
+@api.get("/billing/settings")
+@_db
+def billing_settings(request: Request):
+    ctx = require(request)
+    raw = ctx.store.get_setting("billing_plan_map")
+    return {"grace_days": A.grace_days(ctx), "auto_enable": A.auto_enable(ctx), "plan_map": json.loads(raw) if raw else {}, "webhook_configured": bool(ctx.s.cakto_webhook_secret),
+            "smtp_configured": mailer.configured(), "site_url": mailer.site_url()}
+
+
+@api.put("/billing/settings")
+@_db
+async def billing_settings_put(request: Request):
+    ctx = require(request)
+    b = await _json(request)
+    if "grace_days" in b:
+        if isinstance(b["grace_days"], bool) or not isinstance(b["grace_days"], int) or not 0 <= b["grace_days"] <= 60:
+            raise fail(422, "grace_days deve ser de 0 a 60", "invalid_request_error", "invalid_billing_settings")
+        ctx.store.set_setting("billing_grace_days", str(b["grace_days"]))
+    if "auto_enable" in b:
+        if not isinstance(b["auto_enable"], bool):
+            raise fail(422, "auto_enable deve ser true ou false", "invalid_request_error", "invalid_billing_settings")
+        ctx.store.set_setting("billing_auto_enable", "1" if b["auto_enable"] else "0")
+    if "plan_map" in b:
+        if not isinstance(b["plan_map"], dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in b["plan_map"].items()):
+            raise fail(422, "plan_map deve ser {trecho do nome: id do plano}", "invalid_request_error", "invalid_billing_settings")
+        ctx.store.set_setting("billing_plan_map", json.dumps(b["plan_map"], ensure_ascii=False))
+    return billing_settings(request)
+
+
+@api.get("/billing/events")
+@_db
+def billing_events(request: Request, limit: int = 30):
+    ctx = require(request)
+    rows = ctx.store.query("SELECT id,provider,kind,received_at,processed,error FROM billing_events ORDER BY received_at DESC, id DESC LIMIT ?", (max(1, min(limit, 200)),))
+    return {"rows": [{"id": r["id"], "provider": r["provider"], "kind": r["kind"], "at": iso(r["received_at"]), "processed": bool(r["processed"]), "error": r["error"]} for r in rows]}

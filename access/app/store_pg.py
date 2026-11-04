@@ -14,7 +14,7 @@ from psycopg.rows import dict_row
 
 from app.store import SCHEMA
 
-TABLES_WITH_ID = ("people", "keys", "usage_log", "safety_log")
+TABLES_WITH_ID = ("people", "keys", "usage_log", "safety_log", "accounts", "subscriptions", "billing_events")
 LOCK_KEY = 7_424_001  # lock consultivo do llm-access (serializa transacoes de escrita)
 
 
@@ -79,6 +79,7 @@ class PgStore:
             c.execute(f'CREATE SCHEMA IF NOT EXISTS "{self.schema}"')
             c.execute(f'SET search_path TO "{self.schema}"')
             c.execute(_ddl())
+            c.execute("ALTER TABLE keys ADD COLUMN IF NOT EXISTS label TEXT")
             c.execute("ALTER TABLE people ADD COLUMN IF NOT EXISTS safety_level BIGINT NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2))")
             self._c = c
         return self._c

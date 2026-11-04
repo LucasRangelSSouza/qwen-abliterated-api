@@ -40,6 +40,7 @@ class Settings:
     login_window_s: float = 60.0
     session_ttl_s: float = 12 * 3600
     request_timeout_s: float = 1800.0
+    cakto_webhook_secret: str = ""  # CAKTO_WEBHOOK_SECRET: sem ele o webhook responde 503 (nunca fica aberto)
 
     @property
     def upstream_base(self) -> str:
@@ -66,4 +67,5 @@ class Settings:
             owner_key_sha256=e("OWNER_KEY_SHA256", "").strip().lower(),
             platform_key_sha256=e("PLATFORM_KEY_SHA256", "").strip().lower(),
             panel_dir=e("ACCESS_PANEL_DIR", cls.panel_dir),
+            cakto_webhook_secret=_secret("CAKTO_WEBHOOK_SECRET"),
         )

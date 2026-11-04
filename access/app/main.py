@@ -57,7 +57,9 @@ def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = No
         """Quem abre o endereco no navegador cai no painel (as rotas da API continuam em /v1)."""
         return RedirectResponse("/admin/", status_code=307)
 
+    from app import accounts_routes  # registra o CRM no router do painel antes dele ser incluido
     app.include_router(proxy.router)
+    app.include_router(accounts_routes.router)
     app.include_router(enroll.router)
     app.include_router(admin.api)
     app.include_router(admin.static)  # por ultimo: o catch-all /admin/{path} nao pode engolir /admin/api

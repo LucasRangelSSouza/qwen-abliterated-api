@@ -26,6 +26,10 @@ CREATE TABLE IF NOT EXISTS usage_log(
 CREATE INDEX IF NOT EXISTS usage_log_ts ON usage_log(ts);
 CREATE INDEX IF NOT EXISTS usage_log_person ON usage_log(person_id, ts);
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS safety_log(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, classifier TEXT NOT NULL CHECK(classifier IN ('input','output')),
+  person_id INTEGER, category TEXT, score REAL, route TEXT, source TEXT);
+CREATE INDEX IF NOT EXISTS safety_log_ts ON safety_log(ts);
 """
 
 
@@ -45,6 +49,9 @@ class Store:
             c.execute("PRAGMA synchronous=NORMAL")
             c.execute("PRAGMA foreign_keys=ON")
             c.executescript(SCHEMA)
+            # migracao: nivel de seguranca por pessoa. DEFAULT 1 = sem trava: quem ja existe nao muda de comportamento
+            if "safety_level" not in {r["name"] for r in c.execute("PRAGMA table_info(people)").fetchall()}:
+                c.execute("ALTER TABLE people ADD COLUMN safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2))")
             self._c = c
         return self._c
 

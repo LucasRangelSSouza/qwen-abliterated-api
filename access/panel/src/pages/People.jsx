@@ -4,7 +4,7 @@ import { api } from '../lib/api.js'
 import { fmtInt, fmtIn, fmtAgo, cn } from '../lib/format.js'
 import PageHeader from '../components/PageHeader.jsx'
 import {
-  Button, IconButton, Card, Badge, Field, Input, Textarea, Toggle, Progress, Drawer, ConfirmModal, KeyReveal,
+  Button, IconButton, Card, Badge, Field, Input, Textarea, Select, Toggle, Progress, Drawer, ConfirmModal, KeyReveal,
   Skeleton, EmptyState, ErrorState, useToast, useLoad,
 } from '../components/ui.jsx'
 
@@ -39,7 +39,7 @@ function PersonDrawer({ open, person, onClose, onSaved }) {
     if (!open) return
     const l = person?.limits
     setF({
-      name: person?.name || '', note: person?.note || '',
+      name: person?.name || '', note: person?.note || '', safety: String(person?.safety_level || 1),
       sOn: l ? l.session_limit_tokens != null : true, sTok: l?.session_limit_tokens != null ? String(l.session_limit_tokens) : '',
       wOn: l ? l.week_limit_tokens != null : false, wTok: l?.week_limit_tokens != null ? String(l.week_limit_tokens) : '',
       sSec: editing ? String(l.session_seconds) : '', wSec: editing ? String(l.week_seconds) : '',
@@ -60,7 +60,7 @@ function PersonDrawer({ open, person, onClose, onSaved }) {
     setErrs(er)
     if (Object.keys(er).length) return
     const body = {
-      name: f.name.trim(), note: f.note.trim(),
+      name: f.name.trim(), note: f.note.trim(), safety_level: +f.safety,
       session_limit_tokens: f.sOn ? +f.sTok : null,
       week_limit_tokens: f.wOn ? +f.wTok : null,
     }
@@ -87,6 +87,14 @@ function PersonDrawer({ open, person, onClose, onSaved }) {
         </Field>
         <Field label="Observação" htmlFor="p-note" hint="Opcional. Por exemplo, a plataforma que a pessoa usa.">
           <Textarea id="p-note" value={f.note} onChange={(e) => set('note', e.target.value)} />
+        </Field>
+
+        <Field label="Nível de segurança" htmlFor="p-safety"
+          hint={f.safety === '2' ? 'Nível 2: os pedidos e as respostas passam pelos dois classificadores. A resposta só aparece quando termina de ser conferida.' : 'Nível 1: a IA sem trava, sem nenhum classificador. É o padrão.'}>
+          <Select id="p-safety" value={f.safety} onChange={(e) => set('safety', e.target.value)}>
+            <option value="1">Nível 1 · Sem trava</option>
+            <option value="2">Nível 2 · Com classificadores</option>
+          </Select>
         </Field>
 
         <div className="rounded-[12px] border border-border-subtle bg-bg p-4 flex flex-col gap-4">
@@ -227,6 +235,7 @@ export default function People() {
                     <tr className="text-xs text-text-muted border-b border-border-subtle bg-bg-alt/50">
                       <th className="font-medium px-5 py-3">Pessoa</th>
                       <th className="font-medium px-3 py-3">Estado</th>
+                      <th className="font-medium px-3 py-3">Segurança</th>
                       <th className="font-medium px-3 py-3">Chave</th>
                       <th className="font-medium px-3 py-3">Sessão</th>
                       <th className="font-medium px-3 py-3">Semana</th>
@@ -242,6 +251,7 @@ export default function People() {
                           <div className="text-xs text-text-muted line-clamp-2">{p.note || <span className="text-text-subtle">sem observação</span>}</div>
                         </td>
                         <td className="px-3 py-4"><StatusBadge s={p.status} /></td>
+                        <td className="px-3 py-4"><Badge variant={p.safety_level === 2 ? 'warning' : 'default'}>{p.safety_level === 2 ? 'Nível 2 · classificado' : 'Nível 1 · sem trava'}</Badge></td>
                         <td className="px-3 py-4"><code className="text-[12px] font-mono text-text-muted bg-surface-2 rounded-md px-1.5 py-0.5">...{p.key_last4}</code></td>
                         <td className="px-3 py-4"><WindowCell w={p.session} /></td>
                         <td className="px-3 py-4"><WindowCell w={p.week} /></td>

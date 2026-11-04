@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Users, Activity, Cpu, Image as ImageIcon, Settings as Cog, LogOut, Sun, Moon, ShieldCheck, Loader2 } from 'lucide-react'
+import { Users, Activity, Cpu, Image as ImageIcon, ShieldAlert, Settings as Cog, LogOut, Sun, Moon, ShieldCheck, Loader2 } from 'lucide-react'
 import { api, setUnauthorizedHandler } from './lib/api.js'
 import { cn } from './lib/format.js'
 import { ToastProvider, Button, Card, Field, Input, IconButton } from './components/ui.jsx'
@@ -7,6 +7,7 @@ import People from './pages/People.jsx'
 import Usage from './pages/Usage.jsx'
 import MachineLlm from './pages/Machines.jsx'
 import MachineImage from './pages/MachineImage.jsx'
+import Safety from './pages/Safety.jsx'
 import Settings from './pages/Settings.jsx'
 
 const NAV = [
@@ -14,6 +15,7 @@ const NAV = [
   { id: 'uso', label: 'Uso', icon: Activity, el: Usage },
   { id: 'llm', label: 'Máquina LLM', icon: Cpu, el: MachineLlm },
   { id: 'imagem', label: 'Máquina de imagem', icon: ImageIcon, el: MachineImage },
+  { id: 'seguranca', label: 'Segurança', icon: ShieldAlert, el: Safety },
   { id: 'config', label: 'Configurações', icon: Cog, el: Settings },
 ]
 

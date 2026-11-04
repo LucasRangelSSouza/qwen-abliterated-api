@@ -73,6 +73,7 @@ const status = () => ({ state: process_state, eta_s: process_state === 'starting
     { t: nowS() - 900, offer: 3, machine: 55194, geo: 'Bulgaria, BG', dph: 0.4236, down_mbps: 1100, known: true, outcome: 'oferta_sumiu', detail: 'no_such_ask' },
     { t: nowS() - 600, offer: 4, machine: 150100, geo: 'Bulgaria, BG', dph: 0.4236, down_mbps: 870, known: false, outcome: 'running', detail: 'em 818s' },
   ] })
+let safetyMock = null
 let process_state = 'ready'
 
 const settings = {
@@ -156,6 +157,13 @@ function handle(method, url, body) {
         { id: 128, kind: 'chat', consumer: 'llm-access', end_user: 'Marina Duarte', cls: 'interactive', enq: n - 700, start: n - 699, end: n - 640, code: '200' },
         { id: 127, kind: 'embed', consumer: 'llm-access', end_user: 'platform', cls: 'batch', enq: n - 900, start: null, end: n - 850, code: '503' }],
       error: null })
+  }
+  if (path === '/safety' || path.startsWith('/safety/')) {
+    safetyMock = safetyMock || { input: { enabled: true, backend: 'rules', categories: ['csam', 'cbrn', 'malware', 'fraud', 'violence', 'selfharm'], model_url: '', model_name: '', refusal: '', model_key_set: false, all_categories: ['csam', 'cbrn', 'malware', 'fraud', 'violence', 'selfharm'], blocked_24h: { cbrn: 2, fraud: 1 } },
+      output: { enabled: true, backend: 'both', categories: ['csam', 'cbrn', 'malware', 'fraud', 'violence', 'selfharm', 'destructive_action', 'credential_exfil'], model_url: 'http://guard.rt:8000/v1', model_name: 'Qwen3Guard-Gen-4B', refusal: '', model_key_set: true, all_categories: ['csam', 'cbrn', 'malware', 'fraud', 'violence', 'selfharm', 'destructive_action', 'credential_exfil'], blocked_24h: { destructive_action: 3 } } }
+    if (method === 'GET' && path === '/safety') return json({ people: { level1: people.filter((p) => (p.safety_level || 1) === 1).length, level2: people.filter((p) => p.safety_level === 2).length }, input: safetyMock.input, output: safetyMock.output })
+    if (method === 'PUT') { const w = path.endsWith('/input') ? 'input' : 'output'; const { model_key, ...rest } = body; safetyMock[w] = { ...safetyMock[w], ...rest, model_key_set: safetyMock[w].model_key_set || !!model_key }; return json(safetyMock[w]) }
+    if (method === 'GET' && path === '/safety/log') { const n = nowS(); return json({ classifier: q.get('classifier'), rows: [{ ts: n - 600, person: 'Marina Duarte', category: q.get('classifier') === 'input' ? 'cbrn' : 'destructive_action', route: 'chat', source: 'rules' }, { ts: n - 7200, person: 'Paulo Henrique', category: q.get('classifier') === 'input' ? 'fraud' : 'destructive_action', route: 'chat', source: 'model' }] }) }
   }
   if (method === 'GET' && path === '/billing') {
     const n = nowS(), mk = (id, label, gpu, ng, dph, gpuDph, st, loc, ram, disk, start, end) => ({ id, label, status: 'running', gpu, num_gpus: ng, location: loc, dph, dph_gpu: gpuDph, storage_dph: st, disk_gb: disk, cpu_ram_gb: ram, started: start, offer_end: end, running: true, monthly_usd: +(dph * 720).toFixed(2) })

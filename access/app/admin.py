@@ -106,7 +106,7 @@ async def me(request: Request):
 # ---- pessoas
 
 _PERSON_SQL = (
-    "SELECT p.id, p.name, p.note, p.status, l.session_limit_tokens sl, l.week_limit_tokens wl, l.session_seconds ss, l.week_seconds ws,"
+    "SELECT p.id, p.name, p.note, p.status, p.safety_level, l.session_limit_tokens sl, l.week_limit_tokens wl, l.session_seconds ss, l.week_seconds ws,"
     " (SELECT key_last4 FROM keys k WHERE k.person_id=p.id AND k.revoked_at IS NULL ORDER BY k.id DESC LIMIT 1) key_last4,"
     " (SELECT MAX(ts) FROM usage_log u WHERE u.person_id=p.id AND u.status IN ('ok','cut')) last_used"
     " FROM people p JOIN limits l ON l.person_id=p.id")
@@ -115,7 +115,7 @@ _PERSON_SQL = (
 def _person_view(ctx: Ctx, r, windows: dict) -> dict:
     now = ctx.clock()
     return {
-        "id": r["id"], "name": r["name"], "note": r["note"], "status": r["status"], "key_last4": r["key_last4"],
+        "id": r["id"], "name": r["name"], "note": r["note"], "status": r["status"], "safety_level": r["safety_level"], "key_last4": r["key_last4"],
         "limits": {"session_limit_tokens": r["sl"], "week_limit_tokens": r["wl"], "session_seconds": r["ss"], "week_seconds": r["ws"]},
         **{k: {kk: vv for kk, vv in view(windows.get(k), r["sl" if k == "session" else "wl"], now).items() if kk != "remaining"} for k in KINDS},
         "last_used_at": iso(r["last_used"]),
@@ -135,6 +135,12 @@ def _get_person(ctx: Ctx, pid: int) -> dict:
     if not out:
         raise fail(404, "pessoa nao encontrada", "invalid_request_error", "not_found")
     return out[0]
+
+
+def _level(v) -> int:
+    if isinstance(v, bool) or v not in (1, 2):
+        raise fail(422, "safety_level deve ser 1 (sem trava) ou 2 (com classificadores)", "invalid_request_error", "invalid_safety_level")
+    return int(v)
 
 
 def _limit(v, name: str):
@@ -173,9 +179,10 @@ async def people_create(request: Request):
     sl, wl = _limit(b.get("session_limit_tokens"), "session_limit_tokens"), _limit(b.get("week_limit_tokens"), "week_limit_tokens")
     ss = _seconds(ctx, b.get("session_seconds", ctx.s.default_session_seconds), "session_seconds")
     ws = _seconds(ctx, b.get("week_seconds", ctx.s.default_week_seconds), "week_seconds")
+    level = _level(b.get("safety_level", 1))
     key = new_api_key()
     with ctx.store.tx() as c:
-        pid = c.execute("INSERT INTO people(name,note,created_at) VALUES(?,?,?)", (name, str(b.get("note", "")), ctx.clock())).lastrowid
+        pid = c.execute("INSERT INTO people(name,note,created_at,safety_level) VALUES(?,?,?,?)", (name, str(b.get("note", "")), ctx.clock(), level)).lastrowid
         c.execute("INSERT INTO limits(person_id,session_limit_tokens,week_limit_tokens,session_seconds,week_seconds) VALUES(?,?,?,?,?)",
                   (pid, sl, wl, ss, ws))
         c.execute("INSERT INTO keys(person_id,key_hash,key_last4,created_at) VALUES(?,?,?,?)", (pid, sha256(key), key[-4:], ctx.clock()))
@@ -196,6 +203,8 @@ async def people_patch(pid: int, request: Request):
             c.execute("UPDATE people SET name=? WHERE id=?", (name, pid))
         if "note" in b:
             c.execute("UPDATE people SET note=? WHERE id=?", (str(b["note"]), pid))
+        if "safety_level" in b:
+            c.execute("UPDATE people SET safety_level=? WHERE id=?", (_level(b["safety_level"]), pid))
         for f in ("session_limit_tokens", "week_limit_tokens"):
             if f in b:
                 c.execute(f"UPDATE limits SET {f}=? WHERE person_id=?", (_limit(b[f], f), pid))
@@ -323,6 +332,88 @@ async def queue(request: Request):
         return {**r.json(), "error": None}
     except Exception as e:  # noqa: BLE001
         return {"gpu_state": None, "lanes": {}, "waiting": [], "running": [], "recent": [], "error": f"fila indisponivel ({type(e).__name__})"}
+
+
+# ---- seguranca: dois classificadores, cada um na sua rota e com a sua configuracao (nunca misturados)
+
+def _safety_view(ctx: Ctx, mod) -> dict:
+    from app.safety.common import load_config
+    cfg = load_config(ctx.store, mod.CONFIG_KEY, mod.DEFAULTS)
+    key = cfg.pop("model_key", "")
+    return {**cfg, "model_key_set": bool(key), "all_categories": mod.CATEGORIES}
+
+
+def _safety_patch(ctx: Ctx, mod, b: dict) -> dict:
+    """Valida e grava a configuracao de UM classificador. `mod` e o modulo dele; o outro nao e tocado."""
+    from app.safety.common import load_config, save_config
+    cfg = load_config(ctx.store, mod.CONFIG_KEY, mod.DEFAULTS)
+    extra = set(b) - {"enabled", "categories", "backend", "model_url", "model_name", "model_key", "refusal"}
+    if extra:
+        raise fail(422, "campos desconhecidos: " + ", ".join(sorted(extra)), "invalid_request_error", "invalid_safety_config")
+    if "enabled" in b:
+        if not isinstance(b["enabled"], bool):
+            raise fail(422, "enabled deve ser true ou false", "invalid_request_error", "invalid_safety_config")
+        cfg["enabled"] = b["enabled"]
+    if "categories" in b:
+        cats = b["categories"]
+        if not isinstance(cats, list) or any(c not in mod.CATEGORIES for c in cats):
+            raise fail(422, "categorias validas: " + ", ".join(mod.CATEGORIES), "invalid_request_error", "invalid_safety_config")
+        cfg["categories"] = list(dict.fromkeys(cats))
+    if "backend" in b:
+        if b["backend"] not in ("rules", "model", "both"):
+            raise fail(422, "backend deve ser rules, model ou both", "invalid_request_error", "invalid_safety_config")
+        cfg["backend"] = b["backend"]
+    for f in ("model_url", "model_name", "refusal"):
+        if f in b:
+            if not isinstance(b[f], str) or len(b[f]) > 600:
+                raise fail(422, f"{f} deve ser texto de ate 600 caracteres", "invalid_request_error", "invalid_safety_config")
+            cfg[f] = b[f].strip()
+    if "model_key" in b:  # so escrita: o painel nunca recebe a chave de volta
+        if not isinstance(b["model_key"], str):
+            raise fail(422, "model_key deve ser texto", "invalid_request_error", "invalid_safety_config")
+        cfg["model_key"] = b["model_key"].strip()
+    if cfg["backend"] in ("model", "both") and not cfg["model_url"]:
+        raise fail(422, "para usar o modelo-guarda informe model_url", "invalid_request_error", "invalid_safety_config")
+    save_config(ctx.store, mod.CONFIG_KEY, cfg)
+    return _safety_view(ctx, mod)
+
+
+@api.get("/safety")
+async def safety_get(request: Request):
+    from app.safety import classifier_input, classifier_output
+    ctx = require(request)
+    since = ctx.clock() - 86400
+    counts = {"input": {}, "output": {}}
+    for r in ctx.store.query("SELECT classifier, category, COUNT(*) n FROM safety_log WHERE ts>=? GROUP BY classifier, category", (since,)):
+        counts[r["classifier"]][r["category"] or "?"] = r["n"]
+    lv = {r["safety_level"]: r["n"] for r in ctx.store.query("SELECT safety_level, COUNT(*) n FROM people GROUP BY safety_level")}
+    return {"people": {"level1": lv.get(1, 0), "level2": lv.get(2, 0)},
+            "input": {**_safety_view(ctx, classifier_input), "blocked_24h": counts["input"]},
+            "output": {**_safety_view(ctx, classifier_output), "blocked_24h": counts["output"]}}
+
+
+@api.put("/safety/input")
+async def safety_put_input(request: Request):
+    from app.safety import classifier_input
+    ctx = require(request)
+    return _safety_patch(ctx, classifier_input, await _json(request))
+
+
+@api.put("/safety/output")
+async def safety_put_output(request: Request):
+    from app.safety import classifier_output
+    ctx = require(request)
+    return _safety_patch(ctx, classifier_output, await _json(request))
+
+
+@api.get("/safety/log")
+async def safety_log(request: Request, classifier: str = "input", limit: int = 50):
+    ctx = require(request)
+    if classifier not in ("input", "output"):
+        raise fail(422, "classifier deve ser input ou output", "invalid_request_error", "invalid_classifier")
+    rows = ctx.store.query("SELECT l.*, p.name FROM safety_log l LEFT JOIN people p ON p.id=l.person_id WHERE l.classifier=? ORDER BY l.ts DESC, l.id DESC LIMIT ?",
+                           (classifier, max(1, min(limit, 200))))
+    return {"classifier": classifier, "rows": [{"ts": iso(r["ts"]), "person": r["name"], "category": r["category"], "route": r["route"], "source": r["source"]} for r in rows]}
 
 
 # ---- imagem (vem do llm-queue)

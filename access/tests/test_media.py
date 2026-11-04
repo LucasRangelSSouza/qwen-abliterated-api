@@ -39,3 +39,17 @@ async def test_painel_de_imagem_le_do_queue(rig: Rig):
     assert (await rig.client.get("/admin/api/media/jobs")).json()["recent"][0]["id"] == "j1"
     r = await rig.client.get("/admin/api/media/image/j1")
     assert r.status_code == 200 and r.headers["content-type"] == "image/png" and r.content.startswith(b"PNG")
+
+
+async def test_faturamento_e_metricas_exigem_login(rig: Rig):
+    assert (await rig.client.get("/admin/api/billing")).status_code == 401
+    assert (await rig.client.get("/admin/api/metrics")).status_code == 401
+
+
+async def test_faturamento_e_metricas_leem_do_queue(rig: Rig):
+    await rig.login()
+    b = (await rig.client.get("/admin/api/billing")).json()
+    assert b["credit_usd"] == 77.0 and b["machines"]["image"]["id"] == 2
+    m = (await rig.client.get("/admin/api/metrics?machine=image")).json()
+    assert m["machine"] == "image" and m["totals"]["requests"] == 3
+    assert (await rig.client.get("/admin/api/metrics?machine=lixo")).json()["machine"] == "llm"  # maquina invalida cai em llm

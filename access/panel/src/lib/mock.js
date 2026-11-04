@@ -157,6 +157,21 @@ function handle(method, url, body) {
         { id: 127, kind: 'embed', consumer: 'llm-access', end_user: 'platform', cls: 'batch', enq: n - 900, start: null, end: n - 850, code: '503' }],
       error: null })
   }
+  if (method === 'GET' && path === '/billing') {
+    const n = nowS(), mk = (id, label, gpu, ng, dph, gpuDph, st, loc, ram, disk, start, end) => ({ id, label, status: 'running', gpu, num_gpus: ng, location: loc, dph, dph_gpu: gpuDph, storage_dph: st, disk_gb: disk, cpu_ram_gb: ram, started: start, offer_end: end, running: true, monthly_usd: +(dph * 720).toFixed(2) })
+    return json({ credit_usd: 77.08, burn_per_hour_usd: 0.4166, burn_per_day_usd: 10.0, burn_per_month_usd: 300.0, days_of_balance: 7.7, recharge_by: n + 7.7 * 86400, recharge_needed_for_30d_usd: 222.92,
+      machines: { llm: mk(58831117, 'hold-cz-25792', 'RTX 3090', 2, 0.2893, 0.28, 0.0093, 'Czechia, CZ', 94, 50, n - 2 * 86400, 1817059800), image: mk(59106171, 'midia-gpu-1', 'RTX 3090', 1, 0.1276, 0.1053, 0.0222, 'Brazil, BR', 16, 80, n - 4 * 3600, 1809098968), other: [] } })
+  }
+  if (method === 'GET' && path === '/metrics') {
+    const n = nowS(), img = q.get('machine') === 'image', t0 = Math.floor(n / 3600) * 3600
+    const hourly = Array.from({ length: 24 }, (_, i) => { const t = t0 - (23 - i) * 3600, h = new Date(t * 1000).getUTCHours(), peak = Math.exp(-((h - 15) ** 2) / 18), r = Math.round((img ? 14 : 30) * peak + (i % 3)); return { t, requests: r, errors: r > 20 ? 1 : 0, wait_p50: +(img ? 1.2 : 0.6 + peak * 2).toFixed(1), wait_p95: +(img ? 4 + peak * 20 : 3 + peak * 40).toFixed(1), run_p50: img ? 7.5 : 14 + peak * 8, run_p95: img ? 10 + peak * 3 : 38 + peak * 25, busy_pct: Math.min(100, Math.round(r * (img ? 6 : 2.4))) } })
+    const d0 = Math.floor(n / 86400) * 86400
+    const daily = Array.from({ length: 14 }, (_, i) => ({ t: d0 - (13 - i) * 86400, requests: Math.round((img ? 40 : 190) * (0.5 + 0.5 * Math.abs(Math.sin(i * 1.7)))), errors: i % 5 === 0 ? 2 : 0, run_p50: img ? 7.8 : 16, run_p95: img ? 11 : 52, wait_p50: 1, wait_p95: 9, busy_pct: 30 }))
+    const pk = hourly.reduce((a, b) => (b.requests > a.requests ? b : a))
+    return json({ machine: img ? 'image' : 'llm', hourly, daily, peak_hour: { t: pk.t, requests: pk.requests },
+      totals: { requests: daily.reduce((a, b) => a + b.requests, 0), ok: 0, errors: 7, wait_p50: 1.1, wait_p95: 14.2, run_p50: img ? 7.8 : 16.4, run_p95: img ? 11.6 : 58 },
+      top_users: [{ who: 'Marina Duarte', requests: 212 }, { who: 'dono', requests: 150 }, { who: 'platform', requests: 96 }] })
+  }
   if (method === 'GET' && path === '/media/status') {
     return json({ enabled: true, state: process_state === 'off' ? 'off' : process_state === 'ready' ? 'ready' : 'starting', tunnel: process_state === 'ready',
       instance: { id: 59106171, status: 'running', dph: 0.1276, gpu: 'RTX 3090', num_gpus: 1, location: 'Brazil, BR', label: 'midia-gpu-1', disk_gb: 80, cpu_ram_gb: 16 },

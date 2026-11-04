@@ -15,6 +15,7 @@ import uuid
 
 import httpx
 
+from app import metrics
 from app.config import Settings
 from app.gpu.tunnel import Tunnel
 from app.scheduler import Lane, QueueFull
@@ -189,6 +190,8 @@ class Media:
                 job["seconds"] = round(job["finished"] - job["started"], 1)
             await self._save(job)
             await self.r.lpush("llmq:media:recent", job["id"])
+            await metrics.log_job(self.r, "image", "image", job["consumer"], job["end_user"], job["enq"], job.get("started"), job["finished"] or self.now(),
+                                  "200" if job["state"] == "done" else "500", job.get("cls", "interactive"))
             await self.r.ltrim("llmq:media:recent", 0, RECENT_MAX - 1)
             self.live.pop(job["id"], None)
             self.tasks.pop(job["id"], None)

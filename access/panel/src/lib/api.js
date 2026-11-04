@@ -53,6 +53,8 @@ export const api = {
   usage: (o) => request('GET', '/usage' + qs(o)),
   machines: (limit = 50) => request('GET', '/machines' + qs({ limit })),
   queue: () => request('GET', '/queue'),
+  billing: () => request('GET', '/billing'),
+  metrics: (machine, hours = 24, days = 14) => request('GET', '/metrics' + qs({ machine, hours, days })),
   mediaStatus: () => request('GET', '/media/status'),
   mediaJobs: (limit = 40) => request('GET', '/media/jobs' + qs({ limit })),
   settings: () => request('GET', '/settings'),

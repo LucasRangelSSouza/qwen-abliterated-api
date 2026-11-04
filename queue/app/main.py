@@ -18,7 +18,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
-from app import notice
+from app import metrics as mx, notice
 from app.alerts import Alerts
 from app.config import Settings
 from app.gpu.controller import READY, GPUController, GPUUnavailable
@@ -250,6 +250,26 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             raise HTTPException(404, detail=_err("imagem nao encontrada (ou expirou, 48 h)", "invalid_request_error", "not_found"))
         return Response(content=img, media_type="image/png", headers={"Cache-Control": "private, max-age=3600"})
 
+    @app.get("/admin/metrics")
+    async def admin_metrics(request: Request, machine: str = "llm", hours: int = 24, days: int = 14):
+        """Series de uso e latencia de uma maquina (`llm` ou `image`) para os graficos do painel. So metadados."""
+        q = _admin(request)
+        return await mx.summary(q.r, machine if machine in ("llm", "image") else "llm", max(1, min(hours, 168)), max(1, min(days, 60)))
+
+    @app.get("/admin/billing")
+    async def admin_billing(request: Request):
+        """Saldo da Vast, preco real de cada maquina, custo programado por mes e dias de cobertura (para o admin saber quando recarregar)."""
+        q = _admin(request)
+        vast = q.ctl.vast
+        try:
+            credit = await vast.credit()
+            insts = await vast.list_instances()
+        except Exception as e:  # noqa: BLE001
+            raise HTTPException(502, detail=_err(f"Vast indisponivel ({type(e).__name__})", "service_unavailable", "vast_unavailable"))
+        view = mx.billing_view(credit, insts, q.s.static_instance_id or None, q.s.media_instance_id or None)
+        view["spend"] = (await q.ctl.ledger.snapshot()) if hasattr(q.ctl, "ledger") else None
+        return view
+
     @app.get("/admin/gpu/cycles")
     async def admin_cycles(request: Request, limit: int = 50):
         """Log de ligar/desligar da GPU (tela Maquinas do painel): mais recente primeiro; o ciclo em curso vem com stopped_at nulo."""
@@ -454,6 +474,7 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             REQS.labels(name, kind, code).inc()
             q.recent.appendleft({"id": ticket.seq, "kind": kind, "consumer": name, "end_user": ticket.end_user, "cls": ticket.cls, "enq": ticket.t_enq,
                                  "start": ticket.t_start, "end": time.time(), "code": code})
+            await mx.log_job(q.r, "llm", kind, name, ticket.end_user, ticket.t_enq, ticket.t_start, time.time(), code, ticket.cls)
             if got_slot:
                 await lane.release(ticket)
             else:

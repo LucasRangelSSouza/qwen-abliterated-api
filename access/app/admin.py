@@ -334,6 +334,25 @@ async def _queue_admin_get(ctx: Ctx, path: str, params: dict | None = None):
         raise fail(502, f"llm-queue indisponivel ({type(e).__name__})", "service_unavailable", "upstream_unavailable")
 
 
+@api.get("/billing")
+async def billing(request: Request):
+    """Saldo da Vast, preco real de cada maquina, custo programado por mes e dias de cobertura (vem do llm-queue)."""
+    r = await _queue_admin_get(require(request), "/admin/billing")
+    if r.status_code != 200:
+        return {"error": f"faturamento indisponivel (HTTP {r.status_code})"}
+    return r.json()
+
+
+@api.get("/metrics")
+async def metrics(request: Request, machine: str = "llm", hours: int = 24, days: int = 14):
+    """Series de uso e latencia de uma maquina (`llm` ou `image`) para os graficos."""
+    r = await _queue_admin_get(require(request), "/admin/metrics", {"machine": machine if machine in ("llm", "image") else "llm",
+                                                                    "hours": max(1, min(hours, 168)), "days": max(1, min(days, 60))})
+    if r.status_code != 200:
+        return {"error": f"metricas indisponiveis (HTTP {r.status_code})", "hourly": [], "daily": [], "totals": {}, "top_users": []}
+    return r.json()
+
+
 @api.get("/media/status")
 async def media_status(request: Request):
     r = await _queue_admin_get(require(request), "/admin/media/status")

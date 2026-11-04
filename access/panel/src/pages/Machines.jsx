@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
-import { Cpu, Wallet, Server, RefreshCw, ListOrdered, MessageSquare, Image as ImageIcon } from 'lucide-react'
+import { useEffect } from 'react'
+import { Cpu, Wallet, Server, RefreshCw, ListOrdered } from 'lucide-react'
 import { api } from '../lib/api.js'
-import { fmtUsd, fmtDur, fmtFull, fmtIn, cn } from '../lib/format.js'
+import { fmtUsd, fmtDur, fmtFull, fmtIn } from '../lib/format.js'
 import PageHeader from '../components/PageHeader.jsx'
-import MachinesImage, { imgState } from './MachinesImage.jsx'
+import { BalanceCard, MachineCostCard, UsageSection, useBilling } from '../components/machine-shared.jsx'
 import { Card, CardHeader, Badge, Progress, Button, Notice, Skeleton, EmptyState, ErrorState, useLoad } from '../components/ui.jsx'
 
 const STATES = {
@@ -131,8 +131,9 @@ function Jobs() {
   )
 }
 
-function LlmMachines() {
+export default function MachineLlm() {
   const { data, loading, error, reload, refresh } = useLoad(() => api.machines(50), [])
+  const billing = useBilling()
   useEffect(() => {
     const t = setInterval(() => { if (document.visibilityState === 'visible') refresh() }, 6000)
     return () => clearInterval(t)
@@ -146,9 +147,12 @@ function LlmMachines() {
 
   return (
     <>
+      <PageHeader title="Máquina LLM" subtitle="O servidor que roda o Qwen 27B abliterado: estado, custo, fila de pedidos, uso e tentativas de aluguel."
+        actions={<Button variant="outline" icon={RefreshCw} onClick={() => { refresh(); billing.refresh() }}>Atualizar</Button>} />
       {error ? <Card><ErrorState message={error} onRetry={reload} /></Card> : (
         <div className="space-y-4">
           {warn && <Notice>Dados incompletos: {String(warn)}</Notice>}
+          <BalanceCard billing={billing} />
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader icon={Cpu} title="GPU agora" />
@@ -181,7 +185,11 @@ function LlmMachines() {
             </Card>
           </div>
 
+          <MachineCostCard m={billing.data?.machines?.llm} loading={billing.loading} ledger={sp} />
+
           <Jobs />
+
+          <UsageSection machine="llm" unit="Pedidos" />
 
           <Card className="overflow-hidden">
             <CardHeader icon={Server} title="Máquina e tentativas de aluguel"
@@ -296,70 +304,6 @@ function LlmMachines() {
           </Card>
         </div>
       )}
-    </>
-  )
-}
-
-
-/* ---------- cartao-resumo de uma máquina (também é a aba que escolhe o detalhe) ---------- */
-function MachineCard({ icon: Icon, title, model, state, loading, price, meta, active, onClick, id }) {
-  return (
-    <button type="button" role="tab" id={id} aria-selected={active} onClick={onClick}
-      className={cn('text-left rounded-[16px] border bg-surface p-4 sm:p-5 transition-all focus-visible:outline-2 focus-visible:outline-brand-500',
-        active ? 'border-brand-500 shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-brand-500)_16%,transparent)]' : 'border-border-subtle hover:border-border hover:bg-surface-2/40')}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className={cn('grid place-items-center size-10 rounded-[12px] shrink-0', active ? 'bg-brand-500/12 text-brand-text' : 'bg-surface-2 text-text-muted')}><Icon className="size-5" /></span>
-          <div className="min-w-0">
-            <div className="font-semibold text-text-main leading-tight">{title}</div>
-            <div className="text-xs text-text-muted truncate">{model}</div>
-          </div>
-        </div>
-        {loading ? <Skeleton className="h-6 w-20" /> : <Badge variant={state.variant} dot pulse={state.pulse}>{state.label}</Badge>}
-      </div>
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        {meta.map(([l, v]) => (
-          <div key={l}><div className="text-[11px] font-medium text-text-muted">{l}</div><div className="num text-sm font-semibold text-text-main truncate">{loading ? '…' : v}</div></div>
-        ))}
-        <div><div className="text-[11px] font-medium text-text-muted">Preço</div><div className="num text-sm font-semibold text-text-main">{loading ? '…' : price}</div></div>
-      </div>
-    </button>
-  )
-}
-
-export default function Machines() {
-  const [tab, setTab] = useState(() => { try { return localStorage.getItem('maq-aba') === 'imagem' ? 'imagem' : 'llm' } catch { return 'llm' } })
-  const pick = (t) => { setTab(t); try { localStorage.setItem('maq-aba', t) } catch { /* sem armazenamento */ } }
-  // resumo dos dois cartões: poucas chamadas leves, atualizadas só com a aba visível
-  const llm = useLoad(() => api.machines(1), [])
-  const llmQ = useLoad(() => api.queue(), [])
-  const img = useLoad(() => api.mediaStatus(), [])
-  const imgQ = useLoad(() => api.mediaJobs(1), [])
-  useEffect(() => {
-    const t = setInterval(() => { if (document.visibilityState === 'visible') { llm.refresh(); llmQ.refresh(); img.refresh(); imgQ.refresh() } }, 6000)
-    return () => clearInterval(t)
-  }, [llm.refresh, llmQ.refresh, img.refresh, imgQ.refresh])
-
-  const ls = llm.data?.status
-  const lInfo = stateInfo(ls?.state)
-  const iInfo = imgState(img.data?.state)
-  const imgOn = img.data?.enabled !== false
-  return (
-    <>
-      <PageHeader title="Máquinas" subtitle="Cada máquina virtual alugada, o que roda nela e a fila de pedidos de cada uma." />
-      <div role="tablist" aria-label="Máquinas" className="grid gap-4 md:grid-cols-2 mb-5">
-        <MachineCard id="aba-llm" icon={MessageSquare} title="Texto · LLM" model="Qwen 27B abliterado · 2× RTX 3090" active={tab === 'llm'} onClick={() => pick('llm')}
-          loading={llm.loading && !llm.data} state={{ ...lInfo, pulse: isBooting(ls?.state) }}
-          price={ls?.instance?.dph != null ? `${fmtUsd(ls.instance.dph)}/h` : '—'}
-          meta={[['Na fila', llmQ.data?.waiting?.length ?? 0], ['Rodando', llmQ.data?.running?.length ?? 0], ['Região', ls?.instance?.geo || '—']]} />
-        <MachineCard id="aba-imagem" icon={ImageIcon} title="Imagem" model="Flux schnell · 1× RTX 3090" active={tab === 'imagem'} onClick={() => pick('imagem')}
-          loading={img.loading && !img.data} state={imgOn ? { ...iInfo, pulse: img.data?.state === 'starting' } : { label: 'Desligada', variant: 'default' }}
-          price={img.data?.instance?.dph != null ? `${fmtUsd(img.data.instance.dph)}/h` : '—'}
-          meta={[['Na fila', imgQ.data?.waiting?.length ?? 0], ['Gerando', imgQ.data?.running?.length ?? 0], ['Região', img.data?.instance?.location || '—']]} />
-      </div>
-      <div role="tabpanel" aria-labelledby={tab === 'llm' ? 'aba-llm' : 'aba-imagem'}>
-        {tab === 'llm' ? <LlmMachines /> : <MachinesImage />}
-      </div>
     </>
   )
 }

@@ -84,6 +84,10 @@ class Upstream:
             return httpx.Response(200, json=self.gpu_config)
         if path == "/v1/models":
             return httpx.Response(200, json={"object": "list", "data": [{"id": "qwen-abliterated"}]})
+        if path == "/admin/billing":
+            return httpx.Response(200, json={"credit_usd": 77.0, "burn_per_day_usd": 10.0, "days_of_balance": 7.7, "machines": {"llm": {"id": 1}, "image": {"id": 2}, "other": []}})
+        if path == "/admin/metrics":
+            return httpx.Response(200, json={"machine": request.url.params.get("machine"), "hourly": [], "daily": [], "totals": {"requests": 3}, "top_users": []})
         if path.startswith("/admin/media/"):
             if request.headers.get("x-admin-key") != UP_ADMIN:
                 return httpx.Response(403, json={"error": "x"})

@@ -73,7 +73,8 @@ class Ledger:
                     c.execute("UPDATE windows SET reserved_tokens=reserved_tokens+? WHERE person_id=? AND kind=?", (amount, person_id, kind))
                     res.held.append((kind, w["start_ts"]))
                 else:
-                    c.execute("INSERT OR REPLACE INTO windows(person_id,kind,start_ts,end_ts,used_tokens,reserved_tokens) VALUES(?,?,?,?,0,?)",
+                    c.execute("INSERT INTO windows(person_id,kind,start_ts,end_ts,used_tokens,reserved_tokens) VALUES(?,?,?,?,0,?) "
+                              "ON CONFLICT(person_id,kind) DO UPDATE SET start_ts=excluded.start_ts, end_ts=excluded.end_ts, used_tokens=0, reserved_tokens=excluded.reserved_tokens",
                               (person_id, kind, now, now + secs, amount))
                     res.held.append((kind, now))
             return res

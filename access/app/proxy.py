@@ -5,12 +5,12 @@ import asyncio
 import hmac
 import json
 import math
-import sqlite3
 
 import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
+from app.dberr import DB_ERRORS
 from app.auth import Principal, bearer, sha256
 from app.ctx import Ctx, err, fail
 from app.ledger import Blocked, iso
@@ -33,7 +33,7 @@ def authenticate(ctx: Ctx, request: Request) -> Principal:
     try:
         r = ctx.store.one("SELECT k.id key_id, p.id, p.name, p.status FROM keys k JOIN people p ON p.id=k.person_id "
                           "WHERE k.key_hash=? AND k.revoked_at IS NULL", (digest,))
-    except sqlite3.Error:
+    except DB_ERRORS:
         raise fail(503, "banco de chaves indisponivel", "service_unavailable", "database_unavailable")
     if not r:
         raise fail(401, "chave de API invalida", "invalid_request_error", "invalid_api_key")
@@ -52,7 +52,7 @@ def _safety_level(ctx: Ctx, p: Principal) -> int:
         return 1
     try:
         r = ctx.store.one("SELECT safety_level FROM people WHERE id=?", (p.person_id,))
-    except sqlite3.Error:
+    except DB_ERRORS:
         return 1
     return int(r["safety_level"]) if r else 1
 
@@ -107,7 +107,7 @@ async def forward(request: Request, path: str, route: str) -> Response:
         except Blocked as b:
             _log(ctx, p, route, 0, 0, 0, "blocked_" + b.window, limits)
             return _blocked(ctx, b)
-        except sqlite3.Error:
+        except DB_ERRORS:
             raise fail(503, "banco de chaves indisponivel", "service_unavailable", "database_unavailable")
 
     def release_and_log(status: str) -> None:
@@ -222,7 +222,7 @@ async def usage(request: Request):
         return {"person": p.name, "session": free, "week": dict(free)}
     try:
         w = ctx.ledger.windows(p.person_id)
-    except sqlite3.Error:
+    except DB_ERRORS:
         raise fail(503, "banco de chaves indisponivel", "service_unavailable", "database_unavailable")
     return {"person": p.name, "session": w["session"], "week": w["week"]}
 

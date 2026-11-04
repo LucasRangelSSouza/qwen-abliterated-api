@@ -4,7 +4,6 @@ from __future__ import annotations
 import functools
 import inspect
 import json
-import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -12,6 +11,7 @@ import httpx
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
+from app.dberr import DB_ERRORS
 from app.auth import COOKIE, new_api_key, sha256
 from app.ctx import Ctx, fail
 from app.ledger import KINDS, iso, view
@@ -41,7 +41,7 @@ def _db(fn):
         async def awrap(*a, **k):
             try:
                 return await fn(*a, **k)
-            except sqlite3.Error:
+            except DB_ERRORS:
                 raise down()
         return awrap
 
@@ -49,7 +49,7 @@ def _db(fn):
     def wrap(*a, **k):
         try:
             return fn(*a, **k)
-        except sqlite3.Error:
+        except DB_ERRORS:
             raise down()
     return wrap
 

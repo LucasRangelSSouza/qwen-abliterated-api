@@ -2,6 +2,8 @@
 import asyncio
 import hashlib
 import json
+import os
+import uuid
 
 import httpx
 import pytest_asyncio
@@ -137,6 +139,10 @@ class Rig:
         self.kw = dict(db_path=self.db, upstream_url="http://up", upstream_key=UP_KEY, upstream_admin_key=UP_ADMIN,
                        admin_password=PASSWORD, session_secret="segredo-de-teste", owner_key_sha256=sha(OWNER_KEY),
                        platform_key_sha256=sha(PLATFORM_KEY), panel_dir=str(tmp_path / "sem-painel"))
+        self.pg_schema = None
+        if os.environ.get("TEST_DATABASE_URL"):  # mesma suite, agora no Postgres: um schema novo por teste
+            self.pg_schema = "t_" + uuid.uuid4().hex[:10]
+            self.kw.update(database_url=os.environ["TEST_DATABASE_URL"], database_schema=self.pg_schema)
         self.kw.update(kw)
         self.app = self.client = self._cm = None
 
@@ -147,12 +153,14 @@ class Rig:
         await self._cm.__aenter__()
         self.client = httpx.AsyncClient(transport=httpx.ASGITransport(app=self.app), base_url="http://t")
 
-    async def stop(self):
+    async def stop(self, drop: bool = True):
         await self.client.aclose()
         await self._cm.__aexit__(None, None, None)
+        if self.pg_schema and drop:
+            self.app.state.ctx.store.drop_schema()
 
     async def restart(self):
-        await self.stop()
+        await self.stop(drop=False)
         await self.start()
 
     async def login(self):

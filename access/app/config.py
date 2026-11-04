@@ -20,6 +20,8 @@ def _secret(name: str) -> str:
 @dataclass
 class Settings:
     db_path: str = "/data/access.db"
+    database_url: str = ""         # DATABASE_URL: Postgres unificado da VPS (vazio = SQLite em db_path, usado nos testes)
+    database_schema: str = "access"
     upstream_url: str = "http://llm-queue.rt:8000"
     upstream_key: str = ""
     upstream_admin_key: str = ""
@@ -53,6 +55,8 @@ class Settings:
         e = os.environ.get
         return cls(
             db_path=e("ACCESS_DB_PATH", cls.db_path),
+            database_url=_secret("DATABASE_URL"),
+            database_schema=e("DATABASE_SCHEMA", cls.database_schema),
             upstream_url=e("UPSTREAM_URL", cls.upstream_url),
             upstream_key=_secret("UPSTREAM_KEY"),
             upstream_admin_key=_secret("UPSTREAM_ADMIN_KEY"),

@@ -18,7 +18,11 @@ from app.store import Store
 
 def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = None, clock=time.time) -> FastAPI:
     s = s or Settings.from_env()
-    store = Store(s.db_path)
+    if s.database_url:
+        from app.store_pg import PgStore  # Postgres unificado (producao)
+        store = PgStore(s.database_url, s.database_schema)
+    else:
+        store = Store(s.db_path)
     client = http or httpx.AsyncClient(timeout=httpx.Timeout(s.request_timeout_s, connect=10.0))
     ctx = Ctx(s, store, Ledger(store, clock, s.retention_days), client, clock,
               AdminAuth(s.admin_password, s.session_secret, store, clock, s.session_ttl_s, s.login_max_attempts, s.login_window_s))

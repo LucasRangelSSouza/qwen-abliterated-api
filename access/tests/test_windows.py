@@ -1,3 +1,6 @@
+import os
+
+import pytest
 """Cenarios de QA da Spec 14 §5.3.2 (T1..T6 e bordas) contra o upstream falso, com relogio injetavel."""
 import asyncio
 
@@ -244,6 +247,7 @@ async def test_chaves_owner_e_platform_sem_janela_mas_registradas(rig: Rig):
     assert {r["name"] for r in rows} == {"owner", "platform"} and len(rows) == 4 and rows[0]["total_tokens"] == 5000
 
 
+@pytest.mark.skipif(bool(os.environ.get("TEST_DATABASE_URL")), reason="testa arquivo SQLite quebrado")
 async def test_chaves_especiais_valem_mesmo_com_banco_quebrado(tmp_path, make_rig):
     arquivo = tmp_path / "arquivo"
     arquivo.write_text("x")

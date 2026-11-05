@@ -274,3 +274,51 @@ async def test_stream_parado_no_meio_e_abortado_e_libera_a_vaga(redis):
         assert b'data: {"a":1}' in r.content and b"upstream_stalled" in r.content and r.content.endswith(b"data: [DONE]\n\n")
         assert ctl.begun == 1 and ctl.ended == 1  # a vaga foi devolvida
         await client.aclose()
+
+
+async def test_cliente_que_cancela_nao_vaza_a_vaga(redis):
+    import asyncio
+
+    async def gen():
+        yield b'data: {"a":1}\n\n'
+        await asyncio.sleep(60)  # upstream lento: o cliente desiste antes
+
+    ctl = StubCtl()
+    s = Settings(tunnel_mode="none", keepalive_s=0.05, stream_idle_timeout_s=30)
+    app = create_app(s, controller=ctl, redis=redis, http=make_upstream(lambda req: httpx.Response(200, content=gen())), consumers=CONSUMERS)
+    async with app.router.lifespan_context(app):
+        client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
+        tarefa = asyncio.create_task(client.post("/v1/chat/completions", json={**BODY, "stream": True}, headers=H))
+        await asyncio.sleep(0.5)
+        assert app.state.q.chat.inflight == 1
+        tarefa.cancel()
+        try:
+            await tarefa
+        except asyncio.CancelledError:
+            pass
+        await asyncio.sleep(0.2)
+        assert app.state.q.chat.inflight == 0 and app.state.q.chat.running == []
+        assert ctl.begun == ctl.ended == 1
+        await client.aclose()
+
+
+async def test_segunda_interrupcao_durante_a_limpeza_nao_vaza_a_vaga(redis, monkeypatch):
+    import asyncio
+    from app import main as appmain
+
+    async def log_cancelado(*a, **k):
+        raise asyncio.CancelledError()  # o cancelamento chega de novo no primeiro await da limpeza
+
+    monkeypatch.setattr(appmain.mx, "log_job", log_cancelado)
+    ctl = StubCtl()
+    s = Settings(tunnel_mode="none", keepalive_s=0.05)
+    app = create_app(s, controller=ctl, redis=redis, http=make_upstream(lambda req: httpx.Response(200, json={"id": "x"})), consumers=CONSUMERS)
+    async with app.router.lifespan_context(app):
+        client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
+        try:
+            await client.post("/v1/chat/completions", json=BODY, headers=H)
+        except BaseException:  # noqa: BLE001
+            pass
+        await asyncio.sleep(0.2)
+        assert app.state.q.chat.inflight == 0 and app.state.q.chat.running == []
+        await client.aclose()

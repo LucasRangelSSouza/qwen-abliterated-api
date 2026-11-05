@@ -526,12 +526,17 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             REQS.labels(name, kind, code).inc()
             q.recent.appendleft({"id": ticket.seq, "kind": kind, "consumer": name, "end_user": ticket.end_user, "cls": ticket.cls, "enq": ticket.t_enq,
                                  "start": ticket.t_start, "end": time.time(), "code": code})
-            await mx.log_job(q.r, "llm", kind, name, ticket.end_user, ticket.t_enq, ticket.t_start, time.time(), code, ticket.cls)
+            # o que e sincrono vem antes de qualquer await: se o cliente cancelar, o cancelamento pode interromper o primeiro
+            # await e a vaga ficaria vazada (aparece "executando" na fila sem nenhum pedido real)
             if got_slot:
-                await lane.release(ticket)
+                lane.release_now(ticket)
             else:
-                await lane.cancel(ticket)
+                lane.cancel_now(ticket)
             q.ctl.end_request()
+            try:
+                await mx.log_job(q.r, "llm", kind, name, ticket.end_user, ticket.t_enq, ticket.t_start, time.time(), code, ticket.cls)
+            except asyncio.CancelledError:
+                pass  # o registro e opcional; o pedido ja foi encerrado acima
 
     async def _prepare(q: App, lane: Lane, ticket, priority: bool) -> None:
         await q.ctl.ensure_ready(priority)

@@ -69,24 +69,37 @@ class Lane:
                     return
                 await self._cond.wait()
 
+    def release_now(self, t: Ticket) -> None:
+        """Libera a vaga sem nenhum await: um cliente que desiste (CancelledError) nao pode deixar a vaga vazada."""
+        if t.admitted:
+            self.inflight -= 1
+            self.by_consumer[t.consumer] = max(0, self.by_consumer.get(t.consumer, 1) - 1)
+            t.admitted = False
+            if t in self.running:
+                self.running.remove(t)
+            self.served += 1
+        self._wake()
+
+    def cancel_now(self, t: Ticket) -> None:
+        if t in self.waiting:
+            self.waiting.remove(t)
+        self.release_now(t)
+
+    def _wake(self) -> None:
+        async def _notify():
+            async with self._cond:
+                self._cond.notify_all()
+        try:
+            asyncio.get_running_loop().create_task(_notify())
+        except RuntimeError:  # sem loop (teste sincrono)
+            pass
+
     async def release(self, t: Ticket) -> None:
-        async with self._cond:
-            if t.admitted:
-                self.inflight -= 1
-                self.by_consumer[t.consumer] = max(0, self.by_consumer.get(t.consumer, 1) - 1)
-                t.admitted = False
-                if t in self.running:
-                    self.running.remove(t)
-                self.served += 1
-            self._cond.notify_all()
+        self.release_now(t)
 
     async def cancel(self, t: Ticket) -> None:
         """Cliente desistiu enquanto esperava (ou terminou): sai da fila e libera o lugar."""
-        async with self._cond:
-            if t in self.waiting:
-                self.waiting.remove(t)
-            self._cond.notify_all()
-        await self.release(t)
+        self.cancel_now(t)
 
     def position(self, t: Ticket) -> int:
         try:

@@ -125,7 +125,7 @@ class Settings:
     embed_queue_max: int = 200
     max_context_tokens: int = 65536
     request_timeout_s: float = 1800.0
-    stream_idle_timeout_s: float = 180.0  # STREAM_IDLE_TIMEOUT_S: stream sem nenhum byte do vLLM por este tempo e abortado
+    stream_idle_timeout_s: float = 420.0  # STREAM_IDLE_TIMEOUT_S: stream sem nenhum byte do vLLM por este tempo e abortado (o parser qwen3_xml so entrega a chamada de ferramenta quando completa: escrita de arquivo grande fica 2 a 4 min sem bytes)
     # --- midia (imagem; ComfyUI numa GPU fixa propria, alcancada por tunel SSH)
     media_instance_id: int = 0       # MEDIA_INSTANCE_ID: instancia Vast da GPU de midia (0 = sem midia)
     media_local_port: int = 18188    # porta local do tunel ate o ComfyUI (8188 na maquina)

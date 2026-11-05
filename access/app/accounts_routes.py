@@ -60,6 +60,9 @@ async def cakto_webhook(request: Request):
     if not _webhook_ok(secret, request, raw, payload):
         raise fail(401, "segredo do webhook invalido", "invalid_request_error", "invalid_webhook_secret")
     try:
+        if isinstance(payload.get("data"), list):  # webhook V2: principal e order bump da mesma cobranca vem juntos, um evento por pedido
+            res = [A.process_billing(ctx, "cakto", json.dumps({**payload, "data": d}, ensure_ascii=False), {**payload, "data": d}) for d in payload["data"] if isinstance(d, dict)]
+            return {"ok": True, "duplicate": bool(res) and all(r["duplicate"] for r in res), "processed": len(res)}
         return A.process_billing(ctx, "cakto", raw.decode("utf-8", "replace"), payload)
     except RuntimeError as e:  # a Cakto tenta de novo quando recebe erro; o evento ja ficou registrado com o motivo
         raise fail(500, "falha ao processar o evento", "server_error", "billing_processing_failed", detail=str(e)[:120])

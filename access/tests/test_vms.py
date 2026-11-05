@@ -289,3 +289,17 @@ async def test_excluir_assinante_remove_conta_revoga_chaves_e_protege_vm_viva(ri
     assert ctx.store.one("SELECT revoked_at FROM keys WHERE key_hash=?", (sha256(chave),))["revoked_at"] is not None
     assert ctx.store.one("SELECT status FROM people WHERE id=?", (pid,))["status"] == "suspended"
     assert (await r.client.delete(f"/admin/api/subscribers/{aid}")).status_code == 404
+
+
+async def test_webhook_v2_com_plano_e_order_bump_no_mesmo_evento_cria_plano_e_pedido_de_vm(rig2):
+    r, ctx, fake = rig2
+    def pedido(produto, ev, sub, tipo):
+        return {"id": ev, "offer_type": tipo, "customer": {"name": "Ana", "email": "bump@x.com"}, "product": {"name": produto}, "amount": 399.0, "subscription": {"id": sub}}
+    corpo = {"event": "purchase_approved", "data": [pedido("Segundo Cérebro Max", "p1", "plano-1", "main"), pedido("Máquina virtual Segundo Cérebro", "v1", "vm-1", "orderbump")]}
+    resp = await r.client.post("/v1/billing/cakto", content=json.dumps(corpo), headers={"content-type": "application/json", "x-webhook-secret": SEG})
+    assert resp.status_code == 200 and resp.json()["processed"] == 2
+    assert ctx.store.one("SELECT plan,status FROM subscriptions")["status"] == "active" and ctx.store.one("SELECT COUNT(*) n FROM subscriptions")["n"] == 1
+    vms = ctx.store.query("SELECT * FROM vms")
+    assert len(vms) == 1 and vms[0]["status"] == "requested" and vms[0]["external_id"] == "vm-1"
+    again = await r.client.post("/v1/billing/cakto", content=json.dumps(corpo), headers={"content-type": "application/json", "x-webhook-secret": SEG})
+    assert again.json()["duplicate"] is True and ctx.store.one("SELECT COUNT(*) n FROM vms")["n"] == 1

@@ -16,12 +16,15 @@ import uuid
 import httpx
 
 from app import metrics, notice
+from app import mediaparams as mp
 from app.config import Settings
 from app.gpu.tunnel import Tunnel
 from app.scheduler import Lane, QueueFull
 
 log = logging.getLogger("llm-queue.media")
 
+EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "video/mp4": "mp4", "video/webm": "webm"}
+MIME_BY_EXT = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "mp4": "video/mp4", "webm": "video/webm"}
 JOB_TTL_S = 48 * 3600
 RECENT_MAX = 100
 MAX_PROMPT_CHARS = 4000
@@ -54,83 +57,64 @@ class MediaError(Exception):
 
 # --------------------------------------------------------------------------- receitas
 
+VIDEO_MAX_PIXELS = mp.VIDEO_MAX_PIXELS
+VIDEO_MAX_SECONDS = mp.VIDEO_MAX_SECONDS
+VIDEO_SIZES = mp.VIDEO_SIZES
+NEG_VIDEO = mp.NEG_VIDEO
+
+
 def _size(p: dict) -> tuple[int, int]:
-    """Aceita "1024x1024" (ou width/height). Arredonda para multiplos de 64 e limita a 1,6 MP para caber na 3090 com folga."""
-    w = h = 1024
-    sz = str(p.get("size") or "")
-    if "x" in sz:
-        try:
-            a, b = sz.lower().split("x", 1)
-            w, h = int(a), int(b)
-        except ValueError:
-            pass
-    w = int(p.get("width") or w)
-    h = int(p.get("height") or h)
-    w, h = max(256, min(1536, round(w / 64) * 64)), max(256, min(1536, round(h / 64) * 64))
-    while w * h > 1_650_000:
-        w, h = max(256, w - 64), max(256, h - 64)
-    return w, h
+    e, _ = mp.normalize_image(p if p.get("prompt") else {**p, "prompt": "x"})
+    return e["width"], e["height"]
 
 
-def recipe_flux_schnell(p: dict, ckpt: str) -> dict:
-    w, h = _size(p)
-    seed = int(p["seed"]) if p.get("seed") is not None else random.randint(0, 2**53)
+def _video_size(p: dict) -> tuple[int, int]:
+    e, _ = mp.normalize_video(p if p.get("prompt") else {**p, "prompt": "x"})
+    return e["width"], e["height"]
+
+
+def recipe_flux_schnell(p: dict, ckpt: str, image_name: str | None = None) -> dict:
+    e, _ = mp.normalize_image(p)
     return {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": ckpt}},
-        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": str(p["prompt"]), "clip": ["1", 1]}},
-        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": "", "clip": ["1", 1]}},
-        "4": {"class_type": "EmptySD3LatentImage", "inputs": {"width": w, "height": h, "batch_size": 1}},
+        "2": {"class_type": "CLIPTextEncode", "inputs": {"text": mp.with_style(e["prompt"], e["style"]), "clip": ["1", 1]}},
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": e["negative_prompt"], "clip": ["1", 1]}},  # so tem efeito com cfg > 1
+        "4": {"class_type": "EmptySD3LatentImage", "inputs": {"width": e["width"], "height": e["height"], "batch_size": e["n"]}},
         "5": {"class_type": "KSampler", "inputs": {"model": ["1", 0], "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["4", 0],
-                                                    "seed": seed, "steps": 4, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0}},
+                                                    "seed": e["seed"], "steps": e["steps"], "cfg": e["cfg"], "sampler_name": e["sampler"], "scheduler": e["scheduler"], "denoise": 1.0}},
         "6": {"class_type": "VAEDecode", "inputs": {"samples": ["5", 0], "vae": ["1", 2]}},
         "7": {"class_type": "SaveImage", "inputs": {"images": ["6", 0], "filename_prefix": "midia"}},
     }
 
 
-# A GPU de midia tem 16 GB de RAM e roda Flux, T5 e LTX: um video maior que isto levou o ComfyUI a morrer por falta de memoria (codigo 137,
-# pico medido de 14,4 GB com 512x512 por 4 s). Os limites protegem a geracao de imagem dos clientes.
-VIDEO_MAX_PIXELS = 512 * 512
-VIDEO_MAX_SECONDS = 4.0
-VIDEO_SIZES = {"paisagem": (640, 384), "retrato": (384, 640), "quadrado": (512, 512)}
-NEG_VIDEO = "worst quality, inconsistent motion, blurry, jittery, distorted, watermark, text, deformed"
-
-
-def _video_size(p: dict) -> tuple[int, int]:
-    w, h = VIDEO_SIZES.get(str(p.get("format") or p.get("formato") or "paisagem"), VIDEO_SIZES["paisagem"])
-    sz = str(p.get("size") or "")
-    if "x" in sz:
-        try:
-            a, b = sz.lower().split("x", 1)
-            w, h = max(256, min(832, round(int(a) / 32) * 32)), max(256, min(832, round(int(b) / 32) * 32))
-        except ValueError:
-            pass
-    if w * h > VIDEO_MAX_PIXELS:  # reduz mantendo a proporcao
-        k = (VIDEO_MAX_PIXELS / (w * h)) ** 0.5
-        w, h = max(256, int(w * k) // 32 * 32), max(256, int(h * k) // 32 * 32)
-    return w, h
-
-
-def recipe_ltx_video(p: dict, _ckpt: str) -> dict:
-    """Texto para video (LTX-Video 2B): clipes curtos de 2 a 6 s a 25 quadros por segundo."""
-    w, h = _video_size(p)
-    secs = max(1.0, min(VIDEO_MAX_SECONDS, float(p.get("seconds") or p.get("segundos") or 4)))
-    frames = int(round(secs * 25 / 8)) * 8 + 1  # o modelo pede 8n+1 quadros
-    seed = int(p["seed"]) if p.get("seed") is not None else random.randint(0, 2**53)
-    return {
+def recipe_ltx_video(p: dict, _ckpt: str, image_name: str | None = None) -> dict:
+    """Texto para video (LTX-Video 2B) ou imagem para video (image_name = arquivo ja enviado ao ComfyUI): clipes de 1 a 4 s."""
+    e, _ = mp.normalize_video(p)
+    wf = {
         "1": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "ltx-video-2b-v0.9.5.safetensors"}},
         "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": "t5xxl_fp8_e4m3fn_scaled.safetensors", "type": "ltxv"}},
-        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": str(p["prompt"]), "clip": ["2", 0]}},
-        "4": {"class_type": "CLIPTextEncode", "inputs": {"text": NEG_VIDEO, "clip": ["2", 0]}},
-        "5": {"class_type": "LTXVConditioning", "inputs": {"positive": ["3", 0], "negative": ["4", 0], "frame_rate": 25.0}},
-        "6": {"class_type": "EmptyLTXVLatentVideo", "inputs": {"width": w, "height": h, "length": frames, "batch_size": 1}},
-        "7": {"class_type": "LTXVScheduler", "inputs": {"steps": 30, "max_shift": 2.05, "base_shift": 0.95, "stretch": True, "terminal": 0.1, "latent": ["6", 0]}},
-        "8": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "euler"}},
-        "9": {"class_type": "SamplerCustom", "inputs": {"model": ["1", 0], "add_noise": True, "noise_seed": seed, "cfg": 3.0, "positive": ["5", 0], "negative": ["5", 1],
+        "3": {"class_type": "CLIPTextEncode", "inputs": {"text": e["prompt"], "clip": ["2", 0]}},
+        "4": {"class_type": "CLIPTextEncode", "inputs": {"text": e["negative_prompt"], "clip": ["2", 0]}},
+        "7": {"class_type": "LTXVScheduler", "inputs": {"steps": e["steps"], "max_shift": 2.05, "base_shift": 0.95, "stretch": True, "terminal": 0.1, "latent": ["6", 0]}},
+        "8": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": e["sampler"]}},
+        "9": {"class_type": "SamplerCustom", "inputs": {"model": ["1", 0], "add_noise": True, "noise_seed": e["seed"], "cfg": e["cfg"], "positive": ["5", 0], "negative": ["5", 1],
                                                        "sampler": ["8", 0], "sigmas": ["7", 0], "latent_image": ["6", 0]}},
         "10": {"class_type": "VAEDecode", "inputs": {"samples": ["9", 0], "vae": ["1", 2]}},
-        "11": {"class_type": "CreateVideo", "inputs": {"images": ["10", 0], "fps": 25.0}},
+        "11": {"class_type": "CreateVideo", "inputs": {"images": ["10", 0], "fps": float(e["fps"])}},
         "12": {"class_type": "SaveVideo", "inputs": {"video": ["11", 0], "filename_prefix": "video/midia", "format": "mp4", "codec": "h264"}},
     }
+    if image_name:  # imagem para video: o primeiro quadro vem da imagem; strength baixo da mais liberdade ao movimento
+        wf["20"] = {"class_type": "LoadImage", "inputs": {"image": image_name}}
+        wf["21"] = {"class_type": "LTXVPreprocess", "inputs": {"image": ["20", 0], "img_compression": 35}}
+        wf["22"] = {"class_type": "LTXVImgToVideo", "inputs": {"positive": ["3", 0], "negative": ["4", 0], "vae": ["1", 2], "image": ["21", 0], "width": e["width"], "height": e["height"],
+                                                               "length": e["frames"], "batch_size": 1, "strength": e["strength"] if e["strength"] is not None else 1.0}}
+        wf["5"] = {"class_type": "LTXVConditioning", "inputs": {"positive": ["22", 0], "negative": ["22", 1], "frame_rate": float(e["fps"])}}
+        wf["7"]["inputs"]["latent"] = ["22", 2]
+        wf["9"]["inputs"]["latent_image"] = ["22", 2]
+    else:
+        wf["5"] = {"class_type": "LTXVConditioning", "inputs": {"positive": ["3", 0], "negative": ["4", 0], "frame_rate": float(e["fps"])}}
+        wf["6"] = {"class_type": "EmptyLTXVLatentVideo", "inputs": {"width": e["width"], "height": e["height"], "length": e["frames"], "batch_size": 1}}
+    return wf
 
 
 RECIPES = {
@@ -247,16 +231,17 @@ class Media:
         recipe = params.get("recipe") or next(k for k, v in RECIPES.items() if v.get("default" if kind == "image" else "default_video"))
         if recipe not in RECIPES or RECIPES[recipe]["kind"] != kind:
             raise MediaError(f"receita desconhecida: {recipe}")
-        prompt = str(params.get("prompt") or "").strip()
-        if not prompt:
-            raise MediaError("o pedido precisa de um prompt")
-        params = {**params, "prompt": prompt[:MAX_PROMPT_CHARS]}
+        try:
+            eff, adjusted = (mp.normalize_image if kind == "image" else mp.normalize_video)(params)
+        except mp.ParamError as e:
+            raise MediaError(str(e))
+        params = {**params, **eff}
         t = self.lane.admit(consumer, cls, self.now())  # QueueFull sobe para o chamador (429)
         t.end_user, t.kind = end_user, kind
         jid = uuid.uuid4().hex[:12]
-        w, h = _video_size(params) if kind == "video" else _size(params)
-        job = {"id": jid, "state": "na_fila", "recipe": recipe, "kind": kind, "consumer": consumer, "end_user": end_user, "cls": cls,
-               "prompt": prompt[:300], "size": f"{w}x{h}", "enq": self.now(), "started": None, "finished": None, "seconds": None, "error": None}
+        job = {"id": jid, "state": "na_fila", "recipe": recipe, "kind": kind, "type": kind, "consumer": consumer, "end_user": end_user, "cls": cls,
+               "prompt": eff["prompt"][:300], "size": f"{eff['width']}x{eff['height']}", "params": mp.public(eff), "adjusted": adjusted,
+               "enq": self.now(), "started": None, "finished": None, "seconds": None, "error": None}
         self.live[jid] = job
         self.tickets[jid] = t
         await self._save(job)
@@ -269,10 +254,14 @@ class Media:
             job.update(state="executando", started=self.now())
             await self._save(job)
             await self._ensure_tunnel()
-            wf = RECIPES[job["recipe"]]["build"](params, self.s.media_ckpt)
-            img, mime = await self._comfy_run(wf, job, RECIPES[job["recipe"]].get("timeout"))
-            await self.r.setex(f"llmq:media:img:{job['id']}", JOB_TTL_S, img)
-            job.update(state="done", finished=self.now(), bytes=len(img), mime=mime)
+            image_name = await self._upload_start_image(params) if job["kind"] == "video" and params.get("image_to_video") else None
+            wf = RECIPES[job["recipe"]]["build"](params, self.s.media_ckpt, image_name)
+            files = await self._comfy_run(wf, job, RECIPES[job["recipe"]].get("timeout"))
+            results = []
+            for i, (blob, mime) in enumerate(files):
+                await self.r.setex(f"llmq:media:img:{job['id']}" + (f":{i}" if i else ""), JOB_TTL_S, blob)
+                results.append({"index": i, "type": job["kind"], "mime": mime, "ext": EXT.get(mime, "bin"), "bytes": len(blob), "url": f"/v1/jobs/{job['id']}/file" + (f"?i={i}" if i else "")})
+            job.update(state="done", finished=self.now(), bytes=results[0]["bytes"], mime=results[0]["mime"], ext=results[0]["ext"], results=results)
         except (MediaUnavailable, MediaError) as e:
             job.update(state="failed", finished=self.now(), error=str(e))
         except asyncio.CancelledError:
@@ -295,7 +284,7 @@ class Media:
             self.tickets.pop(job["id"], None)
             self.prog.pop(job["id"], None)
 
-    async def _comfy_run(self, wf: dict, job: dict, timeout: float | None = None) -> tuple[bytes, str]:
+    async def _comfy_run(self, wf: dict, job: dict, timeout: float | None = None) -> list[tuple[bytes, str]]:
         watcher = asyncio.create_task(self._watch(job["id"]))  # progresso real; se o WebSocket falhar, o pedido segue so com o polling
         try:
             return await self._comfy_run_inner(wf, job, timeout)
@@ -323,7 +312,7 @@ class Media:
         except Exception as e:  # noqa: BLE001
             log.debug("media: websocket de progresso indisponivel: %r", e)
 
-    async def _comfy_run_inner(self, wf: dict, job: dict, timeout: float | None = None) -> tuple[bytes, str]:
+    async def _comfy_run_inner(self, wf: dict, job: dict, timeout: float | None = None) -> list[tuple[bytes, str]]:
         try:
             r = await self.http.post(self.comfy + "/prompt", json={"prompt": wf, "client_id": job["id"]}, timeout=30)
         except httpx.HTTPError as e:
@@ -347,13 +336,21 @@ class Media:
                 msgs = [m for m in st.get("messages", []) if m and m[0] == "execution_error"]
                 detail = (msgs[0][1].get("exception_message") if msgs else "") or "erro de execucao"
                 raise MediaError("falha ao gerar: " + str(detail)[:200])
-            for out in (entry.get("outputs") or {}).values():
-                for im in out.get("images", []):
-                    v = await self.http.get(f"{self.comfy}/view", params={"filename": im["filename"], "subfolder": im.get("subfolder", ""), "type": im.get("type", "output")}, timeout=60)
+            found = [im for out in (entry.get("outputs") or {}).values() for im in out.get("images", [])]
+            if found:
+                files = []
+                for im in found:
+                    ext = im["filename"].rsplit(".", 1)[-1].lower() if "." in im["filename"] else ""
+                    want = MIME_BY_EXT.get(ext)
+                    if want is None or want.split("/")[0] != job["kind"]:
+                        continue  # o ComfyUI tambem lista previas: so entra o arquivo do tipo pedido (video mp4, imagem png)
+                    v = await self.http.get(f"{self.comfy}/view", params={"filename": im["filename"], "subfolder": im.get("subfolder", ""), "type": im.get("type", "output")}, timeout=120)
                     if v.status_code == 200 and v.content:
-                        return v.content, (v.headers.get("content-type") or "image/png").split(";")[0]
+                        files.append((v.content, want))
+                if files:
+                    return files
             if st.get("completed"):
-                raise MediaError("o ComfyUI terminou sem devolver imagem")
+                raise MediaError("o ComfyUI terminou sem devolver o arquivo do tipo pedido")
         raise MediaError(f"tempo esgotado ({int(limit)} s)")
 
     # ---- persistencia / consultas
@@ -400,13 +397,28 @@ class Media:
                 rest = ETA_DEFAULT_S[rj.get("kind", "image")] * (100 - self.prog.get(rj.get("id", ""), 0)) / 100
                 eta += int(rest)
             eta += ETA_DEFAULT_S[kind]
-        out = {"id": jid, "kind": kind, "status": status, "position": position, "eta_s": eta, "progress": pct, "message": msg}
+        out = {"id": jid, "kind": kind, "type": kind, "status": status, "position": position, "eta_s": eta, "progress": pct, "message": msg,
+               "params": job.get("params"), "adjusted": job.get("adjusted") or []}
         if status == "done":
-            out.update(result=f"/v1/jobs/{jid}/file", mime=job.get("mime"), seconds=job.get("seconds"), size=job.get("size"))
+            out.update(result=f"/v1/jobs/{jid}/file", mime=job.get("mime"), ext=job.get("ext"), results=job.get("results") or [], seconds=job.get("seconds"), size=job.get("size"))
         return out
 
-    async def image(self, jid: str) -> bytes | None:
-        return await self.r.get(f"llmq:media:img:{jid}")
+    async def _upload_start_image(self, params: dict) -> str:
+        raw = str(params.get("image") or params.get("start_image") or "")
+        if raw.startswith("data:"):
+            raw = raw.split(",", 1)[-1]
+        blob = base64.b64decode(raw)
+        ext, mime = ("png", "image/png") if blob.startswith(b"\x89PNG") else ("webp", "image/webp") if blob.startswith(b"RIFF") else ("jpg", "image/jpeg")
+        try:
+            r = await self.http.post(self.comfy + "/upload/image", files={"image": (f"inicio-{uuid.uuid4().hex[:8]}.{ext}", blob, mime)}, data={"overwrite": "true"}, timeout=60)
+        except httpx.HTTPError as e:
+            raise MediaUnavailable(f"ComfyUI inacessivel ({type(e).__name__})")
+        if r.status_code != 200:
+            raise MediaError("a imagem inicial foi recusada")
+        return r.json()["name"]
+
+    async def image(self, jid: str, index: int = 0) -> bytes | None:
+        return await self.r.get(f"llmq:media:img:{jid}" + (f":{index}" if index else ""))
 
     async def wait(self, jid: str, timeout: float) -> dict | None:
         task = self.tasks.get(jid)

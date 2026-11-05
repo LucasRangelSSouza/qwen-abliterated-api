@@ -296,5 +296,7 @@ async def media_job_progress(job_id: str, request: Request):
 async def job_image(job_id: str, request: Request):
     ctx = _ctx(request)
     p = authenticate(ctx, request)
-    r = await ctx.http.get(ctx.s.upstream_base + f"/v1/jobs/{job_id}/image", headers=_media_headers(ctx, p), timeout=120)
-    return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
+    idx = request.query_params.get("i", "0")
+    r = await ctx.http.get(ctx.s.upstream_base + f"/v1/jobs/{job_id}/image", params={"i": idx if idx.isdigit() else "0"}, headers=_media_headers(ctx, p), timeout=120)
+    extra = {"Content-Disposition": r.headers["content-disposition"]} if "content-disposition" in r.headers else {}
+    return Response(r.content, status_code=r.status_code, headers=extra, media_type=r.headers.get("content-type", "application/json"))

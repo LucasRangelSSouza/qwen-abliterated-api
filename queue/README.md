@@ -44,6 +44,38 @@ Autenticação: `Authorization: Bearer <chave>`; consumidores em `CONSUMERS_JSON
 
 Ordem: uma geração por vez na GPU de mídia. Imagem (`interactive`) passa na frente de vídeo na fila (`batch`); um vídeo em execução termina antes (limite de 4 s e 512x512). Pedido de vídeo: `POST /v1/videos/generations` (202 com o id); de imagem: `POST /v1/images/generations` (`"async": true` para 202).
 
+### Parâmetros de imagem e vídeo (pedido e status)
+
+`POST /v1/images/generations` e `POST /v1/videos/generations` (corpo JSON; `"async": true` devolve 202 com o id). Tudo é validado: número fora da faixa é **ajustado** (e listado em `adjusted`); texto de lista fechada inválido, tipo errado ou imagem ilegível recusa com 422 e mensagem em português.
+
+| Parâmetro | Imagem (Flux schnell) | Vídeo (LTX 2B) |
+|---|---|---|
+| `prompt` | obrigatório, até 4000 caracteres | idem |
+| `negative_prompt` | texto (só pesa com `cfg` > 1) | texto (padrão: qualidade ruim, tremido, texto, marca d'água) |
+| `width`, `height` (ou `size: "1024x1024"`) | múltiplos de 64, 256 a 1536, até 1,65 MP; padrão 1024x1024 | múltiplos de 32, 256 a 832, até 512x512 de área (0,26 MP); padrão `format` |
+| `format` | n/a | `paisagem` (640x384, padrão), `retrato` (384x640), `quadrado` (512x512) |
+| `steps` | 1 a 12 (padrão 4) | 10 a 50 (padrão 30) |
+| `cfg` (ou `guidance`) | 0,5 a 6 (padrão 1,0) | 1 a 8 (padrão 3,0) |
+| `seed` | inteiro (padrão aleatório) | idem |
+| `sampler` | `euler` (padrão), `euler_ancestral`, `heun`, `dpm_2`, `dpmpp_2m`, `dpmpp_2m_sde`, `dpmpp_sde`, `lms`, `lcm`, `uni_pc`, `ddim`, `res_multistep` | idem |
+| `scheduler` | `simple` (padrão), `normal`, `karras`, `sgm_uniform`, `exponential`, `beta`, `ddim_uniform` | n/a |
+| `n` (ou `quantidade`) | 1 a 4 imagens | n/a |
+| `style` (ou `estilo`) | `foto`, `cinema`, `ilustracao`, `anime`, `3d`, `minimalista`, `aquarela` (acrescenta termos ao prompt) | n/a |
+| `seconds` (ou `segundos`) | n/a | 1 a 4 (padrão 4); os quadros são 8n+1, então 4 s viram 3,88 s |
+| `fps` | n/a | 8 a 30 (padrão 25), no máximo 121 quadros |
+| `image` (ou `start_image`) | n/a | imagem inicial em base64 ou data URL (PNG, JPEG, WEBP, até 6 MB): vira imagem para vídeo |
+| `strength` | n/a | 0 a 1 (padrão 1,0), só com `image`: menor dá mais liberdade de movimento |
+
+`GET /v1/media/jobs/{id}` devolve, além do contrato de progresso: `type` (`"image"` ou `"video"`), `params` (valores **efetivamente usados**, com seed sorteada, tamanho final, `frames` etc.; nunca a imagem inicial), `adjusted` (nomes dos parâmetros que foram ajustados) e, em `done`, `mime`, `ext` e `results`:
+
+```json
+{"status": "done", "type": "video", "mime": "video/mp4", "ext": "mp4", "result": "/v1/jobs/ID/file",
+ "results": [{"index": 0, "type": "video", "mime": "video/mp4", "ext": "mp4", "bytes": 122458, "url": "/v1/jobs/ID/file"}],
+ "params": {"prompt": "...", "width": 640, "height": 384, "seconds": 2.0, "fps": 25, "frames": 49, "steps": 30, "cfg": 3.0, "seed": 123, "sampler": "euler", "image_to_video": false}}
+```
+
+Imagens com `n` > 1 trazem uma entrada em `results` por imagem (`/v1/jobs/ID/file?i=1`, `?i=2`...). O arquivo sai com o `Content-Type` do formato real (mp4 nunca como imagem); o servidor só entrega o arquivo do tipo pedido, nunca a prévia do ComfyUI.
+
 ## Estados da GPU
 `OFF → STARTING → (FALLBACK) → LOADING → READY → STOPPING → OFF`. Religar a instância parada leva ~3 min; do zero 6 a 12 min (medido).
 Host indisponível (Spec 13 §5.3): religar sem GPU livre cai no fallback; oferta que sumiu passa para a próxima; host com erro de GPU ou de

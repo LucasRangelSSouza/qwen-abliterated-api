@@ -84,7 +84,8 @@ def test_size_arredonda_e_limita():
     w, h = _size({"size": "4000x4000"})
     assert w * h <= 1_650_000 and w % 64 == 0 and h % 64 == 0
     assert _size({"width": 10, "height": 10}) == (256, 256)
-    assert _size({"size": "lixo"}) == (1024, 1024)
+    with pytest.raises(ValueError):
+        _size({"size": "lixo"})  # tamanho ilegivel e recusado com mensagem clara (422), nao adivinhado
 
 
 @pytest.mark.asyncio

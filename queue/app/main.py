@@ -25,7 +25,7 @@ from app.gpu.controller import READY, GPUController, GPUUnavailable
 from app.gpu.ledger import Ledger
 from app.gpu.tunnel import NoTunnel, SshTunnel
 from app.gpu.vast import RealVast
-from app.media import Media, MediaError, MediaUnavailable
+from app.media import EXT, Media, MediaError, MediaUnavailable
 from app.scheduler import Lane, QueueFull
 
 log = logging.getLogger("llm-queue")
@@ -271,19 +271,22 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         return await m.progress(job_id)
 
     @app.get("/v1/jobs/{job_id}/image")
-    async def job_image(job_id: str, request: Request):
+    async def job_image(job_id: str, request: Request, i: int = 0):
         q: App = request.app.state.q
         c = q.auth(request)
         m = _media(q)
         job = await m.get(job_id)
-        img = await m.image(job_id) if job and job.get("consumer") == c["name"] else None
+        i = max(0, min(i, 8))
+        img = await m.image(job_id, i) if job and job.get("consumer") == c["name"] else None
         if not img:
             raise HTTPException(404, detail=_err("imagem nao encontrada (ou expirou, 48 h)", "invalid_request_error", "not_found"))
-        return Response(content=img, media_type=(job or {}).get("mime") or "image/png")
+        res = (job or {}).get("results") or []
+        mime = (res[i]["mime"] if 0 <= i < len(res) else None) or (job or {}).get("mime") or "image/png"
+        return Response(content=img, media_type=mime, headers={"Content-Disposition": f'inline; filename="{job_id}.{EXT.get(mime, "bin")}"'})
 
     @app.get("/v1/jobs/{job_id}/file")
     async def job_file(job_id: str, request: Request):
-        return await job_image(job_id, request)
+        return await job_image(job_id, request, int(request.query_params.get("i") or 0))
 
     @app.get("/admin/media/status")
     async def admin_media_status(request: Request):

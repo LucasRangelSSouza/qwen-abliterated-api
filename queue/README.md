@@ -24,6 +24,26 @@ outros negócios ─────┘     fila · controlador da GPU · tetos de g
 Autenticação: `Authorization: Bearer <chave>`; consumidores em `CONSUMERS_JSON` (`[{"name","key_sha256","priority"}]`). Classes de tráfego:
 `X-Queue-Class: interactive` (padrão) ou `batch` (só com `GPU_BATCH_ENABLED=true`).
 
+## Progresso de imagem e vídeo (contrato do app)
+
+`GET /v1/media/jobs/{id}` (mesma chave de quem pediu; outro consumidor recebe 404). Compatível com `GET /v1/jobs/{id}`, que segue devolvendo o registro bruto.
+
+```json
+{"id": "a1b2c3d4e5f6", "kind": "video", "status": "running", "position": null, "eta_s": 24, "progress": 42,
+ "message": "Gerando o seu vídeo..."}
+```
+
+- `status`: `queued` | `running` | `done` | `failed`.
+- `position`: posição na fila (1 = próximo) quando `queued`; `null` nos demais.
+- `eta_s`: segundos estimados (na fila: o que falta do job em curso + os à frente + o próprio); `0` em `done`; `null` em `failed`.
+- `progress`: 0 a 100. Real, vem do WebSocket do ComfyUI (`progress` passo/total): 3 = iniciou, 5 a 97 = amostragem, 100 só em `done`. Se o WebSocket cair, fica no último valor e o pedido segue.
+- `message`: texto curto em português, sem infraestrutura: "Seu vídeo está na fila para ser gerado." / "Gerando o seu vídeo..." / "Pronto." (imagem: "Sua imagem..." / "Gerando a sua imagem..."). Em `failed`: a mensagem única de falha.
+- Em `done` vêm também `result` (`/v1/jobs/{id}/file`), `mime`, `seconds`, `size`.
+- Pedido que estava na fila quando o serviço reiniciou aparece como `failed`.
+- Erros: `404 {"error": {"message": "Pedido não encontrado."}}`; `503` com "Este recurso não está disponível no momento." se a mídia estiver desligada.
+
+Ordem: uma geração por vez na GPU de mídia. Imagem (`interactive`) passa na frente de vídeo na fila (`batch`); um vídeo em execução termina antes (limite de 4 s e 512x512). Pedido de vídeo: `POST /v1/videos/generations` (202 com o id); de imagem: `POST /v1/images/generations` (`"async": true` para 202).
+
 ## Estados da GPU
 `OFF → STARTING → (FALLBACK) → LOADING → READY → STOPPING → OFF`. Religar a instância parada leva ~3 min; do zero 6 a 12 min (medido).
 Host indisponível (Spec 13 §5.3): religar sem GPU livre cai no fallback; oferta que sumiu passa para a próxima; host com erro de GPU ou de

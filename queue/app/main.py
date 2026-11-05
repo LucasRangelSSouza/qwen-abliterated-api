@@ -202,7 +202,7 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
     # ---- midia (imagem): fila propria, uma por vez, na GPU de midia
     def _media(q: App) -> Media:
         if q.media is None:
-            raise HTTPException(503, detail=_err("geracao de imagem nao esta habilitada", "service_unavailable", "media_disabled"))
+            raise HTTPException(503, detail=_err("Este recurso não está disponível no momento.", "service_unavailable", "media_disabled"))
         return q.media
 
     @app.post("/v1/videos/generations")
@@ -258,6 +258,17 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         if not job or job.get("consumer") != c["name"]:
             raise HTTPException(404, detail=_err("pedido nao encontrado", "invalid_request_error", "not_found"))
         return {k: v for k, v in job.items() if k != "consumer"}
+
+    @app.get("/v1/media/jobs/{job_id}")
+    async def media_job_progress(job_id: str, request: Request):
+        """Contrato de progresso do app: {id, kind, status: queued|running|done|failed, position, eta_s, progress 0..100, message[, result, mime, seconds, size]}."""
+        q: App = request.app.state.q
+        c = q.auth(request)
+        m = _media(q)
+        job = await m.get(job_id)
+        if not job or job.get("consumer") != c["name"]:
+            raise HTTPException(404, detail=_err("Pedido não encontrado.", "invalid_request_error", "not_found"))
+        return await m.progress(job_id)
 
     @app.get("/v1/jobs/{job_id}/image")
     async def job_image(job_id: str, request: Request):

@@ -270,3 +270,97 @@ def test_rota_de_video_desligada_devolve_503_claro(redis):
         r = c.post("/v1/videos/generations", json={"prompt": "um carro"}, headers={"Authorization": f"Bearer {key}"})
         assert r.status_code == 503, r.text
         assert r.json()["detail"]["error"]["code"] == "video_disabled" and "GPU" not in r.json()["detail"]["error"]["message"] and "máquina" not in r.json()["detail"]["error"]["message"]
+
+
+class FakeWS:
+    """WebSocket do ComfyUI falso: entrega as mensagens de progresso e depois fica aberto."""
+    def __init__(self, msgs):
+        self.msgs = msgs
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    def __aiter__(self):
+        async def gen():
+            import json
+            for m in self.msgs:
+                yield json.dumps(m)
+                await asyncio.sleep(0)
+            await asyncio.sleep(60)
+        return gen()
+
+
+@pytest.mark.asyncio
+async def test_imagem_passa_na_frente_de_video_e_so_um_roda_por_vez(make_media):
+    m, comfy = await make_media(FakeComfy(delay=40), media_video_enabled=True, media_queue_max=10, media_per_consumer=10)
+    v1 = await m.submit("a", "", {"prompt": "carro"}, "batch", "video")
+    await asyncio.sleep(0.05)
+    v2 = await m.submit("a", "", {"prompt": "moto"}, "batch", "video")
+    img = await m.submit("a", "", {"prompt": "logo"}, "interactive", "image")
+    st = await m.jobs()
+    assert [j["id"] for j in st["running"]] == [v1["id"]]  # um por vez; o video em curso termina
+    assert [j["id"] for j in st["waiting"]][0] in {img["id"], v2["id"]}
+    pi, pv = await m.progress(img["id"]), await m.progress(v2["id"])
+    assert pi["status"] == "queued" and pi["position"] == 1 and pv["position"] == 2  # imagem e a proxima, o outro video espera atras
+    assert pi["eta_s"] < pv["eta_s"]
+    for t in list(m.tasks.values()):
+        t.cancel()
+    await asyncio.gather(*m.tasks.values(), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_progresso_real_pelo_websocket_e_contrato_do_app(make_media, redis):
+    msgs = [{"type": "execution_start", "data": {}}, {"type": "progress", "data": {"value": 2, "max": 4}}]
+    m, comfy = await make_media(FakeComfy(delay=60))
+    async def conn(url):
+        assert "clientId=" in url
+        return FakeWS(msgs)
+    m.ws_connect = conn
+    job = await m.submit("a", "", {"prompt": "logo"})
+    for _ in range(100):
+        await asyncio.sleep(0.02)
+        if m.prog.get(job["id"], 0) >= 50:
+            break
+    p = await m.progress(job["id"])
+    assert set(p) >= {"id", "kind", "status", "position", "eta_s", "progress", "message"}
+    assert p["status"] == "running" and p["position"] is None and p["progress"] == 5 + 92 // 2 and p["message"] == "Gerando a sua imagem..."
+    for t in list(m.tasks.values()):
+        t.cancel()
+    await asyncio.gather(*m.tasks.values(), return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_progresso_pronto_falha_neutra_e_pedido_perdido(make_media, redis):
+    import json
+    m, _ = await make_media(FakeComfy(delay=0))
+    job = await m.submit("a", "", {"prompt": "logo"})
+    await m.wait(job["id"], 5)
+    p = await m.progress(job["id"])
+    assert p["status"] == "done" and p["progress"] == 100 and p["message"] == "Pronto." and p["result"].endswith("/file") and p["eta_s"] == 0
+    m2, _ = await make_media(FakeComfy(error="CUDA out of memory no host"))
+    j2 = await m2.submit("a", "", {"prompt": "logo"})
+    await m2.wait(j2["id"], 5)
+    pf = await m2.progress(j2["id"])
+    assert pf["status"] == "failed" and "CUDA" not in json.dumps(pf) and "memory" not in pf["message"].lower()
+    await redis.setex("llmq:media:job:zz", 60, json.dumps({"id": "zz", "state": "executando", "kind": "video", "consumer": "a", "enq": 1, "started": 1}))
+    pl = await m.progress("zz")  # estava rodando quando o servico reiniciou
+    assert pl["status"] == "failed" and pl["message"] == (await m.progress(j2["id"]))["message"]
+    assert await m.progress("nao-existe") is None
+
+
+def test_rota_de_progresso_so_para_o_dono_com_erro_neutro(redis):
+    app, key = _client(redis, FakeComfy(delay=0))
+    with TestClient(app) as c:
+        h = {"Authorization": f"Bearer {key}"}
+        r = c.post("/v1/images/generations", json={"prompt": "logo", "async": True}, headers=h)
+        jid = r.json()["id"]
+        for _ in range(100):
+            j = c.get(f"/v1/media/jobs/{jid}", headers=h).json()
+            if j["status"] == "done":
+                break
+        assert j["status"] == "done" and j["progress"] == 100
+        n = c.get("/v1/media/jobs/inexistente", headers=h)
+        assert n.status_code == 404 and n.json()["detail"]["error"]["message"] == "Pedido não encontrado."

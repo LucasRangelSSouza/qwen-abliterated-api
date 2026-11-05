@@ -15,7 +15,7 @@ import uuid
 
 import httpx
 
-from app import metrics
+from app import metrics, notice
 from app.config import Settings
 from app.gpu.tunnel import Tunnel
 from app.scheduler import Lane, QueueFull
@@ -25,6 +25,23 @@ log = logging.getLogger("llm-queue.media")
 JOB_TTL_S = 48 * 3600
 RECENT_MAX = 100
 MAX_PROMPT_CHARS = 4000
+
+
+# Estimativa de duracao quando ainda nao ha medida real (3090: imagem ~30 s, video de 4 s ~40 s, ja contando a troca de modelo).
+ETA_DEFAULT_S = {"image": 30, "video": 60}
+MSG = {
+    ("image", "queued"): "Sua imagem está na fila para ser gerada.",
+    ("video", "queued"): "Seu vídeo está na fila para ser gerado.",
+    ("image", "running"): "Gerando a sua imagem...",
+    ("video", "running"): "Gerando o seu vídeo...",
+    ("image", "done"): "Pronto.",
+    ("video", "done"): "Pronto.",
+}
+
+
+async def _ws_connect(url: str):
+    from websockets.asyncio.client import connect  # so a producao precisa; os testes injetam um falso
+    return connect(url, open_timeout=5, max_size=2**22)
 
 
 class MediaUnavailable(Exception):
@@ -125,7 +142,7 @@ RECIPES = {
 # --------------------------------------------------------------------------- servico
 
 class Media:
-    def __init__(self, s: Settings, vast, tunnel: Tunnel, redis, http: httpx.AsyncClient, clock=time.time):
+    def __init__(self, s: Settings, vast, tunnel: Tunnel, redis, http: httpx.AsyncClient, clock=time.time, ws_connect=None):
         self.s, self.vast, self.tun, self.r, self.http, self.now = s, vast, tunnel, redis, http, clock
         self.lane = Lane("image", 1, s.media_queue_max, s.media_per_consumer)
         self.live: dict[str, dict] = {}        # pedidos que ainda nao terminaram (fila + rodando)
@@ -134,6 +151,9 @@ class Media:
         self._tun_lock = asyncio.Lock()
         self.comfy = f"http://127.0.0.1:{s.media_local_port}"
         self._keep: asyncio.Task | None = None
+        self.tickets: dict[str, object] = {}   # vaga de cada pedido vivo (para dizer a posicao na fila)
+        self.prog: dict[str, int] = {}         # progresso real 0..100 dos pedidos em execucao
+        self.ws_connect = ws_connect or _ws_connect
 
     # ---- vigia do tunel
     def start(self) -> None:
@@ -238,6 +258,7 @@ class Media:
         job = {"id": jid, "state": "na_fila", "recipe": recipe, "kind": kind, "consumer": consumer, "end_user": end_user, "cls": cls,
                "prompt": prompt[:300], "size": f"{w}x{h}", "enq": self.now(), "started": None, "finished": None, "seconds": None, "error": None}
         self.live[jid] = job
+        self.tickets[jid] = t
         await self._save(job)
         self.tasks[jid] = asyncio.create_task(self._run(job, params, t))
         return job
@@ -263,7 +284,7 @@ class Media:
         finally:
             await self.lane.cancel(t)
             if job.get("started"):
-                job["seconds"] = round(job["finished"] - job["started"], 1)
+                job["seconds"] = round((job["finished"] or self.now()) - job["started"], 1)
             await self._save(job)
             await self.r.lpush("llmq:media:recent", job["id"])
             await metrics.log_job(self.r, "image", job.get("kind", "image"), job["consumer"], job["end_user"], job["enq"], job.get("started"), job["finished"] or self.now(),
@@ -271,10 +292,40 @@ class Media:
             await self.r.ltrim("llmq:media:recent", 0, RECENT_MAX - 1)
             self.live.pop(job["id"], None)
             self.tasks.pop(job["id"], None)
+            self.tickets.pop(job["id"], None)
+            self.prog.pop(job["id"], None)
 
     async def _comfy_run(self, wf: dict, job: dict, timeout: float | None = None) -> tuple[bytes, str]:
+        watcher = asyncio.create_task(self._watch(job["id"]))  # progresso real; se o WebSocket falhar, o pedido segue so com o polling
         try:
-            r = await self.http.post(self.comfy + "/prompt", json={"prompt": wf, "client_id": "llm-queue"}, timeout=30)
+            return await self._comfy_run_inner(wf, job, timeout)
+        finally:
+            watcher.cancel()
+            await asyncio.gather(watcher, return_exceptions=True)
+
+    async def _watch(self, jid: str) -> None:
+        """Acompanha o ComfyUI pelo WebSocket (clientId = id do pedido): 'progress' traz passo/total da amostragem. 5% = carregando modelos, 97% = decodificando."""
+        try:
+            conn = await self.ws_connect(f"ws://127.0.0.1:{self.s.media_local_port}/ws?clientId={jid}")
+            async with conn as ws:
+                async for raw in ws:
+                    if isinstance(raw, (bytes, bytearray)):
+                        continue
+                    m = json.loads(raw)
+                    d = m.get("data") or {}
+                    cur = self.prog.get(jid, 0)
+                    if m.get("type") == "execution_start":
+                        self.prog[jid] = max(cur, 3)
+                    elif m.get("type") == "progress" and d.get("max"):
+                        self.prog[jid] = max(cur, min(97, 5 + int(92 * d["value"] / d["max"])))
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001
+            log.debug("media: websocket de progresso indisponivel: %r", e)
+
+    async def _comfy_run_inner(self, wf: dict, job: dict, timeout: float | None = None) -> tuple[bytes, str]:
+        try:
+            r = await self.http.post(self.comfy + "/prompt", json={"prompt": wf, "client_id": job["id"]}, timeout=30)
         except httpx.HTTPError as e:
             raise MediaUnavailable(f"ComfyUI inacessivel ({type(e).__name__})")
         if r.status_code != 200:
@@ -314,6 +365,45 @@ class Media:
             return dict(self.live[jid])
         raw = await self.r.get(f"llmq:media:job:{jid}")
         return json.loads(raw) if raw else None
+
+    async def progress(self, jid: str) -> dict | None:
+        """Contrato de progresso para o app (GET /v1/media/jobs/{id}). Nunca devolve texto de infraestrutura."""
+        job = await self.get(jid)
+        if job is None:
+            return None
+        kind = job.get("kind", "image")
+        state = job.get("state")
+        live = jid in self.live
+        if state in ("na_fila", "executando") and not live:  # o servico reiniciou no meio: o pedido nao existe mais
+            state = "failed"
+        position = eta = None
+        pct = 0
+        if state == "done":
+            status, pct, eta, msg = "done", 100, 0, MSG[(kind, "done")]
+        elif state == "failed":
+            status, pct, msg = "failed", int(self.prog.get(jid, 0)), notice.MENSAGEM_FALHA
+        elif state == "executando":
+            status, pct = "running", int(self.prog.get(jid, 0))
+            run = max(0.0, self.now() - (job.get("started") or self.now()))
+            est = ETA_DEFAULT_S[kind]
+            eta = int(round(run * (100 - pct) / pct)) if pct >= 10 and run > 3 else max(1, int(est - run))
+            msg = MSG[(kind, "running")]
+        else:
+            status, msg = "queued", MSG[(kind, "queued")]
+            t = self.tickets.get(jid)
+            waiting = list(self.lane.waiting)
+            position = waiting.index(t) + 1 if t in waiting else 1
+            ahead = waiting[:position - 1]
+            eta = sum(ETA_DEFAULT_S.get(getattr(x, "kind", "image"), 30) for x in ahead)
+            for r in self.lane.running:  # o que esta rodando agora ainda leva o que falta dele
+                rj = self.live.get(next((i for i, tk in self.tickets.items() if tk is r), ""), {})
+                rest = ETA_DEFAULT_S[rj.get("kind", "image")] * (100 - self.prog.get(rj.get("id", ""), 0)) / 100
+                eta += int(rest)
+            eta += ETA_DEFAULT_S[kind]
+        out = {"id": jid, "kind": kind, "status": status, "position": position, "eta_s": eta, "progress": pct, "message": msg}
+        if status == "done":
+            out.update(result=f"/v1/jobs/{jid}/file", mime=job.get("mime"), seconds=job.get("seconds"), size=job.get("size"))
+        return out
 
     async def image(self, jid: str) -> bytes | None:
         return await self.r.get(f"llmq:media:img:{jid}")

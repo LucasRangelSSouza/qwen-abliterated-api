@@ -121,6 +121,7 @@ class Settings:
     embed_queue_max: int = 200
     max_context_tokens: int = 65536
     request_timeout_s: float = 1800.0
+    stream_idle_timeout_s: float = 180.0  # STREAM_IDLE_TIMEOUT_S: stream sem nenhum byte do vLLM por este tempo e abortado
     # --- midia (imagem; ComfyUI numa GPU fixa propria, alcancada por tunel SSH)
     media_instance_id: int = 0       # MEDIA_INSTANCE_ID: instancia Vast da GPU de midia (0 = sem midia)
     media_local_port: int = 18188    # porta local do tunel ate o ComfyUI (8188 na maquina)
@@ -224,5 +225,6 @@ class Settings:
             embed_max_inflight=_i("EMBED_MAX_INFLIGHT", cls.embed_max_inflight),
             embed_queue_max=_i("EMBED_QUEUE_MAX", cls.embed_queue_max),
             max_context_tokens=_i("MAX_CONTEXT_TOKENS", cls.max_context_tokens),
+            stream_idle_timeout_s=_f("STREAM_IDLE_TIMEOUT_S", cls.stream_idle_timeout_s),
         )
         return s

@@ -489,7 +489,16 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
                                 yield data
                             return
                         if stream:
-                            async for chunk in r.aiter_raw():
+                            it = r.aiter_raw().__aiter__()
+                            while True:
+                                try:  # stream parado no meio (vLLM travado) nao pode prender a vaga nem o cliente por 30 min
+                                    chunk = await asyncio.wait_for(it.__anext__(), s.stream_idle_timeout_s)
+                                except StopAsyncIteration:
+                                    break
+                                except asyncio.TimeoutError:
+                                    code = "504"
+                                    yield _error_chunk(stream, f"upstream parou de enviar dados por {int(s.stream_idle_timeout_s)} s: tente de novo", "server_error", "upstream_stalled")
+                                    return
                                 sent = True
                                 q.ctl.touch()
                                 yield chunk

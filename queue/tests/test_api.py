@@ -254,3 +254,23 @@ async def test_admin_desligado_sem_chave_configurada(redis):
         c = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
         assert (await c.post("/admin/gpu/stop", headers={"X-Admin-Key": ""})).status_code == 403
         await c.aclose()
+
+
+async def test_stream_parado_no_meio_e_abortado_e_libera_a_vaga(redis):
+    import asyncio
+
+    async def gen():
+        yield b'data: {"a":1}\n\n'
+        await asyncio.sleep(30)  # vLLM travado: nunca mais envia nada
+
+    ctl = StubCtl()
+    s = Settings(tunnel_mode="none", keepalive_s=0.05, stream_idle_timeout_s=0.3)
+    app = create_app(s, controller=ctl, redis=redis, http=make_upstream(lambda req: httpx.Response(200, content=gen())), consumers=CONSUMERS)
+    async with app.router.lifespan_context(app):
+        client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
+        t0 = asyncio.get_event_loop().time()
+        r = await client.post("/v1/chat/completions", json={**BODY, "stream": True}, headers=H)
+        assert asyncio.get_event_loop().time() - t0 < 5
+        assert b'data: {"a":1}' in r.content and b"upstream_stalled" in r.content and r.content.endswith(b"data: [DONE]\n\n")
+        assert ctl.begun == 1 and ctl.ended == 1  # a vaga foi devolvida
+        await client.aclose()

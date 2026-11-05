@@ -270,3 +270,22 @@ def test_toda_tabela_com_id_autoincremento_devolve_lastrowid_no_postgres():
     import re
     todas = re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)\(\s*id INTEGER PRIMARY KEY AUTOINCREMENT", SCHEMA)
     assert "vms" in TABLES_WITH_ID and set(todas) == set(TABLES_WITH_ID) and len(todas) >= 8
+
+
+async def test_excluir_assinante_remove_conta_revoga_chaves_e_protege_vm_viva(rig):
+    r, ctx, fake = rig
+    await r.login()
+    aid, pid = conta(ctx, email="apagar@x.com")
+    chave = V._chave_dedicada(ctx, pid, "teste")
+    vm_id = V.solicitar(ctx, aid)
+    await V.provisionar(ctx, vm_id)  # VM viva na Contabo (simulada)
+    resp = await r.client.delete(f"/admin/api/subscribers/{aid}")
+    assert resp.status_code == 409 and resp.json()["error"]["code"] == "vm_active"
+    assert ctx.store.one("SELECT id FROM accounts WHERE id=?", (aid,))  # nada foi apagado
+    await V.cancelar(ctx, vm_id)
+    assert (await r.client.delete(f"/admin/api/subscribers/{aid}")).status_code == 200
+    assert ctx.store.one("SELECT id FROM accounts WHERE id=?", (aid,)) is None
+    assert ctx.store.one("SELECT COUNT(*) n FROM vms WHERE account_id=?", (aid,))["n"] == 0
+    assert ctx.store.one("SELECT revoked_at FROM keys WHERE key_hash=?", (sha256(chave),))["revoked_at"] is not None
+    assert ctx.store.one("SELECT status FROM people WHERE id=?", (pid,))["status"] == "suspended"
+    assert (await r.client.delete(f"/admin/api/subscribers/{aid}")).status_code == 404

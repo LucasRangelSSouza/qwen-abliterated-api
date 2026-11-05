@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Users, UserPlus, KeyRound, Link2, Save, RefreshCw, CreditCard, ListChecks, Check, Copy } from 'lucide-react'
+import { Users, UserPlus, KeyRound, Link2, Save, RefreshCw, CreditCard, ListChecks, Check, Copy, Trash2 } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { fmtUsd, fmtFull, fmtInt, cn } from '../lib/format.js'
 import PageHeader from '../components/PageHeader.jsx'
-import { Card, CardHeader, Badge, Button, Field, Input, Select, Toggle, Notice, Skeleton, EmptyState, ErrorState, Drawer, useToast, useLoad } from '../components/ui.jsx'
+import { Card, CardHeader, Badge, Button, Field, Input, Select, Toggle, Notice, Skeleton, EmptyState, ErrorState, Drawer, ConfirmModal, useToast, useLoad } from '../components/ui.jsx'
 
 const STATUS = { active: ['Assinando', 'success'], late: ['Em atraso', 'warning'], canceled: ['Cancelado', 'default'], refunded: ['Reembolsado', 'default'], chargeback: ['Chargeback', 'error'], pending: ['Pendente', 'info'] }
 const brl = (cents) => (cents == null ? '—' : (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }))
@@ -73,6 +73,7 @@ function Subscribers() {
   const [status, setStatus] = useState('')
   const [open, setOpen] = useState(false)
   const [link, setLink] = useState(null)
+  const [apagar, setApagar] = useState(null)
   const list = useLoad(() => api.subscribers(q, status), [q, status])
   const plans = useLoad(() => api.plans(), [])
   const d = list.data
@@ -129,6 +130,7 @@ function Subscribers() {
                             {r.enabled ? <Button size="sm" variant="secondary" onClick={() => act(() => api.disableSubscriber(r.id), 'Chave desabilitada.')}>Bloquear</Button>
                               : <Button size="sm" icon={KeyRound} onClick={() => act(() => api.enableSubscriber(r.id), 'Chave habilitada.')}>Liberar</Button>}
                             <Button size="sm" variant="outline" icon={Link2} onClick={() => act(async () => setLink((await api.passwordLink(r.id)).setup_link), 'Link gerado, copie acima.')} aria-label={`Gerar link de senha de ${r.email}`}>Senha</Button>
+                            <Button size="sm" variant="outline" icon={Trash2} onClick={() => setApagar(r)} aria-label={`Excluir ${r.email}`}>Excluir</Button>
                           </div>
                         </td>
                       </tr>
@@ -140,6 +142,10 @@ function Subscribers() {
           )}
         <p className="px-5 py-3 text-xs text-text-muted border-t border-border-subtle">Quem compra nasce <b>desabilitado</b> até você liberar. Atrasou além da carência ou cancelou: bloqueia sozinho; voltou a pagar: reabre sozinho. {d && !d.smtp && 'O envio de e-mail ainda não está configurado: use o botão Senha e mande o link.'}</p>
       </Card>
+      <ConfirmModal open={!!apagar} onClose={() => setApagar(null)} danger title="Excluir este assinante?" confirmLabel="Excluir"
+        onConfirm={() => act(async () => { await api.deleteSubscriber(apagar.id); setApagar(null) }, 'Assinante excluído.')}>
+        <p className="text-sm text-text-muted">Remove a conta <b>{apagar?.email}</b>, as assinaturas e os pedidos de máquina virtual, e revoga as chaves. Se houver VM ativa na Contabo, cancele a VM antes. O histórico de uso fica guardado.</p>
+      </ConfirmModal>
       <NewDrawer open={open} plans={plans.data?.plans || []} onClose={() => setOpen(false)} onSaved={() => list.refresh()} />
     </>
   )

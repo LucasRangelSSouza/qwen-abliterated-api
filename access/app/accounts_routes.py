@@ -231,6 +231,27 @@ async def subscribers_create(request: Request):
     return {"subscriber": _one(ctx, acc["id"]), "setup_link": mailer.setup_link(tok), "email_sent": mailer.send_welcome(ctx, email, str(b.get("name") or ""), tok)}
 
 
+@api.delete("/subscribers/{sid}")
+@_db
+def subscribers_delete(sid: int, request: Request):
+    """Remove uma conta (cliente de teste ou encerrado): apaga assinaturas e pedidos de VM, revoga as chaves e suspende a pessoa
+    (o historico de uso continua ligado a ela). Recusa se houver VM viva na Contabo: cancele a VM antes."""
+    ctx = require(request)
+    acc = ctx.store.one("SELECT id,person_id,email FROM accounts WHERE id=?", (sid,))
+    if acc is None:
+        raise fail(404, "assinante nao encontrado", "invalid_request_error", "not_found")
+    viva = ctx.store.one("SELECT id FROM vms WHERE account_id=? AND contabo_id IS NOT NULL AND status!='canceled'", (sid,))
+    if viva:
+        raise fail(409, "este assinante ainda tem uma maquina virtual ativa na Contabo; cancele a VM antes de excluir", "invalid_request_error", "vm_active")
+    with ctx.store.tx() as c:
+        c.execute("DELETE FROM vms WHERE account_id=?", (sid,))
+        c.execute("DELETE FROM subscriptions WHERE account_id=?", (sid,))
+        c.execute("UPDATE keys SET revoked_at=? WHERE person_id=? AND revoked_at IS NULL", (ctx.clock(), acc["person_id"]))
+        c.execute("DELETE FROM accounts WHERE id=?", (sid,))
+    A.set_person_status(ctx, acc["person_id"], "suspended")
+    return {"ok": True}
+
+
 def _set_enabled(ctx, sid: int, enabled: bool) -> dict:
     acc = ctx.store.one("SELECT person_id FROM accounts WHERE id=?", (sid,))
     if acc is None:

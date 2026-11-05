@@ -57,6 +57,7 @@ export const api = {
   createSubscriber: (b) => request('POST', '/subscribers', b),
   enableSubscriber: (id) => request('POST', `/subscribers/${id}/enable`),
   disableSubscriber: (id) => request('POST', `/subscribers/${id}/disable`),
+  deleteSubscriber: (id) => request('DELETE', `/subscribers/${id}`),
   passwordLink: (id) => request('POST', `/subscribers/${id}/password-link`),
   plans: () => request('GET', '/plans'),
   putPlan: (id, b) => request('PUT', `/plans/${id}`, b),

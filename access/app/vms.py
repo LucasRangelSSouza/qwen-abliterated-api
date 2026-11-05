@@ -77,6 +77,7 @@ def config(ctx: Ctx) -> dict:
         "price_cents": int(g("vm_price_cents") or 39900),  # o que COBRAMOS do cliente por mes
         "grace_days": int(g("vm_grace_days") or CARENCIA_PADRAO_DIAS),
         "auto_provision": g("vm_auto_provision") == "1",
+        "ssh_secret_id": g("vm_ssh_secret_id") or "",  # id (na Contabo) da chave SSH do dono, injetada nas VMs novas para suporte
     }
 
 
@@ -134,13 +135,23 @@ class Contabo:
             raise ContaboError(f"A instancia {instancia_id} nao e uma VM de cliente (nome sem '{PREFIXO}').")
         return inst
 
-    async def criar(self, *, nome: str, produto: str, imagem: str, regiao: str, user_data: str) -> dict:
+    async def criar_chave_ssh(self, nome: str, chave_publica: str) -> int:
+        """Guarda uma chave SSH publica na Contabo (secrets) para ser usada em VMs novas. Nao altera nenhuma instancia."""
+        r = await self.http.post("https://api.contabo.com/v1/secrets", json={"name": nome, "type": "ssh", "value": chave_publica.strip()},
+                                 headers={"Authorization": "Bearer " + await self._token(), "x-request-id": str(uuid.uuid4())})
+        if r.status_code >= 300:
+            raise ContaboError(f"Contabo POST /secrets: HTTP {r.status_code} {r.text[:200]}")
+        return int((r.json().get("data") or [{}])[0].get("secretId"))
+
+    async def criar(self, *, nome: str, produto: str, imagem: str, regiao: str, user_data: str, ssh_keys: list[int] | None = None) -> dict:
         if not nome.startswith(PREFIXO):
             raise ContaboError(f"Nome da VM precisa comecar com '{PREFIXO}'.")
         if not produto:
             raise ContaboError("Defina o productId do plano da VM (vm_product_id) antes de criar.")
-        j = await self._req("POST", "/instances", {"imageId": imagem, "productId": produto, "region": regiao, "displayName": nome,
-                                                   "userData": user_data, "period": 1, "defaultUser": "root"})
+        corpo = {"imageId": imagem, "productId": produto, "region": regiao, "displayName": nome, "userData": user_data, "period": 1, "defaultUser": "root"}
+        if ssh_keys:
+            corpo["sshKeys"] = ssh_keys
+        j = await self._req("POST", "/instances", corpo)
         return (j.get("data") or [{}])[0]
 
     async def acao(self, instancia_id: str, acao: str) -> None:
@@ -204,7 +215,8 @@ async def provisionar(ctx: Ctx, vm_id: int, contabo: Contabo | None = None) -> d
     c = contabo or cliente(ctx)
     try:
         chave = _chave_dedicada(ctx, vm["person_id"], vm["name"])
-        inst = await c.criar(nome=vm["name"], produto=cfg["product_id"], imagem=cfg["image_id"], regiao=cfg["region"], user_data=_user_data(vm["email"], chave))
+        inst = await c.criar(nome=vm["name"], produto=cfg["product_id"], imagem=cfg["image_id"], regiao=cfg["region"], user_data=_user_data(vm["email"], chave),
+                             ssh_keys=[int(cfg["ssh_secret_id"])] if cfg["ssh_secret_id"].isdigit() else None)
         _mudar(ctx, vm_id, status="provisioning", contabo_id=str(inst.get("instanceId") or ""), product_id=cfg["product_id"], region=cfg["region"],
                cost_cents=cfg["cost_cents"], price_cents=cfg["price_cents"], last_error=None)
     except ContaboError as e:

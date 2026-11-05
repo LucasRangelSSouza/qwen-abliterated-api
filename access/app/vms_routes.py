@@ -43,7 +43,7 @@ def vms_config(request: Request):
 async def vms_config_put(request: Request):
     ctx = require(request)
     b = await _json(request)
-    for chave, campo in (("product_id", "vm_product_id"), ("image_id", "vm_image_id"), ("region", "vm_region")):
+    for chave, campo in (("product_id", "vm_product_id"), ("image_id", "vm_image_id"), ("region", "vm_region"), ("ssh_secret_id", "vm_ssh_secret_id")):
         if chave in b:
             ctx.store.set_setting(campo, str(b[chave]).strip())
     for chave, campo in (("cost_cents", "vm_cost_cents"), ("price_cents", "vm_price_cents"), ("grace_days", "vm_grace_days")):
@@ -119,3 +119,23 @@ async def vms_sync(request: Request):
         return {"atualizadas": await V.sincronizar(ctx), **await V.varredura(ctx)}
     except V.ContaboError as e:
         raise _erro(e)
+
+
+@api.post("/vms/ssh-key")
+@_db
+async def vms_ssh_key(request: Request):
+    """Cadastra na Contabo a chave SSH publica do dono; as VMs novas ja nascem com ela (acesso de suporte)."""
+    ctx = require(request)
+    b = await _json(request)
+    chave = str(b.get("public_key") or "").strip()
+    if not chave.startswith(("ssh-", "ecdsa-")):
+        raise fail(422, "informe uma chave SSH publica (ssh-ed25519 ...)", "invalid_request_error", "invalid_key")
+    c = V.cliente(ctx)
+    try:
+        sid = await c.criar_chave_ssh(str(b.get("name") or "sc-vm-suporte")[:60], chave)
+    except V.ContaboError as e:
+        raise _erro(e)
+    finally:
+        await c.aclose()
+    ctx.store.set_setting("vm_ssh_secret_id", str(sid))
+    return {"secret_id": sid}

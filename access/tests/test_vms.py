@@ -38,6 +38,8 @@ class FakeContabo:
                     "diskMb": 76800, "ipConfig": {"v4": {"ip": "203.0.113.9"}}}
             self.instances[str(novo["instanceId"])] = novo
             return httpx.Response(201, json={"data": [novo]})
+        if m == "POST" and p == "/v1/secrets":
+            return httpx.Response(201, json={"data": [{"secretId": 77}]})
         if m == "POST":
             return httpx.Response(200, json={"data": [{}]})
         return httpx.Response(404, json={})
@@ -247,3 +249,15 @@ async def test_pedido_pendente_de_pagamento_nao_cria_vm(rig2):
     await cakto(r, "purchase_created")  # pendente: so um boleto/pix aguardando
     assert ctx.store.one("SELECT COUNT(*) n FROM vms")["n"] == 0
     assert await V.provisionar_pagas(ctx) == 0
+
+
+async def test_chave_ssh_do_dono_vai_nas_vms_novas(rig):
+    r, ctx, fake = rig
+    await r.login()
+    sid = (await r.client.post("/admin/api/vms/ssh-key", json={"public_key": "ssh-ed25519 AAAAteste dono@x"})).json()["secret_id"]
+    assert sid == 77 and (await r.client.get("/admin/api/vms/config")).json()["ssh_secret_id"] == "77"
+    assert (await r.client.post("/admin/api/vms/ssh-key", json={"public_key": "isto nao e chave"})).status_code == 422
+    aid, _ = conta(ctx)
+    await V.provisionar(ctx, V.solicitar(ctx, aid))
+    corpo = [b for m, p, b in fake.calls if m == "POST" and p == "/v1/compute/instances"][0]
+    assert corpo["sshKeys"] == [77]

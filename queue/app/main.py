@@ -41,6 +41,33 @@ def _err(message: str, typ: str = "server_error", code: str | None = None) -> di
     return {"error": {"message": message, "type": typ, "code": code}}
 
 
+
+IMAGE_TOKENS = 1500  # custo fixo por imagem: o base64 nao pode entrar na conta de caracteres (1 MB viraria 350 mil tokens)
+
+
+def approx_chat_tokens(messages) -> int:
+    """Estimativa grosseira de tokens de um chat: caracteres/3 no texto e custo fixo por imagem."""
+    n = 0
+    for m in messages if isinstance(messages, list) else []:
+        if not isinstance(m, dict):
+            n += len(json.dumps(m, ensure_ascii=False)) // 3
+            continue
+        c = m.get("content")
+        if isinstance(c, str):
+            n += len(c) // 3
+        elif isinstance(c, list):
+            for part in c:
+                if isinstance(part, dict) and part.get("type") in ("image_url", "input_image", "image"):
+                    n += IMAGE_TOKENS
+                elif isinstance(part, dict) and isinstance(part.get("text"), str):
+                    n += len(part["text"]) // 3
+                else:
+                    n += len(json.dumps(part, ensure_ascii=False)) // 3
+        elif c is not None:
+            n += len(json.dumps(c, ensure_ascii=False)) // 3
+        n += len(json.dumps({k: v for k, v in m.items() if k != "content"}, ensure_ascii=False)) // 3
+    return n
+
 class App:
     """Agrupa as pecas (usado pela fabrica e pelos testes, que injetam fakes)."""
     def __init__(self, s: Settings, controller: GPUController, redis, http: httpx.AsyncClient, alerts: Alerts):
@@ -385,7 +412,7 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         if cls not in ("interactive", "batch"):
             raise HTTPException(400, detail=_err("X-Queue-Class deve ser interactive ou batch", "invalid_request_error"))
         if kind == "chat":
-            approx = len(json.dumps(body.get("messages", []), ensure_ascii=False)) // 3 + int(body.get("max_tokens") or 0)
+            approx = approx_chat_tokens(body.get("messages", [])) + int(body.get("max_tokens") or 0)
             if approx > q.s.max_context_tokens * 2:  # folga: a conta de caracteres por 3 superestima
                 raise HTTPException(400, detail=_err(f"contexto acima do limite de {q.s.max_context_tokens} tokens", "invalid_request_error", "context_length_exceeded"))
         if request.headers.get("x-queue-wait", "").strip() == "0" and q.ctl.state != READY:

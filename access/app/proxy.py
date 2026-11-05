@@ -279,6 +279,18 @@ async def job_status(job_id: str, request: Request):
     return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
 
 
+@router.get("/v1/media/jobs/{job_id}")
+async def media_job_progress(job_id: str, request: Request):
+    """Progresso de imagem/video para o app: status, posicao, eta, progress e mensagem neutra (contrato no README do queue)."""
+    ctx = _ctx(request)
+    p = authenticate(ctx, request)
+    try:
+        r = await ctx.http.get(ctx.s.upstream_base + f"/v1/media/jobs/{job_id}", headers=_media_headers(ctx, p), timeout=15)
+    except httpx.HTTPError:
+        return JSONResponse(err("Não foi possível consultar agora. Tente de novo em instantes.", "server_error", "upstream_error"), status_code=502)
+    return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
+
+
 @router.get("/v1/jobs/{job_id}/file")
 @router.get("/v1/jobs/{job_id}/image")
 async def job_image(job_id: str, request: Request):

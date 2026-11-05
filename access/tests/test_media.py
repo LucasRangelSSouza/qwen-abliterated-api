@@ -28,6 +28,13 @@ async def test_status_e_imagem_do_pedido(rig: Rig):
     assert (await rig.client.get("/v1/jobs/j1")).status_code == 401
 
 
+async def test_progresso_de_midia_passa_pelo_proxy(rig: Rig):
+    h = {"Authorization": f"Bearer {OWNER_KEY}"}
+    r = await rig.client.get("/v1/media/jobs/j1", headers=h)
+    assert r.status_code == 200 and r.json()["progress"] == 40 and r.json()["status"] == "running"
+    assert (await rig.client.get("/v1/media/jobs/j1")).status_code == 401
+
+
 async def test_painel_de_imagem_exige_login(rig: Rig):
     for p in ("/media/status", "/media/jobs", "/media/image/j1"):
         assert (await rig.client.get("/admin/api" + p)).status_code == 401

@@ -99,6 +99,8 @@ class Upstream:
                 return httpx.Response(200, json={"enabled": True, "waiting": [], "running": [], "recent": [{"id": "j1", "state": "done"}], "lane": {"limit": 1}})
             if "/image/" in path:
                 return httpx.Response(200, content=b"PNGfake", headers={"content-type": "image/png"})
+        if path.startswith("/v1/media/jobs/"):
+            return httpx.Response(200, json={"id": "j1", "kind": "video", "status": "running", "position": None, "eta_s": 20, "progress": 40, "message": "Gerando o seu vídeo..."})
         if path.startswith("/v1/jobs/"):
             self.calls.append((path, {}, dict(request.headers)))
             if path.endswith("/image"):

@@ -28,7 +28,6 @@ class Settings:
     admin_password: str = ""
     session_secret: str = ""       # vazio: segredo aleatorio por boot (as sessoes caem no reinicio)
     qa_mode: bool = False
-    safety_server: bool = False    # SAFETY_SERVER: o servidor NAO barra nada por padrao; quem barra e o Hermes no app (o nivel vem do cadastro)
     owner_key_sha256: str = ""
     platform_key_sha256: str = ""
     panel_dir: str = str(Path(__file__).resolve().parent.parent / "panel" / "dist")
@@ -58,7 +57,6 @@ class Settings:
         e = os.environ.get
         return cls(
             db_path=e("ACCESS_DB_PATH", cls.db_path),
-            safety_server=e("SAFETY_SERVER", "") == "1",
             database_url=_secret("DATABASE_URL"),
             database_schema=e("DATABASE_SCHEMA", cls.database_schema),
             upstream_url=e("UPSTREAM_URL", cls.upstream_url),

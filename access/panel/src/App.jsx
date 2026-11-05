@@ -7,7 +7,6 @@ import People from './pages/People.jsx'
 import Usage from './pages/Usage.jsx'
 import MachineLlm from './pages/Machines.jsx'
 import MachineImage from './pages/MachineImage.jsx'
-import Safety from './pages/Safety.jsx'
 import Subscribers from './pages/Subscribers.jsx'
 import Settings from './pages/Settings.jsx'
 import VMs from './pages/VMs.jsx'
@@ -19,7 +18,6 @@ const NAV = [
   { id: 'llm', label: 'Máquina LLM', icon: Cpu, el: MachineLlm },
   { id: 'imagem', label: 'Máquina de imagem', icon: ImageIcon, el: MachineImage },
   { id: 'vms', label: 'Máquinas virtuais', icon: Server, el: VMs },
-  { id: 'seguranca', label: 'Segurança', icon: ShieldAlert, el: Safety },
   { id: 'config', label: 'Configurações', icon: Cog, el: Settings },
 ]
 

@@ -46,17 +46,6 @@ def _ctx(request: Request) -> Ctx:
     return request.app.state.ctx
 
 
-def _safety_level(ctx: Ctx, p: Principal) -> int:
-    """1 = sem trava (padrao e o produto). So pessoa cadastrada pode ser nivel 2; chaves do dono e da plataforma sao sempre nivel 1."""
-    if p.kind != "person":
-        return 1
-    try:
-        r = ctx.store.one("SELECT safety_level FROM people WHERE id=?", (p.person_id,))
-    except DB_ERRORS:
-        return 1
-    return int(r["safety_level"]) if r else 1
-
-
 def _log(ctx: Ctx, p: Principal, route: str, i: int, o: int, t: int, status: str, limits: dict | None) -> None:
     try:
         ctx.ledger.log(person_id=p.person_id, key_id=p.key_id, actor=None if p.kind == "person" else p.kind, route=route,
@@ -89,9 +78,6 @@ async def forward(request: Request, path: str, route: str) -> Response:
         assert isinstance(body, dict)
     except Exception:  # noqa: BLE001
         raise fail(400, "JSON invalido", "invalid_request_error", "invalid_json")
-    if route == "chat" and ctx.s.safety_server and _safety_level(ctx, p) >= 2:
-        from app.safety.flow import forward_level2  # import tardio: o nivel 1 nunca carrega o pacote de seguranca
-        return await forward_level2(ctx, request, p, body)
     stream = bool(body.get("stream")) and route == "chat"
     in_est = estimate_in(body, route)
     reserve = in_est + (max_out(body, ctx.s.default_max_tokens) if route == "chat" else 0)
@@ -253,11 +239,6 @@ async def _media_generate(request: Request, path: str, route: str):
         assert isinstance(body, dict)
     except Exception:  # noqa: BLE001
         raise fail(400, "JSON invalido", "invalid_request_error", "invalid_json")
-    if ctx.s.safety_server and _safety_level(ctx, p) >= 2:  # vale para imagem e video
-        from app.safety.flow import gate_image
-        refused = await gate_image(ctx, p, body)
-        if refused is not None:
-            return refused
     headers = {**_media_headers(ctx, p), "Content-Type": "application/json"}
     for h in ("x-queue-class", "prefer"):
         if h in request.headers:

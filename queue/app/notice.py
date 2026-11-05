@@ -1,5 +1,6 @@
-"""Aviso de espera dentro do stream (Spec 14 §3): quem pede com a GPU desligada ve, na hora, que o recurso esta sendo ligado
-e que a demora nao e erro. Texto fixo, em portugues, sem chamar o modelo."""
+"""Aviso de espera dentro do stream (Spec 14 §3 e Spec 22): quem pede enquanto a resposta ainda nao pode comecar ve uma mensagem curta e
+neutra. Regra de produto: o cliente nunca le sobre maquina, GPU, aluguel, reinicio ou problema; so que a resposta esta sendo
+processada. Os detalhes de infraestrutura ficam em x_queue (para o painel) e nos logs. Texto fixo, em portugues, sem chamar o modelo."""
 from __future__ import annotations
 
 import json
@@ -15,35 +16,20 @@ PHASES = {
     "OFF": ("starting", "preparando a partida"),
 }
 
-
-def _minutes(eta_s: float | None) -> str:
-    m = max(1, round((eta_s or 60) / 60))
-    return "1 minuto" if m == 1 else f"{m} minutos"
+# Mensagem unica para qualquer falha de infraestrutura mostrada ao cliente (o codigo do erro continua tecnico, para programas).
+MENSAGEM_FALHA = "Estamos com muito movimento agora e não conseguimos concluir sua solicitação. Tente novamente em instantes."
 
 
-def first_text(path: str, static: bool = False) -> str:
-    if static:  # GPU fixa: o computador esta ligado e nao se aluga nada; o que reinicia e o motor que responde
-        return ("O motor de respostas da IA está reiniciando (o computador continua ligado). Isso leva alguns minutos e não é erro: "
-                "sua pergunta já está na fila e será respondida automaticamente.\n")
-    if path == "restart":
-        quando = "de 2 a 4 minutos"
-    elif path == "known":
-        quando = "de 5 a 8 minutos"
-    else:
-        quando = "de 8 a 18 minutos (é preciso alugar uma máquina nova)"
-    return (f"O computador da IA estava desligado e está sendo ligado agora. Isso leva {quando} e não é erro: "
-            "sua pergunta já está na fila e será respondida automaticamente.\n")
+def first_text(path: str = "", static: bool = False) -> str:
+    return "Sua resposta está sendo processada. Estamos com bastante movimento agora, e ela chega automaticamente em breve.\n"
 
 
-def update_text(state: str, eta_s: float | None, static: bool = False) -> str:
-    if static:
-        return "Ainda reiniciando o motor de respostas da IA. Sua pergunta continua na fila e será respondida assim que ele voltar.\n"
-    _, etapa = PHASES.get(state, PHASES["STARTING"])
-    return f"Ainda ligando o computador da IA ({etapa}). Faltam cerca de {_minutes(eta_s)}. Sua pergunta continua na fila.\n"
+def update_text(state: str = "", eta_s: float | None = None, static: bool = False) -> str:
+    return "Ainda processando a sua resposta. Obrigado por aguardar: ela chega automaticamente.\n"
 
 
 def ready_text() -> str:
-    return "Computador da IA pronto. Respondendo agora.\n\n"
+    return "Pronto. Respondendo agora.\n\n"
 
 
 def x_queue(state: str, eta_s: float | None, elapsed_s: float, message: str, path: str) -> dict:

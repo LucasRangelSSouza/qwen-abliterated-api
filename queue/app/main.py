@@ -233,7 +233,8 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         except MediaError as e:
             raise HTTPException(422, detail=_err(str(e), "invalid_request_error", "invalid_media_request"))
         except MediaUnavailable as e:
-            raise HTTPException(503, detail=_err(str(e), "service_unavailable", "video_disabled"))
+            log.info("video desligado: %s", e)
+            raise HTTPException(503, detail=_err("Este recurso não está disponível no momento.", "service_unavailable", "video_disabled"))
         REQS.labels(c["name"], "image", "accepted").inc()
         if kind == "video" or body.get("async") or request.headers.get("prefer", "").lower() == "respond-async":
             return JSONResponse({"id": job["id"], "status": job["state"], "poll": f"/v1/jobs/{job['id']}"}, status_code=202)
@@ -245,7 +246,8 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             return {"created": int(time.time()), "id": job["id"], "seconds": job["seconds"], "size": job["size"], "data": [item]}
         if job["state"] == "failed":
             unavailable = (job.get("error") or "").startswith(("maquina", "nao consegui abrir", "ComfyUI inacessivel"))
-            raise HTTPException(503 if unavailable else 502, detail=_err(job.get("error") or "falha ao gerar", "service_unavailable" if unavailable else "server_error", "media_failed"))
+            log.warning("falha de midia: %s", job.get("error"))
+            raise HTTPException(503 if unavailable else 502, detail=_err(notice.MENSAGEM_FALHA, "service_unavailable" if unavailable else "server_error", "media_failed"))
         return JSONResponse({"id": job["id"], "status": job["state"], "poll": f"/v1/jobs/{job['id']}"}, status_code=202)
 
     @app.get("/v1/jobs/{job_id}")
@@ -474,7 +476,8 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
                     yield notice.chunk(txt, notice.x_queue(st["state"], st.get("eta_s"), time.time() - t_wait, txt, st["path"]), fields, cid)
             except GPUUnavailable as e:
                 code = "503"
-                yield _error_chunk(stream, f"GPU indisponivel ({e.reason}): tente novamente em {e.retry_after}s", "service_unavailable", e.reason)
+                log.warning("GPU indisponivel (%s), retry em %ss", e.reason, e.retry_after)
+                yield _error_chunk(stream, notice.MENSAGEM_FALHA, "service_unavailable", e.reason)
                 return
             WAIT.labels(kind).observe(max(0.0, time.time() - ticket.t_enq))
             attempts = 0
@@ -499,7 +502,8 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
                                     break
                                 except asyncio.TimeoutError:
                                     code = "504"
-                                    yield _error_chunk(stream, f"upstream parou de enviar dados por {int(s.stream_idle_timeout_s)} s: tente de novo", "server_error", "upstream_stalled")
+                                    log.warning("upstream parou de enviar dados por %s s", int(s.stream_idle_timeout_s))
+                                    yield _error_chunk(stream, notice.MENSAGEM_FALHA, "server_error", "upstream_stalled")
                                     return
                                 sent = True
                                 q.ctl.touch()
@@ -512,14 +516,16 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
                 except (httpx.TransportError, httpx.HTTPError) as e:
                     if sent or attempts >= 1:  # ja respondeu: nao da para refazer sem duplicar tokens
                         code = "502"
-                        yield _error_chunk(stream, f"falha no upstream: {e!r}", "server_error", "upstream_error")
+                        log.warning("falha no upstream: %r", e)
+                        yield _error_chunk(stream, notice.MENSAGEM_FALHA, "server_error", "upstream_error")
                         return
                     attempts += 1  # nenhum byte enviado: volta para a fila e refaz uma vez
                     try:
                         await q.ctl.ensure_ready(priority)
                     except GPUUnavailable as g:
                         code = "503"
-                        yield _error_chunk(stream, f"GPU indisponivel ({g.reason})", "service_unavailable", g.reason)
+                        log.warning("GPU indisponivel (%s)", g.reason)
+                        yield _error_chunk(stream, notice.MENSAGEM_FALHA, "service_unavailable", g.reason)
                         return
         except asyncio.CancelledError:
             code = "499"

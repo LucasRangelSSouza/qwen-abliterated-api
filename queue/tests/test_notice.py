@@ -24,10 +24,10 @@ async def test_aviso_de_espera_no_stream_com_gpu_desligada(rig):
     avisos = _avisos(r.content)
     assert len(avisos) >= 2
     d = avisos[0]["choices"][0]["delta"]
-    assert "não é erro" in d["reasoning"] and d["reasoning_content"] == d["reasoning"] and "content" not in d  # nao suja a resposta
+    assert "sendo processada" in d["reasoning"] and d["reasoning_content"] == d["reasoning"] and "content" not in d  # nao suja a resposta
     xq = avisos[0]["x_queue"]
-    assert xq["phase"] == "loading_model" and xq["eta_s"] == 240 and "2 a 4 minutos" in xq["message"]
-    assert "pronto" in avisos[-1]["choices"][0]["delta"]["reasoning"]
+    assert xq["phase"] == "loading_model" and xq["eta_s"] == 240 and "sendo processada" in xq["message"]  # o cliente nao le de maquina nem de GPU
+    assert "Pronto" in avisos[-1]["choices"][0]["delta"]["reasoning"]
     assert r.content.index(b"x_queue") < r.content.index(b'data: {"ok":true}')  # aviso antes do primeiro dado real
 
 
@@ -40,7 +40,7 @@ async def test_sem_aviso_com_gpu_quente_e_aviso_pode_virar_conteudo(rig):
     ctl.state = "STARTING"
     r2 = await client.post("/v1/chat/completions", json={**BODY, "stream": True}, headers={**H, "X-Queue-Notice": "content"})
     first = json.loads(r2.content.decode().split("\n\n")[0][6:])
-    assert "não é erro" in first["choices"][0]["delta"]["content"] and "reasoning" not in first["choices"][0]["delta"]
+    assert "sendo processada" in first["choices"][0]["delta"]["content"] and "reasoning" not in first["choices"][0]["delta"]
 
 
 async def test_atualizacao_periodica_e_erro_nao_diz_pronto(redis):
@@ -53,8 +53,8 @@ async def test_atualizacao_periodica_e_erro_nao_diz_pronto(redis):
         c = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t")
         r = await c.post("/v1/chat/completions", json={**BODY, "stream": True}, headers=H)
         text = r.content.decode()
-        assert text.count('"x_queue"') >= 3 and "Ainda ligando" in text and "alugando" in text
-        assert "Computador da IA pronto" not in text and "sem_oferta" in text and text.endswith("data: [DONE]\n\n")
+        assert text.count('"x_queue"') >= 3 and "Ainda processando" in text
+        assert "Pronto. Respondendo" not in text and "sem_oferta" in text and text.endswith("data: [DONE]\n\n")
         await c.aclose()
 
 
@@ -99,5 +99,6 @@ async def test_fila_de_pedidos_mostra_quem_espera_quem_roda_e_os_encerrados(redi
 def test_aviso_da_gpu_fixa_nao_diz_que_o_computador_estava_desligado():
     from app import notice
     fixa = notice.first_text("new", static=True) + notice.update_text("LOADING", 120, static=True)
-    assert "alugar" not in fixa and "desligado" not in fixa and "continua ligado" in fixa
-    assert "alugar" in notice.first_text("new")  # modo sob demanda mantem o texto antigo
+    for proibida in ("alugar", "desligad", "máquina", "maquina", "GPU", "computador", "reinici", "problema", "erro"):
+        assert proibida.lower() not in fixa.lower() and proibida.lower() not in (notice.first_text("new") + notice.update_text("LOADING", 60)).lower()
+    assert "processad" in fixa and notice.MENSAGEM_FALHA and "GPU" not in notice.MENSAGEM_FALHA

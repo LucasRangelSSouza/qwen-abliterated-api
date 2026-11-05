@@ -138,7 +138,7 @@ async def test_gpu_indisponivel_vira_erro_openai_no_corpo(rig):
     st["handler"] = lambda req, s: httpx.Response(200, json={})
     r = await client.post("/v1/chat/completions", json=BODY, headers=H)
     j = json.loads(r.content)
-    assert j["error"]["code"] == "sem_oferta" and "300" in j["error"]["message"] and st["calls"] == 0
+    assert j["error"]["code"] == "sem_oferta" and "movimento" in j["error"]["message"] and "GPU" not in j["error"]["message"] and st["calls"] == 0
     rs = await client.post("/v1/chat/completions", json={**BODY, "stream": True}, headers=H)
     assert b"sem_oferta" in rs.content and rs.content.endswith(b"data: [DONE]\n\n")
 

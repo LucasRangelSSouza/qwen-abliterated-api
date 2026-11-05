@@ -269,4 +269,4 @@ def test_rota_de_video_desligada_devolve_503_claro(redis):
     with TestClient(app) as c:
         r = c.post("/v1/videos/generations", json={"prompt": "um carro"}, headers={"Authorization": f"Bearer {key}"})
         assert r.status_code == 503, r.text
-        assert r.json()["detail"]["error"]["code"] == "video_disabled" and "video-motion" in r.json()["detail"]["error"]["message"]
+        assert r.json()["detail"]["error"]["code"] == "video_disabled" and "GPU" not in r.json()["detail"]["error"]["message"] and "máquina" not in r.json()["detail"]["error"]["message"]

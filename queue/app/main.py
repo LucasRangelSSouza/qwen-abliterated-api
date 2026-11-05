@@ -25,7 +25,7 @@ from app.gpu.controller import READY, GPUController, GPUUnavailable
 from app.gpu.ledger import Ledger
 from app.gpu.tunnel import NoTunnel, SshTunnel
 from app.gpu.vast import RealVast
-from app.media import Media, MediaError
+from app.media import Media, MediaError, MediaUnavailable
 from app.scheduler import Lane, QueueFull
 
 log = logging.getLogger("llm-queue")
@@ -232,6 +232,8 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             raise HTTPException(429, detail=_err("fila de midia cheia", "rate_limit_error", "queue_full"), headers={"Retry-After": str(e.retry_after)})
         except MediaError as e:
             raise HTTPException(422, detail=_err(str(e), "invalid_request_error", "invalid_media_request"))
+        except MediaUnavailable as e:
+            raise HTTPException(503, detail=_err(str(e), "service_unavailable", "video_disabled"))
         REQS.labels(c["name"], "image", "accepted").inc()
         if kind == "video" or body.get("async") or request.headers.get("prefer", "").lower() == "respond-async":
             return JSONResponse({"id": job["id"], "status": job["state"], "poll": f"/v1/jobs/{job['id']}"}, status_code=202)

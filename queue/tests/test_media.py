@@ -251,3 +251,22 @@ def test_video_respeita_o_teto_de_memoria_da_gpu_de_midia():
     wf = recipe_ltx_video({"prompt": "x", "seconds": 6}, "")
     frames = wf["6"]["inputs"]["length"]
     assert frames <= round(VIDEO_MAX_SECONDS * 25 / 8) * 8 + 1
+
+
+@pytest.mark.asyncio
+async def test_video_desligado_por_padrao_e_ligavel(make_media):
+    from app.media import MediaUnavailable
+    m, _ = await make_media()
+    with pytest.raises(MediaUnavailable):
+        await m.submit("a", "", {"prompt": "carro"}, "batch", "video")
+    m2, _ = await make_media(media_video_enabled=True)
+    job = await m2.submit("a", "", {"prompt": "carro"}, "batch", "video")
+    assert job["kind"] == "video"
+
+
+def test_rota_de_video_desligada_devolve_503_claro(redis):
+    app, key = _client(redis, FakeComfy())
+    with TestClient(app) as c:
+        r = c.post("/v1/videos/generations", json={"prompt": "um carro"}, headers={"Authorization": f"Bearer {key}"})
+        assert r.status_code == 503, r.text
+        assert r.json()["detail"]["error"]["code"] == "video_disabled" and "video-motion" in r.json()["detail"]["error"]["message"]

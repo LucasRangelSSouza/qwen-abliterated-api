@@ -222,6 +222,8 @@ class Media:
 
     # ---- jobs
     async def submit(self, consumer: str, end_user: str, params: dict, cls: str = "interactive", kind: str = "image") -> dict:
+        if kind == "video" and not self.s.media_video_enabled:
+            raise MediaUnavailable("geracao de video indisponivel nesta maquina de midia (sem memoria para video e imagem juntos); use a skill video-motion no computador")
         recipe = params.get("recipe") or next(k for k, v in RECIPES.items() if v.get("default" if kind == "image" else "default_video"))
         if recipe not in RECIPES or RECIPES[recipe]["kind"] != kind:
             raise MediaError(f"receita desconhecida: {recipe}")

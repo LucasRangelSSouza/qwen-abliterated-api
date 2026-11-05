@@ -136,6 +136,9 @@ class Settings:
     media_poll_s: float = 0.5
     media_keepalive_s: float = 20.0   # vigia: se o tunel cair e a maquina estiver de pe, reabre sozinho
     media_ckpt: str = "flux1-schnell-fp8.safetensors"
+    # video desligado por padrao: na GPU de midia de 16 GB de RAM, Flux + T5 + LTX nao cabem juntos e o ComfyUI morria (137) logo depois do video,
+    # derrubando a imagem dos clientes. Ligue com MEDIA_VIDEO_ENABLED=true so numa maquina com RAM suficiente (32 GB ou mais).
+    media_video_enabled: bool = False
     extra: dict = field(default_factory=dict)
 
     @property
@@ -209,6 +212,7 @@ class Settings:
             media_job_timeout_s=_f("MEDIA_JOB_TIMEOUT_S", cls.media_job_timeout_s),
             media_sync_wait_s=_f("MEDIA_SYNC_WAIT_S", cls.media_sync_wait_s),
             media_ckpt=os.environ.get("MEDIA_CKPT", cls.media_ckpt),
+            media_video_enabled=os.environ.get("MEDIA_VIDEO_ENABLED", "false").strip().lower() in ("1", "true", "yes", "sim"),
             static_retry_s=_f("GPU_STATIC_RETRY_S", cls.static_retry_s),
             static_retry_max_s=_f("GPU_STATIC_RETRY_MAX_S", cls.static_retry_max_s),
             static_llm_start_cmd=os.environ.get("GPU_STATIC_LLM_START_CMD", cls.static_llm_start_cmd),

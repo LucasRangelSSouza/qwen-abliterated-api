@@ -325,3 +325,31 @@ async def test_combinado_cancelado_bloqueia_o_plano_e_marca_a_vm(rig2):
     await cakto(r, "subscription_canceled", email="c2@x.com", produto="Segundo Cérebro Pro + Máquina virtual", sub="combo-9", ev="d2")
     assert ctx.store.one("SELECT status FROM subscriptions")["status"] == "canceled"
     assert ctx.store.one("SELECT billing_status FROM vms")["billing_status"] == "canceled"
+
+
+async def test_planos_anuais_sao_identificados_pelo_nome_e_nao_quebram_plan_from_hint(rig2):
+    from app import accounts as A
+    r, ctx, fake = rig2
+    for nome, esperado in (("Segundo Cérebro Pro anual", "pro"), ("Segundo Cérebro Max anual + Máquina virtual", "max"), ("Segundo Cérebro Ultra anual", "ultra"),
+                           ("Segundo Cérebro Infinity anual + Máquina virtual", "infinity"), ("Máquina virtual Segundo Cérebro anual", None)):
+        assert A.plan_from_hint(ctx, nome.lower()) == esperado, nome
+    assert V.eh_produto_vm(ctx, "máquina virtual segundo cérebro anual") and V.eh_produto_vm(ctx, "segundo cérebro max anual + máquina virtual")
+    assert not V.eh_produto_vm(ctx, "segundo cérebro max anual")
+
+
+async def test_assinatura_anual_combinada_fica_ativa_o_ano_todo_e_so_atrasa_depois_do_vencimento(rig2):
+    from app import accounts as A
+    r, ctx, fake = rig2
+    ctx.store.set_setting("billing_auto_enable", "1")
+    ano = ctx.clock() + 365 * 86400
+    iso = __import__("datetime").datetime.fromtimestamp(ano, __import__("datetime").timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    assert (await cakto(r, "purchase_approved", email="anual@x.com", produto="Segundo Cérebro Max anual + Máquina virtual", sub="anual-1", ev="a1", proximo=iso)).status_code == 200
+    sub = ctx.store.one("SELECT * FROM subscriptions")
+    assert sub["plan"] == "max" and sub["status"] == "active" and abs(sub["next_payment_at"] - ano) < 2
+    vm = ctx.store.one("SELECT * FROM vms")
+    assert vm["status"] == "requested" and vm["billing_status"] == "active" and abs(vm["next_payment_at"] - ano) < 2
+    assert A.sub_allows_use(ctx, sub) and V.deve_ficar_desligada(ctx, V._cobranca(vm, sub)) is False  # a seis meses de vencer, nada e cortado
+    # venceu e nao pagou: atrasa, ainda dentro da carencia; passada a carencia, desliga
+    assert (await cakto(r, "subscription_late", email="anual@x.com", produto="Segundo Cérebro Max anual + Máquina virtual", sub="anual-1", ev="a2", proximo="2020-01-01T00:00:00Z")).status_code == 200
+    vm = ctx.store.one("SELECT * FROM vms")
+    assert vm["billing_status"] == "late" and V.deve_ficar_desligada(ctx, V._cobranca(vm, ctx.store.one("SELECT * FROM subscriptions"))) is True  # 2020 esta alem da carencia

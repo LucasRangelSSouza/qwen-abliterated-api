@@ -124,6 +124,7 @@ class GPUController:
         self._static_next = 0.0
         self._static_power_t = 0.0
         self._static_paused = False  # so depois de stop/destroy forcado pelo admin
+        self._static_llm_t = -1e12  # ultima vez que tentamos reiniciar o vLLM da GPU fixa
 
     @property
     def static(self) -> bool:
@@ -823,9 +824,21 @@ class GPUController:
                 return False
         if not await self.health_probe():
             await self._static_degrade("sem_saude", "a LLM nao responde a saude")
+            await self._static_restart_llm(i)
             return False
         await self._static_ready(i)
         return True
+
+    async def _static_restart_llm(self, i: Instance) -> None:
+        """vLLM morto na GPU fixa (EngineDeadError) nao volta sozinho: roda o script de partida por SSH. So o processo; a instancia nao e tocada.
+        No maximo uma tentativa a cada static_llm_restart_min_s (o carregamento leva alguns minutos e o script ja protege contra duplicata)."""
+        cmd = (self.s.static_llm_start_cmd or "").strip()
+        now = self.clock()
+        if not cmd or not (i.ssh_host and i.ssh_port) or now - self._static_llm_t < self.s.static_llm_restart_min_s:
+            return
+        self._static_llm_t = now
+        ok = await self.tunnel.run(i.ssh_host, int(i.ssh_port), cmd)
+        await self.alerts.notify("static_llm_reiniciado", f"GPU fixa {i.id}: vLLM sem saude, partida do processo pedida por SSH ({'ok' if ok else 'falhou'})", "info")
 
     async def _static_religar(self, i: Instance) -> None:
         """Instancia parada por fora (credito, host): religar e permitido (parar nunca), no maximo uma vez a cada static_retry_max_s."""

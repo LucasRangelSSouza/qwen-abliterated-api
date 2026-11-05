@@ -395,3 +395,41 @@ def test_limite_de_contexto_vem_do_ambiente(monkeypatch):
     from app.config import Settings
     monkeypatch.setenv("MAX_CONTEXT_TOKENS", "131072")
     assert Settings.from_env().max_context_tokens == 131072
+
+
+class TunRun(NoTunnel):
+    def __init__(self):
+        super().__init__()
+        self.runs: list[tuple] = []
+
+    async def run(self, host, port, cmd, timeout=90.0):
+        self.runs.append((host, port, cmd))
+        return True
+
+
+async def test_modo_fixo_vllm_morto_reinicia_so_o_processo_e_respeita_o_intervalo(make_ctl):
+    ctl, vast, probe = await static_ctl(make_ctl, static_llm_restart_min_s=30.0, static_llm_start_cmd="bash /workspace/start_vllm.sh")
+    tun = TunRun()
+    ctl.tunnel = tun
+    ctl.start()
+    await ctl.ensure_ready()
+    probe.ok = False  # o vLLM morreu
+    assert await until(lambda: ctl.degraded is not None)
+    assert await until(lambda: len(tun.runs) >= 1)
+    await asyncio.sleep(0.6)  # varias retentativas de conexao: o reinicio nao se repete antes do intervalo
+    assert len(tun.runs) == 1 and tun.runs[0] == ("ssh.fake", 22222, "bash /workspace/start_vllm.sh")
+    assert forbidden(vast) == [] and SID in vast.instances  # a instancia nunca e parada nem destruida
+    probe.ok = True
+    assert await until(lambda: ctl.state == READY and ctl.degraded is None)
+
+
+async def test_modo_fixo_sem_comando_de_partida_nao_tenta_reiniciar(make_ctl):
+    ctl, vast, probe = await static_ctl(make_ctl, static_llm_start_cmd="")
+    tun = TunRun()
+    ctl.tunnel = tun
+    ctl.start()
+    await ctl.ensure_ready()
+    probe.ok = False
+    assert await until(lambda: ctl.degraded is not None)
+    await asyncio.sleep(0.4)
+    assert tun.runs == []

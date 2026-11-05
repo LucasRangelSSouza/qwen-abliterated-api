@@ -92,6 +92,10 @@ class Settings:
     static_instance_id: int = 0     # GPU_STATIC_INSTANCE_ID: instancia fixa 24/7 (0 = desligado); o controlador nunca cria, para nem destroi
     static_retry_s: float = 15.0    # modo fixo: primeira espera entre tentativas de reconectar; dobra ate static_retry_max_s
     static_retry_max_s: float = 300.0
+    # modo fixo: vLLM morto (EngineDeadError) nao volta sozinho; o controlador roda este comando por SSH (so o processo; a instancia nunca para).
+    # O script tem guarda contra segunda instancia. Vazio desliga a auto-recuperacao.
+    static_llm_start_cmd: str = "export LLM_UTIL=0.90 MAX_LEN=131072 MAX_SEQS=32 MAX_BATCHED=16384; bash /workspace/start_vllm.sh"
+    static_llm_restart_min_s: float = 600.0
     stopped_ttl_h: float = 24.0
     stopped_max_usd: float = 0.30   # custo maximo do disco de uma instancia parada: o TTL efetivo e o menor entre stopped_ttl_h e este teto / preco do disco
     watchdog_idle_min: float = 45.0
@@ -207,6 +211,8 @@ class Settings:
             media_ckpt=os.environ.get("MEDIA_CKPT", cls.media_ckpt),
             static_retry_s=_f("GPU_STATIC_RETRY_S", cls.static_retry_s),
             static_retry_max_s=_f("GPU_STATIC_RETRY_MAX_S", cls.static_retry_max_s),
+            static_llm_start_cmd=os.environ.get("GPU_STATIC_LLM_START_CMD", cls.static_llm_start_cmd),
+            static_llm_restart_min_s=_f("GPU_STATIC_LLM_RESTART_MIN_S", cls.static_llm_restart_min_s),
             stopped_ttl_h=_f("GPU_STOPPED_TTL_H", cls.stopped_ttl_h),
             stopped_max_usd=_f("GPU_STOPPED_MAX_USD", cls.stopped_max_usd),
             wait_max_s=_f("GPU_WAIT_MAX_S", cls.wait_max_s),

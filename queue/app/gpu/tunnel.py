@@ -13,6 +13,7 @@ log = logging.getLogger("llm-queue.tunnel")
 class Tunnel(Protocol):
     async def open(self, host: str, port: int) -> bool: ...
     async def healthy(self) -> bool: ...
+    async def run(self, host: str, port: int, cmd: str, timeout: float = 90.0) -> bool: ...
     async def close(self) -> None: ...
 
 
@@ -27,6 +28,9 @@ class NoTunnel:
 
     async def healthy(self) -> bool:
         return True
+
+    async def run(self, host: str, port: int, cmd: str, timeout: float = 90.0) -> bool:
+        return False
 
     async def close(self) -> None:
         return None
@@ -75,6 +79,20 @@ class SshTunnel:
 
     async def healthy(self) -> bool:
         return self.proc is not None and self.proc.returncode is None and await self._ports_open()
+
+    async def run(self, host: str, port: int, cmd: str, timeout: float = 90.0) -> bool:
+        """Roda um comando na maquina por SSH (sem tunel). True se saiu com codigo 0."""
+        argv = [self.ssh_bin, "-i", self.key_path, "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no",
+                "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR", "-o", "ConnectTimeout=15", "-p", str(port), f"{self.user}@{host}", cmd]
+        try:
+            proc = await asyncio.create_subprocess_exec(*argv, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
+            _, err = await asyncio.wait_for(proc.communicate(), timeout)
+        except Exception as e:  # noqa: BLE001
+            log.warning("ssh run falhou: %r", e)
+            return False
+        if proc.returncode != 0:
+            log.warning("ssh run saiu %s: %s", proc.returncode, (err or b"").decode(errors="replace").strip()[:200])
+        return proc.returncode == 0
 
     async def close(self) -> None:
         p, self.proc = self.proc, None

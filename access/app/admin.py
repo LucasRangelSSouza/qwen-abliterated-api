@@ -138,8 +138,8 @@ def _get_person(ctx: Ctx, pid: int) -> dict:
 
 
 def _level(v) -> int:
-    if isinstance(v, bool) or v not in (1, 2):
-        raise fail(422, "safety_level deve ser 1 (sem trava) ou 2 (com classificadores)", "invalid_request_error", "invalid_safety_level")
+    if isinstance(v, bool) or v not in (1, 2, 3):
+        raise fail(422, "safety_level deve ser 1 (sem trava), 2 (classificador 1) ou 3 (classificadores 1 e 2)", "invalid_request_error", "invalid_safety_level")
     return int(v)
 
 
@@ -387,7 +387,7 @@ async def safety_get(request: Request):
     for r in ctx.store.query("SELECT classifier, category, COUNT(*) n FROM safety_log WHERE ts>=? GROUP BY classifier, category", (since,)):
         counts[r["classifier"]][r["category"] or "?"] = r["n"]
     lv = {r["safety_level"]: r["n"] for r in ctx.store.query("SELECT safety_level, COUNT(*) n FROM people GROUP BY safety_level")}
-    return {"people": {"level1": lv.get(1, 0), "level2": lv.get(2, 0)},
+    return {"people": {"level1": lv.get(1, 0), "level2": lv.get(2, 0), "level3": lv.get(3, 0)},
             "input": {**_safety_view(ctx, classifier_input), "blocked_24h": counts["input"]},
             "output": {**_safety_view(ctx, classifier_output), "blocked_24h": counts["output"]}}
 

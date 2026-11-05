@@ -102,7 +102,8 @@ async def auth_login(request: Request):
     key = A.device_key(ctx, person["id"], device, int(plan["max_devices"] or 0) if plan else 0)
     with ctx.store.tx() as c:
         c.execute("UPDATE accounts SET last_login=? WHERE id=?", (now, acc["id"]))
-    return {"api_key": key, "account": {"email": acc["email"], "name": acc["name"]}, "plan": {"id": sub["plan"], "name": plan["name"] if plan else sub["plan"]},
+    lvl = ctx.store.one("SELECT safety_level FROM people WHERE id=?", (person["id"],))
+    return {"api_key": key, "safety_level": int(lvl["safety_level"]) if lvl else 1, "account": {"email": acc["email"], "name": acc["name"]}, "plan": {"id": sub["plan"], "name": plan["name"] if plan else sub["plan"]},
             "next_payment_at": iso(sub["next_payment_at"])}
 
 
@@ -128,7 +129,8 @@ async def auth_whoami(request: Request):
         raise fail(403, "esta chave nao pertence a uma conta ativa", "invalid_request_error", "no_account")
     if not A.sub_allows_use(ctx, A.current_sub(ctx, acc["id"])):
         raise fail(403, "sua assinatura nao esta ativa", "invalid_request_error", "subscription_inactive")
-    return {"account_id": acc["id"], "email": acc["email"], "name": acc["name"]}
+    lvl = ctx.store.one("SELECT safety_level FROM people WHERE id=?", (p.person_id,))
+    return {"account_id": acc["id"], "email": acc["email"], "name": acc["name"], "safety_level": int(lvl["safety_level"]) if lvl else 1}
 
 
 @router.post("/v1/auth/set-password")

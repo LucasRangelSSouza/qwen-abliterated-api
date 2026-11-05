@@ -89,7 +89,7 @@ async def forward(request: Request, path: str, route: str) -> Response:
         assert isinstance(body, dict)
     except Exception:  # noqa: BLE001
         raise fail(400, "JSON invalido", "invalid_request_error", "invalid_json")
-    if route == "chat" and _safety_level(ctx, p) == 2:
+    if route == "chat" and ctx.s.safety_server and _safety_level(ctx, p) >= 2:
         from app.safety.flow import forward_level2  # import tardio: o nivel 1 nunca carrega o pacote de seguranca
         return await forward_level2(ctx, request, p, body)
     stream = bool(body.get("stream")) and route == "chat"
@@ -253,7 +253,7 @@ async def _media_generate(request: Request, path: str, route: str):
         assert isinstance(body, dict)
     except Exception:  # noqa: BLE001
         raise fail(400, "JSON invalido", "invalid_request_error", "invalid_json")
-    if _safety_level(ctx, p) == 2:  # vale para imagem e video
+    if ctx.s.safety_server and _safety_level(ctx, p) >= 2:  # vale para imagem e video
         from app.safety.flow import gate_image
         refused = await gate_image(ctx, p, body)
         if refused is not None:

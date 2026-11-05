@@ -81,7 +81,13 @@ class PgStore:
             c.execute(f'SET search_path TO "{self.schema}"')
             c.execute(_ddl())
             c.execute("ALTER TABLE keys ADD COLUMN IF NOT EXISTS label TEXT")
-            c.execute("ALTER TABLE people ADD COLUMN IF NOT EXISTS safety_level BIGINT NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2))")
+            c.execute("ALTER TABLE people ADD COLUMN IF NOT EXISTS safety_level BIGINT NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2,3))")
+            for tb in ("people", "plans"):  # nivel 3 (classificadores 1 e 2): troca o CHECK antigo (1,2) uma vez, sem mexer se ja aceita 3
+                try:  # se a migracao falhar o servico sobe igual; so o nivel 3 fica indisponivel
+                    c.execute(f"""DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='{tb}'::regclass AND conname='{tb}_safety_level_check' AND pg_get_constraintdef(oid) LIKE '%3%')
+                        THEN ALTER TABLE {tb} DROP CONSTRAINT IF EXISTS {tb}_safety_level_check; ALTER TABLE {tb} ADD CONSTRAINT {tb}_safety_level_check CHECK(safety_level IN (1,2,3)); END IF; END $$""")
+                except Exception:  # noqa: BLE001
+                    pass
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS external_id TEXT")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS billing_status TEXT")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS next_payment_at DOUBLE PRECISION")

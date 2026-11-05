@@ -100,17 +100,22 @@ export default function Safety() {
       {error ? <Card><ErrorState message={error} onRetry={reload} /></Card> : (
         <div className="space-y-4">
           <Card>
-            <CardHeader icon={ShieldOff} title="Dois níveis" subtitle="O nível é escolhido em cada pessoa (tela Pessoas)" />
-            <div className="px-5 pb-5 grid gap-4 md:grid-cols-2">
+            <CardHeader icon={ShieldOff} title="Três níveis" subtitle="O nível é escolhido em cada pessoa (tela Pessoas)" />
+            <div className="px-5 pb-5 grid gap-4 md:grid-cols-3">
               <div className="rounded-[12px] border border-border-subtle p-4">
                 <div className="flex items-center gap-2"><Badge variant="primary">Nível 1</Badge><span className="font-semibold text-text-main">Sem trava</span></div>
                 <p className="text-sm text-text-muted mt-2">A IA sem filtro, do jeito que ela é. É o padrão. O pedido não passa por nenhum classificador, em nenhum caminho.</p>
                 <div className="num text-2xl font-semibold mt-3 text-text-main">{loading && !data ? '…' : data?.people?.level1 ?? 0} <span className="text-sm font-normal text-text-muted">pessoas</span></div>
               </div>
               <div className="rounded-[12px] border border-border-subtle p-4">
-                <div className="flex items-center gap-2"><Badge variant="warning">Nível 2</Badge><span className="font-semibold text-text-main">Com classificadores</span></div>
-                <p className="text-sm text-text-muted mt-2">Passa pelos dois classificadores. A resposta só aparece quando termina de ser conferida, então é um pouco mais lenta.</p>
+                <div className="flex items-center gap-2"><Badge variant="warning">Nível 2</Badge><span className="font-semibold text-text-main">Classificador 1</span></div>
+                <p className="text-sm text-text-muted mt-2">O app confere o que a pessoa pede e barra crime hediondo, antes de chamar a IA. Quem barra é o app, não o servidor.</p>
                 <div className="num text-2xl font-semibold mt-3 text-text-main">{loading && !data ? '…' : data?.people?.level2 ?? 0} <span className="text-sm font-normal text-text-muted">pessoas</span></div>
+              </div>
+              <div className="rounded-[12px] border border-border-subtle p-4">
+                <div className="flex items-center gap-2"><Badge variant="warning">Nível 3</Badge><span className="font-semibold text-text-main">Classificadores 1 e 2</span></div>
+                <p className="text-sm text-text-muted mt-2">Tudo do nível 2, e o app também confere o que o agente responde e as ações que ele executa, como comandos e arquivos.</p>
+                <div className="num text-2xl font-semibold mt-3 text-text-main">{loading && !data ? '…' : data?.people?.level3 ?? 0} <span className="text-sm font-normal text-text-muted">pessoas</span></div>
               </div>
             </div>
           </Card>

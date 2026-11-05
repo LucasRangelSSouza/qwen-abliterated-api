@@ -58,7 +58,7 @@ function NewDrawer({ open, plans, onClose, onSaved }) {
             <Field label="Nome" htmlFor="n-name"><Input id="n-name" value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="Ex.: Marina Duarte" /></Field>
             <Field label="E-mail" htmlFor="n-email" hint="É o login da pessoa no aplicativo."><Input id="n-email" type="email" value={f.email} onChange={(e) => set('email', e.target.value)} placeholder="pessoa@empresa.com" /></Field>
             <Field label="Plano" htmlFor="n-plan"><Select id="n-plan" value={f.plan} onChange={(e) => set('plan', e.target.value)}>{plans.map((p) => <option key={p.id} value={p.id}>{p.name} · {brl(p.price_cents)}/mês</option>)}</Select></Field>
-            <Field label="Nível de segurança" htmlFor="n-sf"><Select id="n-sf" value={f.safety_level} onChange={(e) => set('safety_level', e.target.value)}><option value="1">Nível 1 · Sem trava</option><option value="2">Nível 2 · Com classificadores</option></Select></Field>
+            <Field label="Nível de segurança" htmlFor="n-sf"><Select id="n-sf" value={f.safety_level} onChange={(e) => set('safety_level', e.target.value)}><option value="1">Nível 1 · Sem trava</option><option value="2">Nível 2 · Classificador 1</option><option value="3">Nível 3 · Classificadores 1 e 2</option></Select></Field>
             <Toggle id="n-en" checked={f.enable} onChange={(v) => set('enable', v)} label="Já liberar a chave" description="Sem isso a pessoa fica aguardando a sua liberação." />
           </>
         )}

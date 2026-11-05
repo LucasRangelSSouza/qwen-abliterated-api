@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS safety_log(
 CREATE INDEX IF NOT EXISTS safety_log_ts ON safety_log(ts);
 CREATE TABLE IF NOT EXISTS plans(
   id TEXT PRIMARY KEY, name TEXT NOT NULL, session_limit_tokens INTEGER, week_limit_tokens INTEGER, image_quota_month INTEGER NOT NULL DEFAULT 0,
-  safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2)), max_devices INTEGER NOT NULL DEFAULT 3, price_cents INTEGER NOT NULL DEFAULT 0);
+  safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2,3)), max_devices INTEGER NOT NULL DEFAULT 3, price_cents INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS accounts(
   id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL DEFAULT '', pw_hash TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','blocked')), person_id INTEGER NOT NULL REFERENCES people(id),
@@ -75,7 +75,7 @@ class Store:
             if "label" not in {r["name"] for r in c.execute("PRAGMA table_info(keys)").fetchall()}:
                 c.execute("ALTER TABLE keys ADD COLUMN label TEXT")  # "app:<computador>" nas chaves emitidas no login
             if "safety_level" not in {r["name"] for r in c.execute("PRAGMA table_info(people)").fetchall()}:
-                c.execute("ALTER TABLE people ADD COLUMN safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2))")
+                c.execute("ALTER TABLE people ADD COLUMN safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2,3))")
             cols_vms = {r["name"] for r in c.execute("PRAGMA table_info(vms)").fetchall()}
             for col, tipo in (("external_id", "TEXT"), ("billing_status", "TEXT"), ("next_payment_at", "REAL")):  # cobranca propria da VM (produto da Cakto)
                 if col not in cols_vms:

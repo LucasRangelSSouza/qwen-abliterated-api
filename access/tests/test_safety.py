@@ -45,7 +45,7 @@ async def test_padrao_e_nivel_1_e_validacao(rig: Rig):
     p2 = (await rig.client.post("/admin/api/people", json={"name": "Beto", "safety_level": 2})).json()["person"]
     assert p2["safety_level"] == 2
     assert (await rig.client.patch(f"/admin/api/people/{p['id']}", json={"safety_level": 2})).json()["safety_level"] == 2
-    for ruim in (0, 3, "2", True, None):
+    for ruim in (0, 4, "2", True, None):
         r = await rig.client.patch(f"/admin/api/people/{p['id']}", json={"safety_level": ruim})
         assert r.status_code == 422 and r.json()["error"]["code"] == "invalid_safety_level"
 
@@ -197,3 +197,17 @@ async def test_imagem_nivel_2_barra_prompt_proibido_e_nivel_1_passa(rig: Rig):
     assert r.status_code == 422 and r.json()["error"]["code"] == "safety_blocked"
     r = await rig.client.post("/v1/images/generations", json=ruim, headers=auth(k1))
     assert r.status_code == 200  # nivel 1: segue para a fila de imagem sem classificador
+
+
+async def test_servidor_nao_barra_por_padrao_e_aceita_nivel_3(tmp_path):
+    rig = Rig(tmp_path, safety_server=False)
+    await rig.start()
+    try:
+        key = await pessoa(rig, "ana", 2)
+        r3 = await rig.client.post("/admin/api/people", json={"name": "bia", "safety_level": 3})
+        assert r3.status_code == 200 and r3.json()["person"]["safety_level"] == 3
+        rig.up.handler = resposta_do_modelo("ok")
+        r = await rig.client.post("/v1/chat/completions", json=RUIM, headers=auth(key))
+        assert r.status_code == 200 and "classificador" not in r.text  # quem barra e o Hermes, nao o servidor
+    finally:
+        await rig.stop()

@@ -90,10 +90,11 @@ function PersonDrawer({ open, person, onClose, onSaved }) {
         </Field>
 
         <Field label="Nível de segurança" htmlFor="p-safety"
-          hint={f.safety === '2' ? 'Nível 2: os pedidos e as respostas passam pelos dois classificadores. A resposta só aparece quando termina de ser conferida.' : 'Nível 1: a IA sem trava, sem nenhum classificador. É o padrão.'}>
+          hint={f.safety === '3' ? 'Nível 3: o app confere o que a pessoa pede, o que o agente responde e as ações que ele executa (classificadores 1 e 2).' : f.safety === '2' ? 'Nível 2: o app confere o que a pessoa pede e barra crime hediondo (classificador 1).' : 'Nível 1: a IA sem trava, sem nenhum classificador. É o padrão.'}>
           <Select id="p-safety" value={f.safety} onChange={(e) => set('safety', e.target.value)}>
             <option value="1">Nível 1 · Sem trava</option>
-            <option value="2">Nível 2 · Com classificadores</option>
+            <option value="2">Nível 2 · Classificador 1</option>
+            <option value="3">Nível 3 · Classificadores 1 e 2</option>
           </Select>
         </Field>
 
@@ -251,7 +252,7 @@ export default function People() {
                           <div className="text-xs text-text-muted line-clamp-2">{p.note || <span className="text-text-subtle">sem observação</span>}</div>
                         </td>
                         <td className="px-3 py-4"><StatusBadge s={p.status} /></td>
-                        <td className="px-3 py-4"><Badge variant={p.safety_level === 2 ? 'warning' : 'default'}>{p.safety_level === 2 ? 'Nível 2 · classificado' : 'Nível 1 · sem trava'}</Badge></td>
+                        <td className="px-3 py-4"><Badge variant={p.safety_level >= 2 ? 'warning' : 'default'}>{p.safety_level === 3 ? 'Nível 3 · classificadores 1 e 2' : p.safety_level === 2 ? 'Nível 2 · classificador 1' : 'Nível 1 · sem trava'}</Badge></td>
                         <td className="px-3 py-4"><code className="text-[12px] font-mono text-text-muted bg-surface-2 rounded-md px-1.5 py-0.5">...{p.key_last4}</code></td>
                         <td className="px-3 py-4"><WindowCell w={p.session} /></td>
                         <td className="px-3 py-4"><WindowCell w={p.week} /></td>

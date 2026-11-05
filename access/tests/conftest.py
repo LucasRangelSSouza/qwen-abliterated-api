@@ -140,7 +140,7 @@ class Rig:
         self.up = Upstream()
         self.kw = dict(db_path=self.db, upstream_url="http://up", upstream_key=UP_KEY, upstream_admin_key=UP_ADMIN,
                        admin_password=PASSWORD, session_secret="segredo-de-teste", owner_key_sha256=sha(OWNER_KEY),
-                       platform_key_sha256=sha(PLATFORM_KEY), panel_dir=str(tmp_path / "sem-painel"))
+                       platform_key_sha256=sha(PLATFORM_KEY), panel_dir=str(tmp_path / "sem-painel"), safety_server=True)
         self.pg_schema = None
         if os.environ.get("TEST_DATABASE_URL"):  # mesma suite, agora no Postgres: um schema novo por teste
             self.pg_schema = "t_" + uuid.uuid4().hex[:10]

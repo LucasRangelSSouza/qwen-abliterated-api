@@ -456,7 +456,7 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
                 now = time.time()
                 if warn and q.ctl.state != READY and now >= next_warn:
                     st = q.ctl.status()
-                    txt = notice.first_text(st["path"]) if not warned else notice.update_text(st["state"], st.get("eta_s"))
+                    txt = notice.first_text(st["path"], q.ctl.static) if not warned else notice.update_text(st["state"], st.get("eta_s"), q.ctl.static)
                     yield notice.chunk(txt, notice.x_queue(st["state"], st.get("eta_s"), now - t_wait, txt, st["path"]), fields, cid)
                     warned, next_warn = True, now + s.notice_every_s
                     continue_wait = min(s.keepalive_s, max(0.05, next_warn - now))

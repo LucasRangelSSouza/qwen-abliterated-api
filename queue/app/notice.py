@@ -21,7 +21,11 @@ def _minutes(eta_s: float | None) -> str:
     return "1 minuto" if m == 1 else f"{m} minutos"
 
 
-def first_text(path: str) -> str:
+def first_text(path: str, static: bool = False) -> str:
+    if static:  # GPU fixa: o computador esta ligado e nao se aluga nada; o que reinicia e o motor que responde
+        return ("O motor de respostas da IA está reiniciando (o computador continua ligado). Isso leva alguns minutos e não é erro: "
+                "sua pergunta já está na fila e será respondida automaticamente.
+")
     if path == "restart":
         quando = "de 2 a 4 minutos"
     elif path == "known":
@@ -32,7 +36,10 @@ def first_text(path: str) -> str:
             "sua pergunta já está na fila e será respondida automaticamente.\n")
 
 
-def update_text(state: str, eta_s: float | None) -> str:
+def update_text(state: str, eta_s: float | None, static: bool = False) -> str:
+    if static:
+        return "Ainda reiniciando o motor de respostas da IA. Sua pergunta continua na fila e será respondida assim que ele voltar.
+"
     _, etapa = PHASES.get(state, PHASES["STARTING"])
     return f"Ainda ligando o computador da IA ({etapa}). Faltam cerca de {_minutes(eta_s)}. Sua pergunta continua na fila.\n"
 

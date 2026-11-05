@@ -94,3 +94,10 @@ async def test_fila_de_pedidos_mostra_quem_espera_quem_roda_e_os_encerrados(redi
         assert j2["waiting"] == [] and j2["running"] == [] and j2["recent"][0]["end_user"] == "ana" and j2["recent"][0]["code"] == "200"
         assert (await c.get("/admin/gpu/jobs")).status_code == 403
         await c.aclose()
+
+
+def test_aviso_da_gpu_fixa_nao_diz_que_o_computador_estava_desligado():
+    from app import notice
+    fixa = notice.first_text("new", static=True) + notice.update_text("LOADING", 120, static=True)
+    assert "alugar" not in fixa and "desligado" not in fixa and "continua ligado" in fixa
+    assert "alugar" in notice.first_text("new")  # modo sob demanda mantem o texto antigo

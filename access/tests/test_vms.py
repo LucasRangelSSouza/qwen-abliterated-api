@@ -261,3 +261,12 @@ async def test_chave_ssh_do_dono_vai_nas_vms_novas(rig):
     await V.provisionar(ctx, V.solicitar(ctx, aid))
     corpo = [b for m, p, b in fake.calls if m == "POST" and p == "/v1/compute/instances"][0]
     assert corpo["sshKeys"] == [77]
+
+
+def test_toda_tabela_com_id_autoincremento_devolve_lastrowid_no_postgres():
+    """O adaptador do Postgres so devolve o id das tabelas da lista; a lista sai do schema, entao tabela nova (ex.: vms) nunca fica de fora."""
+    from app.store import SCHEMA
+    from app.store_pg import TABLES_WITH_ID
+    import re
+    todas = re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)\(\s*id INTEGER PRIMARY KEY AUTOINCREMENT", SCHEMA)
+    assert "vms" in TABLES_WITH_ID and set(todas) == set(TABLES_WITH_ID) and len(todas) >= 8

@@ -14,7 +14,8 @@ from psycopg.rows import dict_row
 
 from app.store import SCHEMA
 
-TABLES_WITH_ID = ("people", "keys", "usage_log", "safety_log", "accounts", "subscriptions", "billing_events")
+# tabelas com coluna `id` autoincremento: derivadas do proprio SCHEMA (uma tabela nova com id nao pode ficar de fora e devolver lastrowid None)
+TABLES_WITH_ID = tuple(re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)\(\s*id INTEGER PRIMARY KEY AUTOINCREMENT", SCHEMA))
 LOCK_KEY = 7_424_001  # lock consultivo do llm-access (serializa transacoes de escrita)
 
 

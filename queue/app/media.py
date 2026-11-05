@@ -70,7 +70,11 @@ def recipe_flux_schnell(p: dict, ckpt: str) -> dict:
     }
 
 
-VIDEO_SIZES = {"paisagem": (768, 512), "retrato": (512, 768), "quadrado": (576, 576)}
+# A GPU de midia tem 16 GB de RAM e roda Flux, T5 e LTX: um video maior que isto levou o ComfyUI a morrer por falta de memoria (codigo 137,
+# pico medido de 14,4 GB com 512x512 por 4 s). Os limites protegem a geracao de imagem dos clientes.
+VIDEO_MAX_PIXELS = 512 * 512
+VIDEO_MAX_SECONDS = 4.0
+VIDEO_SIZES = {"paisagem": (640, 384), "retrato": (384, 640), "quadrado": (512, 512)}
 NEG_VIDEO = "worst quality, inconsistent motion, blurry, jittery, distorted, watermark, text, deformed"
 
 
@@ -83,13 +87,16 @@ def _video_size(p: dict) -> tuple[int, int]:
             w, h = max(256, min(832, round(int(a) / 32) * 32)), max(256, min(832, round(int(b) / 32) * 32))
         except ValueError:
             pass
+    if w * h > VIDEO_MAX_PIXELS:  # reduz mantendo a proporcao
+        k = (VIDEO_MAX_PIXELS / (w * h)) ** 0.5
+        w, h = max(256, int(w * k) // 32 * 32), max(256, int(h * k) // 32 * 32)
     return w, h
 
 
 def recipe_ltx_video(p: dict, _ckpt: str) -> dict:
     """Texto para video (LTX-Video 2B): clipes curtos de 2 a 6 s a 25 quadros por segundo."""
     w, h = _video_size(p)
-    secs = max(1.0, min(6.0, float(p.get("seconds") or p.get("segundos") or 4)))
+    secs = max(1.0, min(VIDEO_MAX_SECONDS, float(p.get("seconds") or p.get("segundos") or 4)))
     frames = int(round(secs * 25 / 8)) * 8 + 1  # o modelo pede 8n+1 quadros
     seed = int(p["seed"]) if p.get("seed") is not None else random.randint(0, 2**53)
     return {

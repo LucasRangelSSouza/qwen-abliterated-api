@@ -241,3 +241,13 @@ async def test_vigia_nao_abre_com_a_maquina_parada(make_media):
     await asyncio.sleep(0.15)
     assert m.tun.opened == []
     await m.stop()
+
+
+def test_video_respeita_o_teto_de_memoria_da_gpu_de_midia():
+    from app.media import VIDEO_MAX_PIXELS, VIDEO_MAX_SECONDS, _video_size, recipe_ltx_video
+    for p in ({}, {"format": "retrato"}, {"size": "832x832"}, {"size": "1280x720"}):
+        w, h = _video_size(p)
+        assert w * h <= VIDEO_MAX_PIXELS and w % 32 == 0 and h % 32 == 0 and min(w, h) >= 256
+    wf = recipe_ltx_video({"prompt": "x", "seconds": 6}, "")
+    frames = wf["6"]["inputs"]["length"]
+    assert frames <= round(VIDEO_MAX_SECONDS * 25 / 8) * 8 + 1

@@ -157,7 +157,7 @@ async def auth_forgot(request: Request):
     acc = A.find_account(ctx, str((await _json(request)).get("email") or ""))
     if acc is not None and acc["status"] == "active":
         tok = A.new_setup_token(ctx, acc["id"])
-        mailer.send(acc["email"], "Redefinir a senha do Segundo Cérebro", f"Use este link para definir uma nova senha (vale por 7 dias):\n{mailer.setup_link(tok)}\n")
+        mailer.send_reset(ctx, acc["email"], tok)
     return {"ok": True}
 
 
@@ -228,7 +228,7 @@ async def subscribers_create(request: Request):
     A.apply_plan_limits(ctx, acc["person_id"], A.get_plan(ctx, plan_id))
     if b.get("enable"):
         A.set_person_status(ctx, acc["person_id"], "active")
-    return {"subscriber": _one(ctx, acc["id"]), "setup_link": mailer.setup_link(tok), "email_sent": mailer.send_welcome(ctx, email, str(b.get("name") or ""), tok)}
+    return {"subscriber": _one(ctx, acc["id"]), "setup_link": mailer.setup_link(tok), "email_sent": mailer.send_welcome(ctx, email, str(b.get("name") or ""), tok, liberada=False)}
 
 
 @api.delete("/subscribers/{sid}")

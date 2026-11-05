@@ -252,7 +252,9 @@ def _apply(ctx: Ctx, ev: dict, now: float) -> None:
     from app import vms  # produto "maquina virtual": cobranca propria da VM, nao mexe no plano nem no acesso da conta
     if vms.eh_produto_vm(ctx, ev["plan_hint"]):
         vms.registrar_pagamento(ctx, acc["id"], ev)
-        return
+        if plan_id is None:
+            return  # so a VM
+        # produto combinado ("<plano> + maquina virtual"): alem do pedido da VM, aplica o plano abaixo
     plan = get_plan(ctx, plan_id) if plan_id else None
     sub = ctx.store.one("SELECT * FROM subscriptions WHERE account_id=? AND (external_id=? OR ?='') ORDER BY id DESC LIMIT 1", (acc["id"], ev["external_id"], ev["external_id"]))
     with ctx.store.tx() as c:

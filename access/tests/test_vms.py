@@ -303,3 +303,25 @@ async def test_webhook_v2_com_plano_e_order_bump_no_mesmo_evento_cria_plano_e_pe
     assert len(vms) == 1 and vms[0]["status"] == "requested" and vms[0]["external_id"] == "vm-1"
     again = await r.client.post("/v1/billing/cakto", content=json.dumps(corpo), headers={"content-type": "application/json", "x-webhook-secret": SEG})
     assert again.json()["duplicate"] is True and ctx.store.one("SELECT COUNT(*) n FROM vms")["n"] == 1
+
+
+async def test_produto_combinado_plano_mais_vm_aplica_o_plano_e_abre_o_pedido_da_vm(rig2):
+    r, ctx, fake = rig2
+    ctx.store.set_setting("billing_auto_enable", "1")  # como em producao: quem paga entra liberado
+    assert (await cakto(r, "purchase_approved", email="combo@x.com", produto="Segundo Cérebro Max + Máquina virtual", sub="combo-1", ev="c1")).status_code == 200
+    sub = ctx.store.one("SELECT plan,status FROM subscriptions")
+    assert sub["plan"] == "max" and sub["status"] == "active"
+    pessoa = ctx.store.one("SELECT p.status FROM people p JOIN accounts a ON a.person_id=p.id WHERE a.email='combo@x.com'")
+    assert pessoa["status"] == "active"
+    vms = ctx.store.query("SELECT * FROM vms")
+    assert len(vms) == 1 and vms[0]["status"] == "requested" and vms[0]["external_id"] == "combo-1"
+    assert (await cakto(r, "subscription_renewed", email="combo@x.com", produto="Segundo Cérebro Max + Máquina virtual", sub="combo-1", ev="c2")).status_code == 200
+    assert ctx.store.one("SELECT COUNT(*) n FROM vms")["n"] == 1 and ctx.store.one("SELECT COUNT(*) n FROM subscriptions")["n"] == 1
+
+
+async def test_combinado_cancelado_bloqueia_o_plano_e_marca_a_vm(rig2):
+    r, ctx, fake = rig2
+    await cakto(r, "purchase_approved", email="c2@x.com", produto="Segundo Cérebro Pro + Máquina virtual", sub="combo-9", ev="d1")
+    await cakto(r, "subscription_canceled", email="c2@x.com", produto="Segundo Cérebro Pro + Máquina virtual", sub="combo-9", ev="d2")
+    assert ctx.store.one("SELECT status FROM subscriptions")["status"] == "canceled"
+    assert ctx.store.one("SELECT billing_status FROM vms")["billing_status"] == "canceled"

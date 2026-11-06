@@ -106,6 +106,11 @@ class Upstream:
             if path.endswith("/image"):
                 return httpx.Response(200, content=b"PNGfake", headers={"content-type": "image/png"})
             return httpx.Response(200, json={"id": "j1", "state": "done"})
+        if path == "/v1/audio/transcriptions":  # multipart (ditado): nao e JSON
+            self.calls.append((path, {"bytes": len(request.content)}, dict(request.headers)))
+            if self.handler:
+                return await self.handler(request, {})
+            return httpx.Response(200, json={"text": "ola mundo", "language": "pt", "duration": 2.0})
         body = json.loads(request.content)
         self.calls.append((path, body, dict(request.headers)))
         if self.delay:

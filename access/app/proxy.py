@@ -252,6 +252,32 @@ async def _media_generate(request: Request, path: str, route: str):
     return Response(r.content, status_code=r.status_code, headers=_pass_headers(r.headers), media_type=r.headers.get("content-type", "application/json"))
 
 
+# ---- ditado: o audio (multipart) segue como veio para o Whisper da maquina do LLM; nao gasta tokens, so autentica e registra o uso
+MAX_AUDIO = 25 * 1024 * 1024
+
+
+@router.post("/v1/audio/transcriptions")
+async def audio_transcriptions(request: Request):
+    ctx = _ctx(request)
+    p = authenticate(ctx, request)
+    if int(request.headers.get("content-length") or 0) > MAX_AUDIO:
+        raise fail(413, "audio grande demais (limite de 25 MB)", "invalid_request_error", "audio_too_large")
+    corpo = await request.body()
+    if len(corpo) > MAX_AUDIO:
+        raise fail(413, "audio grande demais (limite de 25 MB)", "invalid_request_error", "audio_too_large")
+    ctype = request.headers.get("content-type", "")
+    if not ctype.lower().startswith("multipart/form-data"):
+        raise fail(400, "envie o audio como multipart/form-data (campo file)", "invalid_request_error", "invalid_audio")
+    headers = {**_media_headers(ctx, p), "Content-Type": ctype}
+    try:
+        r = await ctx.http.post(ctx.s.upstream_base + "/v1/audio/transcriptions", content=corpo, headers=headers, timeout=120)
+    except httpx.HTTPError:
+        _log(ctx, p, "audio", 0, 0, 0, "upstream_error", None)
+        return JSONResponse(err("falha ao falar com o servico de transcricao", "server_error", "upstream_error"), status_code=502)
+    _log(ctx, p, "audio", 0, 0, 0, "ok" if r.status_code == 200 else "upstream_error", None)
+    return Response(r.content, status_code=r.status_code, headers=_pass_headers(r.headers), media_type=r.headers.get("content-type", "application/json"))
+
+
 @router.get("/v1/jobs/{job_id}")
 async def job_status(job_id: str, request: Request):
     ctx = _ctx(request)

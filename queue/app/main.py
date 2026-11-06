@@ -408,6 +408,33 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
     async def chat(request: Request):
         return await _handle(request, "chat", "/chat/completions")
 
+    @app.post("/v1/audio/transcriptions")
+    async def transcriptions(request: Request):
+        """Ditado: repassa o audio (multipart) ao Whisper da maquina do LLM. Nao acorda a GPU nem entra na fila do chat:
+        se a maquina nao esta pronta, responde 503 na hora e o app mostra uma frase simples."""
+        q: App = request.app.state.q
+        q.auth(request)
+        if not q.s.stt_enabled:
+            raise HTTPException(503, detail=_err("transcricao desligada nesta instalacao (STT_ENABLED)", "service_unavailable", "stt_disabled"))
+        if q.ctl.state != READY:
+            raise HTTPException(503, detail=_err("a maquina da IA nao esta pronta agora", "service_unavailable", "gpu_unavailable"), headers={"Retry-After": "30"})
+        limite = q.s.stt_max_mb * 1024 * 1024
+        if int(request.headers.get("content-length") or 0) > limite:
+            raise HTTPException(413, detail=_err(f"audio acima de {q.s.stt_max_mb} MB", "invalid_request_error", "audio_too_large"))
+        corpo = await request.body()
+        if len(corpo) > limite:
+            raise HTTPException(413, detail=_err(f"audio acima de {q.s.stt_max_mb} MB", "invalid_request_error", "audio_too_large"))
+        sem = getattr(q, "stt_sem", None)
+        if sem is None:
+            sem = q.stt_sem = asyncio.Semaphore(q.s.stt_concurrency)
+        try:
+            async with sem:
+                r = await q.http.post(q.s.stt_upstream.rstrip("/") + "/v1/audio/transcriptions", content=corpo,
+                                      headers={"content-type": request.headers.get("content-type", "application/octet-stream")}, timeout=120.0)
+        except httpx.HTTPError:
+            raise HTTPException(502, detail=_err("falha ao falar com o servico de transcricao", "server_error", "upstream_error"))
+        return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
+
     @app.post("/v1/embeddings")
     async def embeddings(request: Request):
         if not request.app.state.q.s.embed_enabled:
@@ -589,6 +616,8 @@ def _forwards(s: Settings) -> list[tuple[int, int]]:
     fw = [(port(s.chat_upstream), 18000)]
     if s.embed_enabled:
         fw.append((port(s.embed_upstream), 18001))
+    if s.stt_enabled:
+        fw.append((port(s.stt_upstream), 18002))
     return fw
 
 

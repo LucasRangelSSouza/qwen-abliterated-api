@@ -53,6 +53,11 @@ class Settings:
     tool_parser: str = "qwen3_xml"  # o Hermes envia tools com tool_choice=auto: o vLLM exige --enable-auto-tool-choice e um parser (medido em 30/10)
     drive_remote: str = ""      # ex.: gdrive:qwen-cache (Spec 14 §5b): origem dos pesos antes do Hugging Face; vazio = so Hugging Face
     rclone_config_b64: str = ""  # rclone.conf em base64 (segredo; vai no env da instancia, risco aceito pelo dono)
+    stt_enabled: bool = False  # STT_ENABLED: transcricao de voz (ditado) no processador da maquina do LLM, porta 18002 (tunel proprio)
+    stt_upstream: str = "http://127.0.0.1:18002"
+    stt_max_mb: int = 25
+    stt_threads: int = 16
+    stt_concurrency: int = 2
     embed_mode: str = "off"  # off | gpu. "off" ate o teste de convivencia da Fase 2 (Spec 13 §4.2)
     llm_util: float = 0.92   # 0.68 quando embed_mode=gpu
     embed_util: float = 0.24
@@ -175,6 +180,9 @@ class Settings:
             webhook_url=_secret("GOOGLE_CHAT_WEBHOOK"),
             chat_upstream=os.environ.get("CHAT_UPSTREAM", cls.chat_upstream),
             embed_upstream=os.environ.get("EMBED_UPSTREAM", cls.embed_upstream),
+            stt_enabled=os.environ.get("STT_ENABLED", "").strip().lower() in ("1", "true", "yes", "on"),
+            stt_upstream=os.environ.get("STT_UPSTREAM", cls.stt_upstream),
+            stt_threads=int(os.environ.get("STT_THREADS", "").strip() or cls.stt_threads),
             tunnel_mode=os.environ.get("TUNNEL_MODE", cls.tunnel_mode),
             ssh_key_path=os.environ.get("SSH_KEY_PATH", ""),
             vast_api_key=_secret("VAST_API_KEY"),

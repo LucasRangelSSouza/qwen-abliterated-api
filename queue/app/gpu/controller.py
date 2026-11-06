@@ -18,6 +18,7 @@ from typing import Awaitable, Callable
 from app.alerts import Alerts
 from app.config import Settings
 from app.gpu import hosts as H
+from app.gpu import stt
 from app.gpu.cycles import CycleLog
 from app.gpu.ledger import Ledger
 from app.gpu.tunnel import Tunnel
@@ -94,6 +95,7 @@ class GPUController:
         # impressao diferente rodaria o script ANTIGO. Impressao diferente => destruir e recriar.
         self.spec_id = hashlib.sha256((self.onstart + json.dumps(render_env(s), sort_keys=True)).encode()).hexdigest()[:12]
         self.state = OFF
+        self._stt_done: tuple | None = None  # (host, porta) em que o servico de transcricao ja foi garantido
         self.inst: dict | None = None  # {"id","machine_id","dph","storage_h","stopped_at","created_at"}
         self.inflight = 0
         self.last_activity = clock()
@@ -710,6 +712,7 @@ class GPUController:
                         return False
                 if await self.tunnel.open(cur.ssh_host, int(cur.ssh_port)):
                     opened = True
+                    self._ensure_stt(cur.ssh_host, cur.ssh_port)
                     break
                 await asyncio.sleep(s.poll_s)
                 cur = await self.vast.get_instance(iid)  # o endereco pode ter mudado
@@ -822,6 +825,7 @@ class GPUController:
             if not await self.tunnel.open(i.ssh_host, int(i.ssh_port)):
                 await self._static_degrade("tunel", "o tunel SSH nao abriu")
                 return False
+            self._ensure_stt(i.ssh_host, i.ssh_port)
         if not await self.health_probe():
             await self._static_degrade("sem_saude", "a LLM nao responde a saude")
             await self._static_restart_llm(i)
@@ -839,6 +843,22 @@ class GPUController:
         self._static_llm_t = now
         ok = await self.tunnel.run(i.ssh_host, int(i.ssh_port), cmd)
         await self.alerts.notify("static_llm_reiniciado", f"GPU fixa {i.id}: vLLM sem saude, partida do processo pedida por SSH ({'ok' if ok else 'falhou'})", "info")
+
+    def _ensure_stt(self, host: str | None, port) -> None:
+        """Ditado: garante o Whisper na maquina (uma vez por endereco), em segundo plano e sem tocar no onstart da instancia."""
+        if not self.s.stt_enabled or self.s.tunnel_mode == "none" or not host or not port:
+            return
+        alvo = (host, int(port))
+        if self._stt_done == alvo:
+            return
+        self._stt_done = alvo
+
+        async def _go() -> None:
+            ok = await self.tunnel.run(alvo[0], alvo[1], stt.command(self.s.stt_threads), timeout=1500.0)
+            if not ok:
+                self._stt_done = None  # tenta de novo na proxima abertura do tunel
+            await self.alerts.notify("stt_provision", f"transcricao (ditado) na maquina {alvo[0]}:{alvo[1]}: {'ok' if ok else 'falhou'}", "info")
+        self._stt_task = asyncio.create_task(_go())
 
     async def _static_religar(self, i: Instance) -> None:
         """Instancia parada por fora (credito, host): religar e permitido (parar nunca), no maximo uma vez a cada static_retry_max_s."""

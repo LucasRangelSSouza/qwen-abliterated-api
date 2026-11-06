@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 # openssh-client: tunel para a GPU; curl: healthcheck e diagnostico. Roda como root dentro do contêiner (segredos montados por
 # env_file; cap_drop ALL + read_only no compose), igual aos outros servicos da plataforma.
-RUN apt-get update && apt-get install -y --no-install-recommends openssh-client curl ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-client curl ca-certificates ffmpeg \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /srv
 COPY requirements.txt .

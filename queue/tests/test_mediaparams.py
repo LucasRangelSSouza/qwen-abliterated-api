@@ -34,7 +34,12 @@ def test_video_defaults_limites_e_quadros():
     e, adj = mp.normalize_video({"prompt": "carro"})
     assert (e["width"], e["height"], e["seconds"], e["fps"], e["frames"], e["steps"], e["cfg"]) == (640, 384, 3.88, 25, 97, 30, 3.0) and not e["image_to_video"]
     e, adj = mp.normalize_video({"prompt": "x", "seconds": 10, "fps": 30, "width": 2000, "height": 2000, "steps": 5, "seed": 3})
-    assert e["frames"] <= mp.VIDEO_MAX_FRAMES and e["width"] * e["height"] <= mp.VIDEO_MAX_PIXELS and e["steps"] == 10 and {"seconds", "steps", "size"} <= set(adj)
+    assert e["frames"] <= mp.VIDEO_MAX_FRAMES and e["width"] * e["height"] <= mp.VIDEO_MAX_PIXELS and e["steps"] == 10 and {"steps", "size"} <= set(adj)
+    assert "seconds" not in adj and e["segments"] == 3 and 9.5 <= e["total_seconds"] <= 10.5  # 10 s vira 3 clipes encadeados, nao e cortado
+    e15, _ = mp.normalize_video({"prompt": "x", "seconds": 15})
+    assert e15["segments"] == 4 and e15["frames"] <= mp.VIDEO_MAX_FRAMES and 14.5 <= e15["total_seconds"] <= 15.7
+    e99, adj99 = mp.normalize_video({"prompt": "x", "seconds": 99})
+    assert "seconds" in adj99 and e99["segments"] == 15  # teto de 60 s no total
     e2, _ = mp.normalize_video({"prompt": "x", "seconds": 2, "fps": 24})
     assert e2["frames"] == 49 and e2["fps"] == 24
     with pytest.raises(mp.ParamError):

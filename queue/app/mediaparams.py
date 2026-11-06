@@ -3,6 +3,7 @@ Valor fora da faixa e ajustado (e listado em `adjusted`); valor de tipo errado o
 from __future__ import annotations
 
 import base64
+import math
 import binascii
 import random
 
@@ -22,6 +23,7 @@ IMG_MAX_N = 4
 VIDEO_MAX_PIXELS = 512 * 512
 VIDEO_MAX_SECONDS = 4.0
 VIDEO_MAX_FRAMES = 121
+VIDEO_MAX_TOTAL = 60.0  # duracao total aceita: acima de VIDEO_MAX_SECONDS vira cadeia de clipes (app/longvideo.py)
 VIDEO_SIZES = {"paisagem": (640, 384), "retrato": (384, 640), "quadrado": (512, 512)}
 NEG_VIDEO = "worst quality, inconsistent motion, blurry, jittery, distorted, watermark, text, deformed"
 MAX_IMAGE_BYTES = 6 * 1024 * 1024
@@ -120,7 +122,9 @@ def normalize_video(p: dict) -> tuple[dict, list]:
     if fmt not in VIDEO_SIZES:
         raise ParamError(f"Parâmetro inválido: format deve ser um de {', '.join(VIDEO_SIZES)}.")
     w, h = _wh(p, 32, 256, 832, VIDEO_SIZES[fmt], VIDEO_MAX_PIXELS, adj)
-    secs = _num(p, ("seconds", "segundos"), 4.0, 1.0, VIDEO_MAX_SECONDS, adj, "seconds")
+    total = _num(p, ("seconds", "segundos"), 4.0, 1.0, VIDEO_MAX_TOTAL, adj, "seconds")
+    segments = max(1, math.ceil(total / VIDEO_MAX_SECONDS - 1e-9))
+    secs = total / segments  # cada clipe leva a mesma parte; ate 4 s por clipe
     fps = _num(p, ("fps",), 25, 8, 30, adj, "fps", True)
     frames = int(round(secs * fps / 8)) * 8 + 1  # o modelo pede 8n+1 quadros
     if frames > VIDEO_MAX_FRAMES:
@@ -141,7 +145,7 @@ def normalize_video(p: dict) -> tuple[dict, list]:
             raise ParamError("Parâmetro inválido: a imagem inicial é grande demais (máximo 6 MB).")
     eff = {
         "prompt": _prompt(p), "negative_prompt": str(p.get("negative_prompt") or NEG_VIDEO)[:MAX_PROMPT_CHARS],
-        "width": w, "height": h, "seconds": round(frames / fps, 2), "fps": fps, "frames": frames,
+        "width": w, "height": h, "seconds": round(frames / fps, 2), "fps": fps, "frames": frames, "segments": segments, "total_seconds": round(frames / fps * segments, 2),
         "steps": _num(p, ("steps",), 30, 10, 50, adj, "steps", True), "cfg": _num(p, ("cfg", "guidance"), 3.0, 1.0, 8.0, adj, "cfg"),
         "seed": _seed(p), "sampler": _choice(p, "sampler", SAMPLERS, "euler"),
         "image_to_video": bool(image), "strength": _num(p, ("strength",), 1.0, 0.0, 1.0, adj, "strength") if image else None,

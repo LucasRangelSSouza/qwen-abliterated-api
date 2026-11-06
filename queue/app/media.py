@@ -15,7 +15,7 @@ import uuid
 
 import httpx
 
-from app import metrics, notice
+from app import longvideo, metrics, notice
 from app import mediaparams as mp
 from app.config import Settings
 from app.gpu.tunnel import Tunnel
@@ -119,7 +119,7 @@ def recipe_ltx_video(p: dict, _ckpt: str, image_name: str | None = None) -> dict
 
 RECIPES = {
     "flux-schnell": {"kind": "image", "title": "Flux schnell (rapido, boa qualidade)", "build": recipe_flux_schnell, "default": True},
-    "ltx-video": {"kind": "video", "title": "LTX-Video 2B (texto para video, 2 a 6 s)", "build": recipe_ltx_video, "default_video": True, "timeout": 900},
+    "ltx-video": {"kind": "video", "title": "LTX-Video 2B (texto para video; clipes de ate 4 s encadeados ate 60 s)", "build": recipe_ltx_video, "default_video": True, "timeout": 900},
 }
 
 
@@ -254,9 +254,13 @@ class Media:
             job.update(state="executando", started=self.now())
             await self._save(job)
             await self._ensure_tunnel()
-            image_name = await self._upload_start_image(params) if job["kind"] == "video" and params.get("image_to_video") else None
-            wf = RECIPES[job["recipe"]]["build"](params, self.s.media_ckpt, image_name)
-            files = await self._comfy_run(wf, job, RECIPES[job["recipe"]].get("timeout"))
+            n_seg = int(params.get("segments") or 1) if job["kind"] == "video" else 1
+            if n_seg > 1:
+                files = await self._run_chain(job, params, n_seg)
+            else:
+                image_name = await self._upload_start_image(params) if job["kind"] == "video" and params.get("image_to_video") else None
+                wf = RECIPES[job["recipe"]]["build"](params, self.s.media_ckpt, image_name)
+                files = await self._comfy_run(wf, job, RECIPES[job["recipe"]].get("timeout"))
             results = []
             for i, (blob, mime) in enumerate(files):
                 await self.r.setex(f"llmq:media:img:{job['id']}" + (f":{i}" if i else ""), JOB_TTL_S, blob)
@@ -283,6 +287,25 @@ class Media:
             self.tasks.pop(job["id"], None)
             self.tickets.pop(job["id"], None)
             self.prog.pop(job["id"], None)
+
+    async def _run_chain(self, job: dict, params: dict, n_seg: int) -> list[tuple[bytes, str]]:
+        """Video longo: n clipes encadeados pelo ultimo quadro, juntados num MP4 so (app/longvideo.py)."""
+        clips: list[bytes] = []
+        job.update(segments=n_seg, seg_done=0)
+        base = int(params.get("seed") or 0)
+        last = ""
+        for k in range(n_seg):
+            pk = {**params, "segments": 1, "seed": base + k}
+            if k:
+                pk.update(image=last, image_to_video=True, strength=params.get("strength") or 1.0)
+            image_name = await self._upload_start_image(pk) if pk.get("image_to_video") else None
+            wf = RECIPES[job["recipe"]]["build"](pk, self.s.media_ckpt, image_name)
+            blob, _mime = (await self._comfy_run(wf, job, RECIPES[job["recipe"]].get("timeout")))[0]
+            clips.append(blob)
+            job["seg_done"] = k + 1
+            if k + 1 < n_seg:
+                last = await longvideo.last_frame_b64(blob)
+        return [(await longvideo.concat(clips), "video/mp4")]
 
     async def _comfy_run(self, wf: dict, job: dict, timeout: float | None = None) -> list[tuple[bytes, str]]:
         watcher = asyncio.create_task(self._watch(job["id"]))  # progresso real; se o WebSocket falhar, o pedido segue so com o polling
@@ -381,6 +404,8 @@ class Media:
             status, pct, msg = "failed", int(self.prog.get(jid, 0)), notice.MENSAGEM_FALHA
         elif state == "executando":
             status, pct = "running", int(self.prog.get(jid, 0))
+            if job.get("segments", 1) > 1:  # video longo: cada clipe vale uma fatia da barra
+                pct = int((job.get("seg_done", 0) * 100 + pct) / job["segments"])
             run = max(0.0, self.now() - (job.get("started") or self.now()))
             est = ETA_DEFAULT_S[kind]
             eta = int(round(run * (100 - pct) / pct)) if pct >= 10 and run > 3 else max(1, int(est - run))

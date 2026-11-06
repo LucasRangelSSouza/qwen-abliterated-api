@@ -29,4 +29,6 @@ def command(threads: int = 16) -> str:
     """Comando unico para `ssh host <cmd>`: o servidor Python viaja em base64 dentro do proprio comando."""
     srv = base64.b64encode((REMOTE / "stt_server.py").read_bytes()).decode()
     script = base64.b64encode(PROVISION.encode()).decode()
-    return f"STT_SERVER_B64='{srv}' STT_THREADS={int(threads)} bash -c \"$(echo {script} | base64 -d)\""
+    # o script vai para um ARQUIVO e roda de la: dentro de `bash -c "<texto>"` o pgrep -f do proprio script casaria com a linha de comando
+    # dele mesmo (que contem o texto) e ele se mataria antes de subir o servico.
+    return f"mkdir -p /workspace/stt && echo {script} | base64 -d > /workspace/stt/provision.sh && STT_SERVER_B64='{srv}' STT_THREADS={int(threads)} bash /workspace/stt/provision.sh"

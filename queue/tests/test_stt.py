@@ -98,6 +98,8 @@ def test_comando_de_instalacao_e_idempotente_e_leva_o_servidor():
     assert "/health" in stt.PROVISION and "127.0.0.1" in stt.PROVISION and "nice -n 15" in stt.PROVISION
     b64 = cmd.split("STT_SERVER_B64='")[1].split("'")[0]
     assert b"faster_whisper" in base64.b64decode(b64)
+    # o texto do script NAO pode viajar literal na linha de comando (o pgrep -f dele casaria com ele mesmo e ele se mataria)
+    assert "uvicorn stt_server" not in cmd and "provision.sh" in cmd
 
 
 async def test_garante_o_whisper_uma_vez_por_endereco(redis):

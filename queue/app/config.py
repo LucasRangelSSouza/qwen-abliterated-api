@@ -129,6 +129,7 @@ class Settings:
     embed_max_inflight: int = 8
     embed_queue_max: int = 200
     max_context_tokens: int = 65536
+    repetition_penalty: float = 1.1  # REPETITION_PENALTY: padrao injetado no chat quando o cliente nao manda o seu (evita o laco de repeticao degenerada que gastou milhoes de tokens); 0 desliga
     request_timeout_s: float = 1800.0
     stream_idle_timeout_s: float = 420.0  # STREAM_IDLE_TIMEOUT_S: stream sem nenhum byte do vLLM por este tempo e abortado (o parser qwen3_xml so entrega a chamada de ferramenta quando completa: escrita de arquivo grande fica 2 a 4 min sem bytes)
     # --- midia (imagem; ComfyUI numa GPU fixa propria, alcancada por tunel SSH)
@@ -236,6 +237,7 @@ class Settings:
             keepalive_s=_f("KEEPALIVE_S", cls.keepalive_s),
             notice_enabled=_b("NOTICE_ENABLED", cls.notice_enabled),
             notice_every_s=_f("NOTICE_EVERY_S", cls.notice_every_s),
+            repetition_penalty=_f("REPETITION_PENALTY", cls.repetition_penalty),
             notice_fields=tuple(x.strip() for x in os.environ.get("NOTICE_FIELDS", ",".join(cls.notice_fields)).split(",") if x.strip()),
             chat_max_inflight=_i("CHAT_MAX_INFLIGHT", cls.chat_max_inflight),
             chat_per_consumer=_i("CHAT_PER_CONSUMER", cls.chat_per_consumer),

@@ -106,6 +106,19 @@ async def test_chat_json_passa_direto(rig):
     assert r.headers["x-llm-state"] == "READY" and ctl.begun == 1 and ctl.ended == 1
 
 
+async def test_chat_injeta_repetition_penalty_padrao(rig):
+    client, _, st, _ = rig
+    vistos = []
+    def h(req, s):
+        vistos.append(json.loads(req.content))
+        return httpx.Response(200, json={"id": "x", "choices": [{"message": {"content": "ok"}}]})
+    st["handler"] = h
+    await client.post("/v1/chat/completions", json=BODY, headers=H)
+    await client.post("/v1/chat/completions", json={**BODY, "repetition_penalty": 1.3}, headers=H)
+    assert vistos[0]["repetition_penalty"] == 1.1
+    assert vistos[1]["repetition_penalty"] == 1.3  # o do cliente manda
+
+
 async def test_chat_stream_passa_chunks(rig):
     client, _, st, _ = rig
     st["handler"] = lambda req, s: httpx.Response(200, content=sse(b'data: {"a":1}\n\n', b'data: {"a":2}\n\n', b"data: [DONE]\n\n"))

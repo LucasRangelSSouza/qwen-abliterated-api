@@ -459,6 +459,8 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         if kind == "chat":
             if q.s.repetition_penalty and "repetition_penalty" not in body:
                 body["repetition_penalty"] = q.s.repetition_penalty
+            if q.s.presence_penalty and "presence_penalty" not in body:
+                body["presence_penalty"] = q.s.presence_penalty
             approx = approx_chat_tokens(body.get("messages", [])) + int(body.get("max_tokens") or 0)
             if approx > q.s.max_context_tokens * 2:  # folga: a conta de caracteres por 3 superestima
                 raise HTTPException(400, detail=_err(f"contexto acima do limite de {q.s.max_context_tokens} tokens", "invalid_request_error", "context_length_exceeded"))

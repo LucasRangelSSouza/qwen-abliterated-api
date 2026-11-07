@@ -115,7 +115,7 @@ async def test_chat_injeta_repetition_penalty_padrao(rig):
     st["handler"] = h
     await client.post("/v1/chat/completions", json=BODY, headers=H)
     await client.post("/v1/chat/completions", json={**BODY, "repetition_penalty": 1.3}, headers=H)
-    assert vistos[0]["repetition_penalty"] == 1.1
+    assert "repetition_penalty" not in vistos[0] and vistos[0]["presence_penalty"] == 0.5
     assert vistos[1]["repetition_penalty"] == 1.3  # o do cliente manda
 
 

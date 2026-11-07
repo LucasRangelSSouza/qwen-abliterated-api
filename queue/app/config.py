@@ -129,8 +129,8 @@ class Settings:
     embed_max_inflight: int = 8
     embed_queue_max: int = 200
     max_context_tokens: int = 65536
-    presence_penalty: float = 1.5  # PRESENCE_PENALTY: idem (medido: so repetition_penalty 1.1 deixa 66% de palavras unicas no raciocinio; com isto, 95%); 0 desliga
-    repetition_penalty: float = 1.1  # REPETITION_PENALTY: padrao injetado no chat quando o cliente nao manda o seu (evita o laco de repeticao degenerada que gastou milhoes de tokens); 0 desliga
+    presence_penalty: float = 0.5  # PRESENCE_PENALTY: padrao injetado no chat quando o cliente nao manda o seu. Medido em 07/11/2026 (codigo longo via ferramenta, 6 pedidos por valor): 1.5 estourou 6000 tokens em 3/6 e so 2/6 compilaram; 0 e 0.5 deram 6/6. 0 desliga
+    repetition_penalty: float = 0.0  # REPETITION_PENALTY: desligado por padrao (1.1 quebrou geracao de codigo em modo agente); o cliente ainda pode mandar o seu
     request_timeout_s: float = 1800.0
     stream_idle_timeout_s: float = 420.0  # STREAM_IDLE_TIMEOUT_S: stream sem nenhum byte do vLLM por este tempo e abortado (o parser qwen3_xml so entrega a chamada de ferramenta quando completa: escrita de arquivo grande fica 2 a 4 min sem bytes)
     # --- midia (imagem; ComfyUI numa GPU fixa propria, alcancada por tunel SSH)

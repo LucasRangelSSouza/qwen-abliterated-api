@@ -22,11 +22,13 @@ from app.ctx import Ctx
 
 DEFAULT_PLANS = [  # editaveis no painel. tokens None = sem limite; max_devices 0 = computadores ilimitados; safety_level = padrao da pessoa nova
     # id, nome, tokens/sessao (5 h), tokens/semana, imagens/mes, nivel de seguranca, computadores, preco (centavos)
-    ("pro", "Pro", 1_000_000, 10_000_000, 300, 2, 0, 24700),
+    ("light", "Light", 1_000_000, 10_000_000, 300, 2, 0, 12000),
     ("max", "Max", 3_000_000, 30_000_000, 1000, 1, 0, 49700),
-    ("ultra", "Ultra", None, None, 4000, 2, 0, 149700),
-    ("infinity", "Infinity", None, None, 10000, 1, 0, 199700),
+    ("ultra", "Ultra", None, None, 4000, 1, 0, 149700),
+    ("enterprise", "Enterprise", None, None, 10000, 1, 0, 0),  # sob contrato (contato pelo WhatsApp): o administrador atribui, nao ha checkout
 ]
+LEGACY_PLANS = ("pro", "infinity")  # nomes antigos: quem ja assina continua valendo; "pro" virou "light" (migrado em ensure_plans)
+PLANS_WITHOUT_SKILL_PACK = ("light", "pro")  # o pacote de skills profissionais nao vai no plano Light (o instalador e o mesmo para todos)
 SUB_STATUS = ("pending", "active", "late", "canceled", "refunded", "chargeback")
 GRACE_DAYS_DEFAULT = 3
 SETUP_TTL_S = 7 * 86400
@@ -69,6 +71,11 @@ EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 def ensure_plans(ctx: Ctx) -> None:
     """Cria os planos padrao que ainda nao existem (os que o admin ja editou nao sao tocados)."""
     have = {r["id"] for r in ctx.store.query("SELECT id FROM plans")}
+    if "pro" in have and "light" not in have:  # o plano Pro virou Light (R$ 120): mesmo id de contas e assinaturas, so o nome e o preco mudam
+        with ctx.store.tx() as c:
+            c.execute("UPDATE plans SET id='light', name='Light', price_cents=12000 WHERE id='pro'")
+            c.execute("UPDATE subscriptions SET plan='light' WHERE plan='pro'")
+        have = {r["id"] for r in ctx.store.query("SELECT id FROM plans")}
     falta = [p for p in DEFAULT_PLANS if p[0] not in have]
     if not falta:
         return
@@ -99,7 +106,7 @@ def new_setup_token(ctx: Ctx, account_id: int) -> str:
 def create_account(ctx: Ctx, email: str, name: str, plan_id: str | None, safety_level: int | None = None) -> tuple[dict, str]:
     """Cria conta + pessoa (DESABILITADA, aguardando o administrador). Devolve (conta, token para definir a senha)."""
     ensure_plans(ctx)
-    plan = get_plan(ctx, plan_id) or get_plan(ctx, "pro")
+    plan = get_plan(ctx, plan_id) or get_plan(ctx, "light")
     email = norm_email(email)
     now = ctx.clock()
     level = safety_level if safety_level in (1, 2) else int(plan["safety_level"] or 1)
@@ -213,10 +220,15 @@ def plan_from_hint(ctx: Ctx, hint: str) -> str | None:
     for frag, pid in mapping.items():
         if frag.lower() in hint:
             return pid
-    for pid in ("infinity", "ultra", "max", "pro"):  # do maior para o menor: "Ultra Max" nao vira Pro
+    for pid in ("enterprise", "infinity", "ultra", "max", "light", "pro"):  # do maior para o menor: "Ultra Max" nao vira Light
         if pid in hint:
-            return pid
+            return "light" if pid == "pro" else pid
     return None
+
+
+def skill_pack(plan_id: str | None) -> bool:
+    """O plano inclui o pacote de skills profissionais? (Light nao; o app so instala o pacote para quem tem.)"""
+    return (plan_id or "") not in PLANS_WITHOUT_SKILL_PACK
 
 
 def process_billing(ctx: Ctx, provider: str, body_text: str, payload: dict) -> dict:
@@ -260,7 +272,7 @@ def _apply(ctx: Ctx, ev: dict, now: float) -> None:
     with ctx.store.tx() as c:
         if sub is None:
             c.execute("INSERT INTO subscriptions(account_id,plan,status,provider,external_id,next_payment_at,amount_cents,started_at,updated_at,blocked_by_billing) VALUES(?,?,?,?,?,?,?,?,?,0)",
-                      (acc["id"], plan_id or "pro", ev["status"], "cakto", ev["external_id"] or None, ev["next_payment_at"], ev["amount_cents"], now, now))
+                      (acc["id"], plan_id or "light", ev["status"], "cakto", ev["external_id"] or None, ev["next_payment_at"], ev["amount_cents"], now, now))
         else:
             c.execute("UPDATE subscriptions SET status=?, plan=?, next_payment_at=COALESCE(?, next_payment_at), amount_cents=COALESCE(?, amount_cents), updated_at=? WHERE id=?",
                       (ev["status"], plan_id or sub["plan"], ev["next_payment_at"], ev["amount_cents"], now, sub["id"]))

@@ -65,7 +65,7 @@ def conta(ctx, email="ana@x.com", status="active", dias_atraso=0):
         pid = c.execute("INSERT INTO people(name,note,created_at) VALUES('Ana','',?)", (agora,)).lastrowid
         aid = c.execute("INSERT INTO accounts(email,name,pw_hash,person_id,created_at) VALUES(?,?,?,?,?)", (email, "Ana", "x", pid, agora)).lastrowid
         c.execute("INSERT INTO subscriptions(account_id,plan,status,next_payment_at,updated_at) VALUES(?,?,?,?,?)",
-                  (aid, "pro", status, agora - dias_atraso * DIA, agora))
+                  (aid, "light", status, agora - dias_atraso * DIA, agora))
     return aid, pid
 
 
@@ -330,7 +330,7 @@ async def test_combinado_cancelado_bloqueia_o_plano_e_marca_a_vm(rig2):
 async def test_planos_anuais_sao_identificados_pelo_nome_e_nao_quebram_plan_from_hint(rig2):
     from app import accounts as A
     r, ctx, fake = rig2
-    for nome, esperado in (("Segundo Cérebro Pro anual", "pro"), ("Segundo Cérebro Max anual + Máquina virtual", "max"), ("Segundo Cérebro Ultra anual", "ultra"),
+    for nome, esperado in (("Segundo Cérebro Light anual", "light"), ("Segundo Cérebro Pro anual", "light"), ("Segundo Cérebro Max anual + Máquina virtual", "max"), ("Segundo Cérebro Ultra anual", "ultra"),
                            ("Segundo Cérebro Infinity anual + Máquina virtual", "infinity"), ("Máquina virtual Segundo Cérebro anual", None)):
         assert A.plan_from_hint(ctx, nome.lower()) == esperado, nome
     assert V.eh_produto_vm(ctx, "máquina virtual segundo cérebro anual") and V.eh_produto_vm(ctx, "segundo cérebro max anual + máquina virtual")

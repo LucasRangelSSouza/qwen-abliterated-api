@@ -103,7 +103,7 @@ async def auth_login(request: Request):
     with ctx.store.tx() as c:
         c.execute("UPDATE accounts SET last_login=? WHERE id=?", (now, acc["id"]))
     lvl = ctx.store.one("SELECT safety_level FROM people WHERE id=?", (person["id"],))
-    return {"api_key": key, "safety_level": int(lvl["safety_level"]) if lvl else 1, "account": {"email": acc["email"], "name": acc["name"]}, "plan": {"id": sub["plan"], "name": plan["name"] if plan else sub["plan"]},
+    return {"api_key": key, "safety_level": int(lvl["safety_level"]) if lvl else 1, "account": {"email": acc["email"], "name": acc["name"]}, "plan": {"id": sub["plan"], "name": plan["name"] if plan else sub["plan"], "skill_pack": A.skill_pack(sub["plan"])},
             "next_payment_at": iso(sub["next_payment_at"])}
 
 
@@ -127,10 +127,12 @@ async def auth_whoami(request: Request):
     acc = ctx.store.one("SELECT id,email,name,status FROM accounts WHERE person_id=?", (p.person_id,)) if p.kind == "person" else None
     if acc is None or acc["status"] != "active":
         raise fail(403, "esta chave nao pertence a uma conta ativa", "invalid_request_error", "no_account")
-    if not A.sub_allows_use(ctx, A.current_sub(ctx, acc["id"])):
+    sub = A.current_sub(ctx, acc["id"])
+    if not A.sub_allows_use(ctx, sub):
         raise fail(403, "sua assinatura nao esta ativa", "invalid_request_error", "subscription_inactive")
     lvl = ctx.store.one("SELECT safety_level FROM people WHERE id=?", (p.person_id,))
-    return {"account_id": acc["id"], "email": acc["email"], "name": acc["name"], "safety_level": int(lvl["safety_level"]) if lvl else 1}
+    return {"account_id": acc["id"], "email": acc["email"], "name": acc["name"], "safety_level": int(lvl["safety_level"]) if lvl else 1,
+            "plan": {"id": sub["plan"], "skill_pack": A.skill_pack(sub["plan"])}}
 
 
 @router.post("/v1/auth/set-password")
@@ -221,7 +223,7 @@ async def subscribers_create(request: Request):
         raise fail(422, "e-mail invalido", "invalid_request_error", "invalid_email")
     if A.find_account(ctx, email):
         raise fail(409, "ja existe uma conta com este e-mail", "invalid_request_error", "email_taken")
-    plan_id = str(b.get("plan") or "pro")
+    plan_id = str(b.get("plan") or "light")
     if A.get_plan(ctx, plan_id) is None:
         raise fail(422, "plano desconhecido", "invalid_request_error", "invalid_plan")
     lvl = b.get("safety_level")
@@ -314,7 +316,7 @@ async def subscribers_patch(sid: int, request: Request):
 def plans_list(request: Request):
     ctx = require(request)
     A.ensure_plans(ctx)
-    return {"plans": [dict(r) for r in ctx.store.query("SELECT * FROM plans ORDER BY price_cents")]}
+    return {"plans": [dict(r) for r in ctx.store.query("SELECT * FROM plans ORDER BY CASE WHEN price_cents=0 THEN 1 ELSE 0 END, price_cents")]}
 
 
 @api.put("/plans/{pid}")

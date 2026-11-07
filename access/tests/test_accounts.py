@@ -88,10 +88,10 @@ async def test_evento_desconhecido_ou_sem_email_so_fica_no_registro(make_rig):
 
 async def test_plano_pelo_nome_do_produto(make_rig):
     r = await make_rig(cakto_webhook_secret=SEG)
-    for i, (nome, esperado) in enumerate([("Plano Ultra", "ultra"), ("Pro mensal", "pro"), ("Ultra Max", "ultra"), ("Plano Max", "max")]):
+    for i, (nome, esperado) in enumerate([("Plano Ultra", "ultra"), ("Light mensal", "light"), ("Pro mensal", "light"), ("Ultra Max", "ultra"), ("Plano Max", "max")]):
         await webhook(r, compra(email=f"u{i}@x.com", plano=nome, ev=f"e{i}", sub=f"s{i}"))
     await r.login()
-    assert {x["email"]: x["plan"] for x in (await lista(r))["rows"]} == {"u0@x.com": "ultra", "u1@x.com": "pro", "u2@x.com": "ultra", "u3@x.com": "max"}
+    assert {x["email"]: x["plan"] for x in (await lista(r))["rows"]} == {"u0@x.com": "ultra", "u1@x.com": "light", "u2@x.com": "light", "u3@x.com": "ultra", "u4@x.com": "max"}
 
 
 # ---------------------------------------------------------------- login: so assinante liberado entra
@@ -111,7 +111,7 @@ async def test_fluxo_completo_compra_senha_liberacao_login(make_rig):
     resp = await login(r)
     assert resp.status_code == 200
     j = resp.json()
-    assert j["api_key"].startswith("sk-") and j["plan"] == {"id": "max", "name": "Max"} and j["account"]["email"] == "ana@exemplo.com"
+    assert j["api_key"].startswith("sk-") and j["plan"] == {"id": "max", "name": "Max", "skill_pack": True} and j["account"]["email"] == "ana@exemplo.com"
     # a chave emitida funciona de verdade no chat
     ok = await r.client.post("/v1/chat/completions", json=BODY, headers={"Authorization": f"Bearer {j['api_key']}"})
     assert ok.status_code == 200
@@ -235,7 +235,7 @@ async def test_crm_exige_login_do_admin(rig: Rig):
 async def test_cadastro_manual_busca_e_filtro(make_rig):
     r = await make_rig(cakto_webhook_secret=SEG)
     await r.login()
-    c = await r.client.post("/admin/api/subscribers", json={"name": "Cortesia", "email": "cortesia@x.com", "plan": "pro", "enable": True, "safety_level": 2})
+    c = await r.client.post("/admin/api/subscribers", json={"name": "Cortesia", "email": "cortesia@x.com", "plan": "light", "enable": True, "safety_level": 2})
     assert c.status_code == 200 and c.json()["subscriber"]["enabled"] is True and c.json()["subscriber"]["safety_level"] == 2 and "definir-senha?token=" in c.json()["setup_link"]
     assert (await r.client.post("/admin/api/subscribers", json={"name": "x", "email": "cortesia@x.com"})).status_code == 409
     assert (await r.client.post("/admin/api/subscribers", json={"name": "x", "email": "sem-arroba"})).status_code == 422
@@ -248,11 +248,11 @@ async def test_cadastro_manual_busca_e_filtro(make_rig):
 async def test_planos_editaveis_e_validados(rig: Rig):
     await rig.login()
     planos = (await rig.client.get("/admin/api/plans")).json()["plans"]
-    assert [p["id"] for p in planos] == ["pro", "max", "ultra", "infinity"] and planos[0]["price_cents"] == 24700
+    assert [p["id"] for p in planos] == ["light", "max", "ultra", "enterprise"] and planos[0]["price_cents"] == 12000
     assert planos[2]["session_limit_tokens"] is None and planos[3]["safety_level"] == 1 and all(p["max_devices"] == 0 for p in planos)
-    assert (await rig.client.put("/admin/api/plans/pro", json={"price_cents": 29900, "week_limit_tokens": 12_000_000})).json()["price_cents"] == 29900
+    assert (await rig.client.put("/admin/api/plans/light", json={"price_cents": 29900, "week_limit_tokens": 12_000_000})).json()["price_cents"] == 29900
     for ruim in ({"safety_level": 3}, {"max_devices": -1}, {"price_cents": -1}, {"nome": "x"}, {"name": "  "}):
-        assert (await rig.client.put("/admin/api/plans/pro", json=ruim)).status_code == 422
+        assert (await rig.client.put("/admin/api/plans/light", json=ruim)).status_code == 422
     assert (await rig.client.put("/admin/api/plans/nao-existe", json={"price_cents": 1})).status_code == 404
 
 
@@ -277,10 +277,10 @@ async def test_esqueci_a_senha_nao_revela_se_existe(make_rig):
 
 async def test_plano_sem_limite_e_computadores_ilimitados(make_rig):
     r = await make_rig(cakto_webhook_secret=SEG)
-    await webhook(r, compra(plano="Plano Infinity"))
+    await webhook(r, compra(plano="Plano Enterprise"))
     await r.login()
     sid = (await lista(r))["rows"][0]["id"]
-    assert (await lista(r))["rows"][0]["plan"] == "infinity"
+    assert (await lista(r))["rows"][0]["plan"] == "enterprise"
     pessoa = (await r.client.get("/admin/api/people")).json()[0]
     assert pessoa["limits"]["session_limit_tokens"] is None and pessoa["limits"]["week_limit_tokens"] is None  # token a vontade
     await definir_senha(r, sid)
@@ -290,7 +290,7 @@ async def test_plano_sem_limite_e_computadores_ilimitados(make_rig):
     codigos = [(await chat(k)).status_code for k in chaves]
     assert codigos == [200] * 6  # nenhuma chave foi derrubada
     # o admin pode tirar o limite de um plano que tinha
-    assert (await r.client.put("/admin/api/plans/pro", json={"session_limit_tokens": None})).json()["session_limit_tokens"] is None
+    assert (await r.client.put("/admin/api/plans/light", json={"session_limit_tokens": None})).json()["session_limit_tokens"] is None
 
 
 async def test_verify_e_whoami_nao_gastam_computador(make_rig):
@@ -311,3 +311,17 @@ async def test_verify_e_whoami_nao_gastam_computador(make_rig):
     w = await r.client.get("/v1/auth/whoami", headers={"Authorization": f"Bearer {key}"})
     assert w.status_code == 200 and w.json()["account_id"] == v.json()["account_id"]
     assert (await r.client.get("/v1/auth/whoami", headers={"Authorization": "Bearer sk-invalida"})).status_code == 401
+
+
+async def test_pacote_de_skills_so_fora_do_light_e_pro_antigo_migra(make_rig):
+    from app import accounts as A
+    assert not A.skill_pack("light") and not A.skill_pack("pro")
+    assert all(A.skill_pack(p) for p in ("max", "ultra", "enterprise", "infinity"))
+    r = await make_rig(cakto_webhook_secret=SEG)
+    ctx = r.app.state.ctx
+    with ctx.store.tx() as c:  # banco de producao antes da mudanca: plano "pro" a R$ 247 com uma assinatura
+        c.execute("DELETE FROM plans")
+        c.execute("INSERT INTO plans(id,name,session_limit_tokens,week_limit_tokens,image_quota_month,safety_level,max_devices,price_cents) VALUES('pro','Pro',1000000,10000000,300,2,0,24700)")
+    A.ensure_plans(ctx)
+    ids = {p["id"]: p for p in ctx.store.query("SELECT * FROM plans")}
+    assert "pro" not in ids and ids["light"]["name"] == "Light" and ids["light"]["price_cents"] == 12000 and ids["light"]["week_limit_tokens"] == 10000000

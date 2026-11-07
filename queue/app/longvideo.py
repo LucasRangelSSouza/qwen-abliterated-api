@@ -46,3 +46,26 @@ async def concat(clips: list[bytes]) -> bytes:
         await _ffmpeg("-f", "concat", "-safe", "0", "-i", os.path.join(d, "l.txt"), "-c", "copy", "-movflags", "+faststart", out)
         with open(out, "rb") as f:
             return f.read()
+
+
+
+async def has_audio(mp4: bytes) -> bool:
+    with tempfile.TemporaryDirectory() as d:
+        src = os.path.join(d, "in.mp4")
+        with open(src, "wb") as f:
+            f.write(mp4)
+        p = await asyncio.create_subprocess_exec("ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream=codec_type", "-of", "csv=p=0", src,
+                                                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        out, _ = await p.communicate()
+        return b"audio" in out
+
+
+async def add_silent_audio(mp4: bytes) -> bytes:
+    """O carregador de video do ComfyUI falha em arquivo sem trilha de audio: junta uma trilha muda."""
+    with tempfile.TemporaryDirectory() as d:
+        src, dst = os.path.join(d, "in.mp4"), os.path.join(d, "out.mp4")
+        with open(src, "wb") as f:
+            f.write(mp4)
+        await _ffmpeg("-i", src, "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-shortest", "-c:v", "copy", "-c:a", "aac", dst)
+        with open(dst, "rb") as f:
+            return f.read()

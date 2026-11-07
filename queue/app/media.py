@@ -9,7 +9,9 @@ import asyncio
 import base64
 import json
 import logging
+import os
 import random
+import re
 import time
 import uuid
 
@@ -140,9 +142,40 @@ def recipe_wan22(p: dict, _ckpt: str, image_name: str | None = None) -> dict:
     return wf
 
 
+# --- troca de personagem (Openjutsu): fluxo do repositorio D3voz/openjutsu (MIT), chamado direto na API do ComfyUI
+SWAP_TEMPLATE = os.path.join(os.path.dirname(__file__), "workflows", "openjutsu_simple.api.json")
+SWAP_INPUT_DIR = "/workspace/ComfyUI/input"  # onde o ComfyUI da maquina de midia guarda os arquivos enviados
+SWAP_LORA = "minimax_h3_ref2v_turbo_4step_v0.1_comfyui_bf16.safetensors"
+SWAP_ENCODER = "qwen3vl_32b_minimax_h3_int4_convrot.safetensors"
+
+
+def patch_swap_workflow(wf: dict, video_name: str, image_name: str, e: dict) -> dict:
+    wf["2"]["inputs"]["image"] = image_name
+    wf["5"]["inputs"]["video"] = video_name
+    wf["27"]["inputs"]["video_path"] = f"{SWAP_INPUT_DIR}/{video_name}"
+    wf["16"]["inputs"]["lora_name"] = SWAP_LORA
+    wf["19"]["inputs"]["clip_name"] = SWAP_ENCODER
+    wf["11"]["inputs"].update(resolution=e["resolution"], steps=e["steps"], seed=e["seed"], clip_seconds=e["clip_seconds"])
+    wf["68"]["inputs"]["value"] = bool(e["no_lip_sync"])
+    return wf
+
+
+def swap_result_path(outputs: dict) -> tuple[str, str] | None:
+    """(subpasta, arquivo) do MP4 final, lido do texto 'assembled ... -> <caminho>' que o no de montagem devolve."""
+    for out in outputs.values():
+        for txt in out.get("text", []) or []:
+            m = re.search(r"-> (/\S*/output/(\S+)\.mp4)", str(txt))
+            if m and "assembled" in str(txt):
+                rel = m.group(2) + ".mp4"
+                sub, _, name = rel.rpartition("/")
+                return sub, name
+    return None
+
+
 RECIPES = {
     "flux-schnell": {"kind": "image", "title": "Flux schnell (rapido, boa qualidade)", "build": recipe_flux_schnell, "default": True},
     "ltx-video": {"kind": "video", "title": "LTX-Video 2B (rapido; clipes de ate 4 s encadeados ate 60 s)", "build": recipe_ltx_video, "default_video": True, "timeout": 900},
+    "openjutsu-swap": {"kind": "video", "title": "Openjutsu (troca de personagem em video, MiniMax H3)", "build": None, "timeout": 3600},
     "wan22-ti2v": {"kind": "video", "title": "Wan 2.2 5B (alta qualidade, 1280x704, 24 fps; clipes de 5 s encadeados ate 60 s)", "build": recipe_wan22, "timeout": 2400},
 }
 
@@ -256,7 +289,7 @@ class Media:
         if recipe not in RECIPES or RECIPES[recipe]["kind"] != kind:
             raise MediaError(f"receita desconhecida: {recipe}")
         try:
-            eff, adjusted = (mp.normalize_image if kind == "image" else mp.normalize_video_wan if recipe == "wan22-ti2v" else mp.normalize_video)(params)
+            eff, adjusted = (mp.normalize_image if kind == "image" else mp.normalize_swap if recipe == "openjutsu-swap" else mp.normalize_video_wan if recipe == "wan22-ti2v" else mp.normalize_video)(params)
         except mp.ParamError as e:
             raise MediaError(str(e))
         params = {**params, **eff}
@@ -279,7 +312,9 @@ class Media:
             await self._save(job)
             await self._ensure_tunnel()
             n_seg = int(params.get("segments") or 1) if job["kind"] == "video" else 1
-            if n_seg > 1:
+            if job["recipe"] == "openjutsu-swap":
+                files = await self._run_swap(job, params)
+            elif n_seg > 1:
                 files = await self._run_chain(job, params, n_seg)
             else:
                 image_name = await self._upload_start_image(params) if job["kind"] == "video" and params.get("image_to_video") else None
@@ -311,6 +346,68 @@ class Media:
             self.tasks.pop(job["id"], None)
             self.tickets.pop(job["id"], None)
             self.prog.pop(job["id"], None)
+
+    async def _upload_file(self, blob: bytes, name: str) -> str:
+        try:
+            r = await self.http.post(self.comfy + "/upload/image", files={"image": (name, blob, "application/octet-stream")}, data={"overwrite": "true"}, timeout=300)
+        except httpx.HTTPError as e:
+            raise MediaUnavailable(f"ComfyUI inacessivel ({type(e).__name__})")
+        if r.status_code != 200:
+            raise MediaError("um arquivo enviado foi recusado")
+        return r.json()["name"]
+
+    async def _run_swap(self, job: dict, params: dict) -> list[tuple[bytes, str]]:
+        """Troca de personagem: envia video e foto ao ComfyUI, roda o fluxo do Openjutsu e busca o MP4 montado."""
+        video, image = mp.swap_blobs(params)
+        if not await longvideo.has_audio(video):
+            video = await longvideo.add_silent_audio(video)
+        tag = uuid.uuid4().hex[:8]
+        ext = "png" if image.startswith(b"\x89PNG") else "webp" if image.startswith(b"RIFF") else "jpg"
+        vname = await self._upload_file(video, f"swap-{tag}.mp4")
+        iname = await self._upload_file(image, f"ref-{tag}.{ext}")
+        with open(SWAP_TEMPLATE, encoding="utf-8") as f:
+            wf = patch_swap_workflow(json.load(f), vname, iname, params)
+        outputs = await self._comfy_wait(wf, job, RECIPES["openjutsu-swap"]["timeout"])
+        where = swap_result_path(outputs)
+        if not where:
+            raise MediaError("o fluxo terminou sem devolver o video")
+        sub, name = where
+        v = await self.http.get(f"{self.comfy}/view", params={"filename": name, "subfolder": sub, "type": "output"}, timeout=300)
+        if v.status_code != 200 or not v.content:
+            raise MediaError("nao consegui buscar o video pronto")
+        return [(v.content, "video/mp4")]
+
+    async def _comfy_wait(self, wf: dict, job: dict, timeout: float) -> dict:
+        """Roda um fluxo e devolve as saidas do historico (qualquer tipo de no), com o mesmo vigia de progresso."""
+        watcher = asyncio.create_task(self._watch(job["id"]))
+        try:
+            try:
+                r = await self.http.post(self.comfy + "/prompt", json={"prompt": wf, "client_id": job["id"]}, timeout=30)
+            except httpx.HTTPError as e:
+                raise MediaUnavailable(f"ComfyUI inacessivel ({type(e).__name__})")
+            if r.status_code != 200:
+                raise MediaError("o ComfyUI recusou o pedido: " + r.text[:200])
+            pid = r.json()["prompt_id"]
+            deadline = self.now() + max(self.s.media_job_timeout_s, timeout or 0)
+            while self.now() < deadline:
+                await asyncio.sleep(max(self.s.media_poll_s, 2.0))
+                try:
+                    h = await self.http.get(f"{self.comfy}/history/{pid}", timeout=15)
+                except httpx.HTTPError as e:
+                    raise MediaUnavailable(f"ComfyUI inacessivel ({type(e).__name__})")
+                entry = (h.json() or {}).get(pid) if h.status_code == 200 else None
+                if not entry:
+                    continue
+                st = entry.get("status") or {}
+                if st.get("status_str") == "error":
+                    msgs = [m for m in st.get("messages", []) if m and m[0] == "execution_error"]
+                    detail = (msgs[0][1].get("exception_message") if msgs else "") or "erro de execucao"
+                    raise MediaError("falha ao gerar: " + str(detail)[:200])
+                if st.get("completed"):
+                    return entry.get("outputs") or {}
+            raise MediaError("tempo esgotado")
+        finally:
+            watcher.cancel()
 
     async def _run_chain(self, job: dict, params: dict, n_seg: int) -> list[tuple[bytes, str]]:
         """Video longo: n clipes encadeados pelo ultimo quadro, juntados num MP4 so (app/longvideo.py)."""

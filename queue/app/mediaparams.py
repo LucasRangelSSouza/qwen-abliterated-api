@@ -152,6 +152,52 @@ def normalize_video(p: dict) -> tuple[dict, list]:
     }
     return eff, adj
 
+SWAP_RESOLUTIONS = {"480p": (864, 480), "576p": (1024, 576), "736p": (1312, 736)}
+MAX_SWAP_VIDEO_BYTES = 40 * 1024 * 1024
+
+
+def _blob(raw, what: str, limit: int) -> bytes:
+    if not raw:
+        raise ParamError(f"Parâmetro inválido: {what} é obrigatório (arquivo em base64).")
+    raw = str(raw)
+    if raw.startswith("data:"):
+        raw = raw.split(",", 1)[-1]
+    try:
+        blob = base64.b64decode(raw, validate=False)
+    except (binascii.Error, ValueError):
+        raise ParamError(f"Parâmetro inválido: {what} deve estar em base64.")
+    if len(blob) > limit:
+        raise ParamError(f"Parâmetro inválido: {what} é grande demais (máximo {limit // (1024 * 1024)} MB).")
+    return blob
+
+
+def swap_blobs(p: dict) -> tuple[bytes, bytes]:
+    """(video de origem, foto do personagem) ja decodificados e validados."""
+    video = _blob(p.get("video") or p.get("source_video"), "video", MAX_SWAP_VIDEO_BYTES)
+    if not (video[4:8] == b"ftyp" or video.startswith(b"\x1a\x45\xdf\xa3")):
+        raise ParamError("Parâmetro inválido: video deve ser MP4, MOV ou WEBM.")
+    image = _blob(p.get("image") or p.get("character_image"), "image", MAX_IMAGE_BYTES)
+    if not image.startswith((b"\x89PNG", b"\xff\xd8", b"RIFF")):
+        raise ParamError("Parâmetro inválido: image deve ser PNG, JPEG ou WEBP.")
+    return video, image
+
+
+def normalize_swap(p: dict) -> tuple[dict, list]:
+    """Troca de personagem em video (Openjutsu / MiniMax H3): a pessoa principal do video vira a da foto, mantendo camera, cortes e audio."""
+    adj: list = []
+    swap_blobs(p)  # valida cedo; o conteudo nao entra no status do job
+    res = str(p.get("resolution") or p.get("resolucao") or "480p").lower()
+    if res not in SWAP_RESOLUTIONS:
+        raise ParamError(f"Parâmetro inválido: resolution deve ser um de {', '.join(SWAP_RESOLUTIONS)}.")
+    w, h = SWAP_RESOLUTIONS[res]
+    eff = {
+        "prompt": str(p.get("prompt") or "troca de personagem")[:300], "negative_prompt": "", "width": w, "height": h, "seconds": 0, "fps": 24, "frames": 0,
+        "segments": 1, "total_seconds": 0, "resolution": res, "steps": _num(p, ("steps",), 4, 1, 8, adj, "steps", True),
+        "clip_seconds": _num(p, ("clip_seconds",), 6.0, 2.5, 15.0, adj, "clip_seconds"), "seed": _seed(p),
+        "no_lip_sync": bool(p.get("no_lip_sync", True)), "image_to_video": False, "strength": None, "cfg": None, "sampler": None,
+    }
+    return eff, adj
+
 
 def public(eff: dict) -> dict:
     """O que o status do job mostra: tudo menos o texto base64 da imagem inicial."""

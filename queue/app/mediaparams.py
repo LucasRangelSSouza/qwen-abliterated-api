@@ -175,7 +175,7 @@ def normalize_video_wan(p: dict) -> tuple[dict, list]:
         raise ParamError(f"Parâmetro inválido: format deve ser um de {', '.join(WAN_SIZES)}.")
     w, h = WAN_SIZES[fmt]
     total = _num(p, ("seconds", "segundos"), 5.0, 1.0, VIDEO_MAX_TOTAL, adj, "seconds")
-    clip_max = (WAN_CLIP_FRAMES - 1) / WAN_FPS
+    clip_max = WAN_CLIP_FRAMES / WAN_FPS  # 121 quadros duram 5,04 s: esse e o teto de UM clipe (com (n-1)/fps o clipe cheio era dividido de novo)
     segments = max(1, math.ceil(total / clip_max - 1e-9))
     secs = total / segments
     frames = int(round(secs * WAN_FPS / 4)) * 4 + 1  # o modelo pede 4n+1 quadros

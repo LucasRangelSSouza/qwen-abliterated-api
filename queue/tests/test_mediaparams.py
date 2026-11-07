@@ -101,7 +101,10 @@ def test_video_wan_clipes_e_cadeia():
     e, adj = mp.normalize_video_wan({"prompt": "x"})
     assert (e["width"], e["height"], e["fps"], e["segments"], e["frames"]) == (1280, 704, 24, 1, 121) and (e["frames"] - 1) % 4 == 0
     e15, _ = mp.normalize_video_wan({"prompt": "x", "seconds": 15})
-    assert e15["segments"] == 3 and e15["frames"] <= mp.WAN_CLIP_FRAMES and 14.5 <= e15["total_seconds"] <= 15.5
+    assert e15["segments"] == 3 and e15["frames"] == 121 and 14.5 <= e15["total_seconds"] <= 15.5
+    # um clipe ja normalizado (seconds=5.04) nao pode ser dividido de novo ao ser reprocessado pela receita
+    again, _ = mp.normalize_video_wan({"prompt": "x", "seconds": e15["seconds"]})
+    assert again["segments"] == 1 and again["frames"] == 121
     e99, adj99 = mp.normalize_video_wan({"prompt": "x", "seconds": 99})
     assert "seconds" in adj99 and e99["segments"] >= 12
     from app.media import recipe_wan22

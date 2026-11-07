@@ -17,7 +17,7 @@ curl -X POST -H "X-Admin-Key: $ADMIN" http://llm-queue.rt:8000/admin/gpu/destroy
 
 ## Chaves e limites
 Toda chave nova nasce na tela **Pessoas** (nome, observação, limite de 5 h e/ou semanal em tokens). A chave aparece uma única vez. Sem limite marcado a pessoa não tem limite.
-A chave do dono (`OWNER_KEY_SHA256`) e a do LUAR (`PLATFORM_KEY_SHA256`) valem mesmo se o banco falhar. O banco é um SQLite em `/opt/platform/data/llm-access` (backup: do dono).
+A chave do dono (`OWNER_KEY_SHA256`) e a do LUAR (`PLATFORM_KEY_SHA256`) valem mesmo se o banco falhar. O banco é o **Postgres unificado** (banco `llm_access`, schema `access`, via `DATABASE_URL`), com dump lógico diário no backup da VPS. O `access.db` que ainda existe em `/opt/platform/data/llm-access` é resto da migração e não é mais escrito.
 
 ## Variáveis que mais importam (`/opt/platform/secrets/llm-queue.env`)
 `GPU_MAX_ALLIN_DPH_USD` (0,45), `GPU_MAX_DAILY_USD` (12), `GPU_MONTHLY_BUDGET_USD` (80), `GPU_MIN_CREDIT_USD` (saldo mínimo para ligar), `GPU_IDLE_MIN` (30, só o valor inicial: ver "GPU fixa e interruptor"),

@@ -3,7 +3,7 @@
 Porta publica da API de IA (`https://qwen.rangeltech.net`, Spec 14 §5). Fica na frente do `llm-queue`: uma chave por pessoa,
 limites opcionais de sessao e semana (estilo Claude Code), consumo por chave e painel em `/admin`. Contrato completo em `DESIGN.md`.
 
-- `app/`: FastAPI + SQLite (stdlib). Chaves guardadas so como SHA-256; nenhum texto de mensagem vai ao banco nem ao log.
+- `app/`: FastAPI + Postgres unificado em producao (`DATABASE_URL`, schema `access`; adaptador `store_pg.py`) e SQLite so em teste/desenvolvimento. Chaves guardadas so como SHA-256; nenhum texto de mensagem vai ao banco nem ao log.
 - `panel/`: painel React (build em `panel/dist`, servido em `/admin`; sem build, `/admin` avisa e a API segue funcionando).
 - `deploy/compose.yml`: stack para a VPS (Traefik, `read_only`, dados em `/opt/platform/data/llm-access`).
 

@@ -1,7 +1,8 @@
 # Stack "llm-access" (Spec 14): porta publica da API de IA (https://qwen.rangeltech.net). Copiar para vps_rt_infra/stacks/llm-access/compose.yml.
 # Fica na frente do llm-queue (rede interna) e serve o painel em /admin. Segredos so na VPS: /opt/platform/secrets/llm-access.env
 # (UPSTREAM_KEY, UPSTREAM_ADMIN_KEY, OWNER_KEY_SHA256, PLATFORM_KEY_SHA256, ADMIN_PASSWORD e SESSION_SECRET ou os *_FILE).
-# O banco SQLite vive em /opt/platform/data/llm-access (dono uid 10001, o usuario do container) e entra no backup.
+# O banco e o Postgres unificado (DATABASE_URL no llm-access.env, schema access); o dump diario do backup da VPS o cobre. O volume /data so guarda o
+# SQLite legado/de teste (dono uid 10001, o usuario do container); em producao ele nao e mais escrito.
 name: llm-access
 services:
   llm-access:

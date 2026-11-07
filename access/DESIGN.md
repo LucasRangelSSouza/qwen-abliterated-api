@@ -1,6 +1,6 @@
 # llm-access: desenho e contrato (Spec 14 §5)
 
-Servico unico exposto ao publico (`https://qwen.rangeltech.net`). Fica na frente do `llm-queue` (rede interna). Python 3.12 + FastAPI, SQLite num volume, painel React estatico servido pelo mesmo processo em `/admin`.
+Servico unico exposto ao publico (`https://qwen.rangeltech.net`). Fica na frente do `llm-queue` (rede interna). Python 3.12 + FastAPI, Postgres unificado em producao (SQLite so em teste), painel React estatico servido pelo mesmo processo em `/admin`.
 
 ## Ambiente
 | var | padrao | uso |
@@ -15,7 +15,7 @@ Servico unico exposto ao publico (`https://qwen.rangeltech.net`). Fica na frente
 | `OWNER_KEY_SHA256`, `PLATFORM_KEY_SHA256` | | chaves especiais (dono sem limite; LUAR) validas mesmo sem banco |
 | `PORT` | `8000` | |
 
-## Dados (SQLite)
+## Dados (as mesmas tabelas no Postgres, schema `access`; SQLite em teste)
 - `people(id, name, note, status[active|suspended], created_at)`
 - `keys(id, person_id, key_hash, key_last4, created_at, revoked_at)` (so SHA-256; a chave aparece uma vez)
 - `limits(person_id, session_limit_tokens NULL, week_limit_tokens NULL, session_seconds DEFAULT 18000, week_seconds DEFAULT 604800)`

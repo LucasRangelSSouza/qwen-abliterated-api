@@ -117,9 +117,33 @@ def recipe_ltx_video(p: dict, _ckpt: str, image_name: str | None = None) -> dict
     return wf
 
 
+def recipe_wan22(p: dict, _ckpt: str, image_name: str | None = None) -> dict:
+    """Wan 2.2 TI2V 5B: texto ou imagem para video em alta qualidade (24 fps, ate 1280x704, 5 s por clipe)."""
+    e, _ = mp.normalize_video_wan(p)
+    wf = {
+        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan2.2_ti2v_5B_fp16.safetensors", "weight_dtype": "default"}},
+        "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors", "type": "wan", "device": "default"}},
+        "3": {"class_type": "VAELoader", "inputs": {"vae_name": "wan2.2_vae.safetensors"}},
+        "4": {"class_type": "CLIPTextEncode", "inputs": {"text": e["prompt"], "clip": ["2", 0]}},
+        "5": {"class_type": "CLIPTextEncode", "inputs": {"text": e["negative_prompt"], "clip": ["2", 0]}},
+        "7": {"class_type": "Wan22ImageToVideoLatent", "inputs": {"vae": ["3", 0], "width": e["width"], "height": e["height"], "length": e["frames"], "batch_size": 1}},
+        "8": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["1", 0], "shift": 8.0}},
+        "9": {"class_type": "KSampler", "inputs": {"model": ["8", 0], "seed": e["seed"], "steps": e["steps"], "cfg": e["cfg"], "sampler_name": e["sampler"], "scheduler": "simple",
+                                                    "positive": ["4", 0], "negative": ["5", 0], "latent_image": ["7", 0], "denoise": 1.0}},
+        "10": {"class_type": "VAEDecode", "inputs": {"samples": ["9", 0], "vae": ["3", 0]}},
+        "11": {"class_type": "CreateVideo", "inputs": {"images": ["10", 0], "fps": float(e["fps"])}},
+        "12": {"class_type": "SaveVideo", "inputs": {"video": ["11", 0], "filename_prefix": "video/midia", "format": "mp4", "codec": "h264"}},
+    }
+    if image_name:  # imagem para video: o primeiro quadro e a imagem (mantem logo, rosto e detalhe)
+        wf["6"] = {"class_type": "LoadImage", "inputs": {"image": image_name}}
+        wf["7"]["inputs"]["start_image"] = ["6", 0]
+    return wf
+
+
 RECIPES = {
     "flux-schnell": {"kind": "image", "title": "Flux schnell (rapido, boa qualidade)", "build": recipe_flux_schnell, "default": True},
-    "ltx-video": {"kind": "video", "title": "LTX-Video 2B (texto para video; clipes de ate 4 s encadeados ate 60 s)", "build": recipe_ltx_video, "default_video": True, "timeout": 900},
+    "ltx-video": {"kind": "video", "title": "LTX-Video 2B (rapido; clipes de ate 4 s encadeados ate 60 s)", "build": recipe_ltx_video, "default_video": True, "timeout": 900},
+    "wan22-ti2v": {"kind": "video", "title": "Wan 2.2 5B (alta qualidade, 1280x704, 24 fps; clipes de 5 s encadeados ate 60 s)", "build": recipe_wan22, "timeout": 2400},
 }
 
 
@@ -232,7 +256,7 @@ class Media:
         if recipe not in RECIPES or RECIPES[recipe]["kind"] != kind:
             raise MediaError(f"receita desconhecida: {recipe}")
         try:
-            eff, adjusted = (mp.normalize_image if kind == "image" else mp.normalize_video)(params)
+            eff, adjusted = (mp.normalize_image if kind == "image" else mp.normalize_video_wan if recipe == "wan22-ti2v" else mp.normalize_video)(params)
         except mp.ParamError as e:
             raise MediaError(str(e))
         params = {**params, **eff}

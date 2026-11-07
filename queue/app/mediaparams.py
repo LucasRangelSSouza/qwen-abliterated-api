@@ -160,3 +160,44 @@ def public(eff: dict) -> dict:
 
 def with_style(prompt: str, style: str | None) -> str:
     return f"{prompt}, {STYLES[style]}" if style else prompt
+
+
+WAN_SIZES = {"paisagem": (1280, 704), "retrato": (704, 1280), "quadrado": (960, 960)}
+WAN_CLIP_FRAMES = 121  # 5 s a 24 fps por clipe (o que cabe numa 3090 de 24 GB); acima disso vira cadeia de clipes
+WAN_FPS = 24
+
+
+def normalize_video_wan(p: dict) -> tuple[dict, list]:
+    """Wan 2.2 5B (alta qualidade, 24 fps, ate 1280x704). Pedido maior que 5 s vira cadeia: o ultimo quadro de um clipe e a imagem inicial do proximo."""
+    adj: list = []
+    fmt = str(p.get("format") or p.get("formato") or "paisagem").lower()
+    if fmt not in WAN_SIZES:
+        raise ParamError(f"Parâmetro inválido: format deve ser um de {', '.join(WAN_SIZES)}.")
+    w, h = WAN_SIZES[fmt]
+    total = _num(p, ("seconds", "segundos"), 5.0, 1.0, VIDEO_MAX_TOTAL, adj, "seconds")
+    clip_max = (WAN_CLIP_FRAMES - 1) / WAN_FPS
+    segments = max(1, math.ceil(total / clip_max - 1e-9))
+    secs = total / segments
+    frames = int(round(secs * WAN_FPS / 4)) * 4 + 1  # o modelo pede 4n+1 quadros
+    frames = min(frames, WAN_CLIP_FRAMES)
+    image = p.get("image") or p.get("start_image")
+    if image:
+        raw = str(image)
+        if raw.startswith("data:"):
+            raw = raw.split(",", 1)[-1]
+        try:
+            blob = base64.b64decode(raw, validate=False)
+        except (binascii.Error, ValueError):
+            raise ParamError("Parâmetro inválido: image deve ser uma imagem em base64.")
+        if not blob.startswith((b"\x89PNG", b"\xff\xd8", b"RIFF")):
+            raise ParamError("Parâmetro inválido: image deve ser PNG, JPEG ou WEBP.")
+        if len(blob) > MAX_IMAGE_BYTES:
+            raise ParamError("Parâmetro inválido: a imagem inicial é grande demais (máximo 6 MB).")
+    eff = {
+        "prompt": _prompt(p), "negative_prompt": str(p.get("negative_prompt") or NEG_VIDEO)[:MAX_PROMPT_CHARS],
+        "width": w, "height": h, "seconds": round(frames / WAN_FPS, 2), "fps": WAN_FPS, "frames": frames, "segments": segments,
+        "total_seconds": round(frames / WAN_FPS * segments, 2),
+        "steps": _num(p, ("steps",), 20, 8, 40, adj, "steps", True), "cfg": _num(p, ("cfg", "guidance"), 5.0, 1.0, 8.0, adj, "cfg"),
+        "seed": _seed(p), "sampler": "euler", "image_to_video": bool(image), "strength": None,
+    }
+    return eff, adj

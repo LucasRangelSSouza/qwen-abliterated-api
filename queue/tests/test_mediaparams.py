@@ -95,3 +95,17 @@ async def test_imagem_inicial_sobe_para_o_comfy_e_n_imagens_viram_resultados(mak
     assert any(w["class_type"] == "LTXVImgToVideo" for w in comfy.prompts[-1]["prompt"].values())
     with pytest.raises(MediaError):
         await m.submit("a", "", {"prompt": "x", "sampler": "inventado"})
+
+
+def test_video_wan_clipes_e_cadeia():
+    e, adj = mp.normalize_video_wan({"prompt": "x"})
+    assert (e["width"], e["height"], e["fps"], e["segments"], e["frames"]) == (1280, 704, 24, 1, 121) and (e["frames"] - 1) % 4 == 0
+    e15, _ = mp.normalize_video_wan({"prompt": "x", "seconds": 15})
+    assert e15["segments"] == 3 and e15["frames"] <= mp.WAN_CLIP_FRAMES and 14.5 <= e15["total_seconds"] <= 15.5
+    e99, adj99 = mp.normalize_video_wan({"prompt": "x", "seconds": 99})
+    assert "seconds" in adj99 and e99["segments"] >= 12
+    from app.media import recipe_wan22
+    wf = recipe_wan22({"prompt": "carro", "seconds": 5}, "")
+    assert wf["7"]["class_type"] == "Wan22ImageToVideoLatent" and "start_image" not in wf["7"]["inputs"]
+    wf2 = recipe_wan22({"prompt": "carro", "seconds": 5}, "", "inicio.png")
+    assert wf2["6"]["inputs"]["image"] == "inicio.png" and wf2["7"]["inputs"]["start_image"] == ["6", 0]

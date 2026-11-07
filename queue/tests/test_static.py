@@ -12,6 +12,7 @@ import pytest
 
 from app.alerts import Alerts
 from app.config import Settings
+from app.gpu import llm_runtime
 from app.gpu.controller import K_BAD, K_CONFIG, K_INST, LABEL, LOADING, OFF, READY, GPUController, GPUUnavailable, load_onstart
 from app.gpu.ledger import Ledger
 from app.gpu.tunnel import NoTunnel
@@ -415,12 +416,53 @@ async def test_modo_fixo_vllm_morto_reinicia_so_o_processo_e_respeita_o_interval
     await ctl.ensure_ready()
     probe.ok = False  # o vLLM morreu
     assert await until(lambda: ctl.degraded is not None)
-    assert await until(lambda: len(tun.runs) >= 1)
+    assert await until(lambda: len(tun.runs) >= 2)
     await asyncio.sleep(0.6)  # varias retentativas de conexao: o reinicio nao se repete antes do intervalo
-    assert len(tun.runs) == 1 and tun.runs[0] == ("ssh.fake", 22222, "bash /workspace/start_vllm.sh")
+    # primeiro instala o start_vllm.sh versionado (idempotente), depois roda a partida
+    assert len(tun.runs) == 2 and tun.runs[1] == ("ssh.fake", 22222, "bash /workspace/start_vllm.sh")
+    assert tun.runs[0][2] == llm_runtime.install_command()
     assert forbidden(vast) == [] and SID in vast.instances  # a instancia nunca e parada nem destruida
     probe.ok = True
     assert await until(lambda: ctl.state == READY and ctl.degraded is None)
+
+
+async def test_modo_fixo_instalacao_do_script_pode_ser_desligada(make_ctl):
+    ctl, vast, probe = await static_ctl(make_ctl, static_llm_restart_min_s=30.0, static_llm_start_cmd="bash /workspace/start_vllm.sh", static_llm_install=False)
+    tun = TunRun()
+    ctl.tunnel = tun
+    ctl.start()
+    await ctl.ensure_ready()
+    probe.ok = False
+    assert await until(lambda: len(tun.runs) >= 1)
+    await asyncio.sleep(0.4)
+    assert [r[2] for r in tun.runs] == ["bash /workspace/start_vllm.sh"]
+
+
+def _bash():
+    """Um bash que funcione (no Windows o `bash` do PATH pode ser o lancador do WSL sem distribuicao)."""
+    for c in (shutil.which("bash"), r"C:\Program Files\Gitinash.exe"):
+        if c and Path(c).exists() and subprocess.run([c, "-c", "true"], capture_output=True).returncode == 0:
+            return c
+    pytest.skip("sem bash funcional")
+
+
+def test_start_vllm_versionado_trava_a_configuracao_medida_em_07_11():
+    txt = llm_runtime.SCRIPT.read_text(encoding="utf-8")
+    assert "--prefix-match-unit 16" in txt                      # ganho medido no cache de prefixo
+    assert "--max-model-len \"${MAX_LEN:-131072}\"" in txt        # contexto 131072 (igual ao static_llm_start_cmd)
+    assert "--max-num-seqs \"${MAX_SEQS:-32}\"" in txt
+    assert "--gpu-memory-utilization \"${LLM_UTIL:-0.90}\"" in txt
+    assert "--speculative-config" in txt and "LLM_MTP" in txt   # MTP so quando pedido; padrao desligado
+    assert 'EXTRA_ARGS="--prefix-match-unit 16"' in txt
+    assert subprocess.run([_bash(), "-n", str(llm_runtime.SCRIPT)]).returncode == 0
+
+
+def test_install_command_e_idempotente_e_guarda_copia():
+    cmd = llm_runtime.install_command()
+    assert llm_runtime.sha256() in cmd                          # so grava se o sha256 da maquina difere
+    assert "base64 -d > /workspace/start_vllm.sh" in cmd and "chmod +x" in cmd
+    assert ".bak_$(date" in cmd                                 # a copia anterior nao se perde
+    assert subprocess.run([_bash(), "-n", "-c", cmd]).returncode == 0
 
 
 async def test_modo_fixo_sem_comando_de_partida_nao_tenta_reiniciar(make_ctl):

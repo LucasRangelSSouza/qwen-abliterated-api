@@ -18,7 +18,7 @@ from typing import Awaitable, Callable
 from app.alerts import Alerts
 from app.config import Settings
 from app.gpu import hosts as H
-from app.gpu import stt
+from app.gpu import llm_runtime, stt
 from app.gpu.cycles import CycleLog
 from app.gpu.ledger import Ledger
 from app.gpu.tunnel import Tunnel
@@ -841,6 +841,9 @@ class GPUController:
         if not cmd or not (i.ssh_host and i.ssh_port) or now - self._static_llm_t < self.s.static_llm_restart_min_s:
             return
         self._static_llm_t = now
+        if self.s.static_llm_install and "start_vllm.sh" in cmd:
+            # o script de partida vem do repositorio (remote/start_vllm.sh): a maquina recriada ou desatualizada recebe a versao certa antes de subir o vLLM
+            await self.tunnel.run(i.ssh_host, int(i.ssh_port), llm_runtime.install_command())
         ok = await self.tunnel.run(i.ssh_host, int(i.ssh_port), cmd)
         await self.alerts.notify("static_llm_reiniciado", f"GPU fixa {i.id}: vLLM sem saude, partida do processo pedida por SSH ({'ok' if ok else 'falhou'})", "info")
 

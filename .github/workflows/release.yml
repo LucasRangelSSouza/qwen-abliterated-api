@@ -1,8 +1,12 @@
 name: Release
 # Uma tag v* gera, no mesmo release, um artefato por servico (llm-queue e llm-access), cada um com seu manifesto.
 # NAO faz deploy: so o vps_rt_infra implanta (release-intake gera o .lock, deploy.yml implanta).
+# Cada push em main que mexe em queue/, access/ ou neste fluxo gera uma release com versao v<serie>.<N> (serie em VERSION_SERIES; o N sobe sozinho).
+# Para abrir uma nova serie (ex.: 0.6), edite VERSION_SERIES. Uma tag v* criada na mao continua funcionando.
 on:
   push:
+    branches: [main]
+    paths: ["queue/**", "access/**", ".github/workflows/release.yml", "VERSION_SERIES"]
     tags: ["v*"]
   workflow_dispatch:
     inputs:
@@ -11,16 +15,32 @@ on:
         required: true
 permissions:
   contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Versao
         id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then V="${{ inputs.version }}"; else V="${GITHUB_REF_NAME}"; fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then V="$INPUT_VERSION"
+          elif [ "${{ github.ref_type }}" = "tag" ]; then V="${GITHUB_REF_NAME}"
+          else
+            S="$(tr -d '[:space:]' < VERSION_SERIES)"
+            git fetch --tags -q
+            N=$(git tag -l "v${S}.*" | sed -E "s/^v${S}\.//" | grep -E '^[0-9]+$' | sort -n | tail -1)
+            V="v${S}.$(( ${N:-0} + 1 ))"
+          fi
+          echo "$V" | grep -Eq '^v[0-9]+\.[0-9]+(\.[0-9]+)?$'
           echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "### Release $V (commit ${GITHUB_SHA::7})" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

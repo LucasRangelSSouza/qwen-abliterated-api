@@ -193,7 +193,7 @@ def normalize_swap(p: dict) -> tuple[dict, list]:
     eff = {
         "prompt": str(p.get("prompt") or "troca de personagem")[:300], "negative_prompt": "", "width": w, "height": h, "seconds": 0, "fps": 24, "frames": 0,
         "segments": 1, "total_seconds": 0, "resolution": res, "steps": _num(p, ("steps",), 4, 1, 8, adj, "steps", True),
-        "clip_seconds": _num(p, ("clip_seconds",), 6.0, 2.5, 15.0, adj, "clip_seconds"), "seed": _seed(p),
+        "clip_seconds": _num(p, ("clip_seconds",), 6.0, 2.5, 15.0, adj, "clip_seconds"), "seed": _seed(p) % 4294967296,  # o no do Openjutsu so aceita 32 bits
         "no_lip_sync": bool(p.get("no_lip_sync", True)), "image_to_video": False, "strength": None, "cfg": None, "sampler": None,
     }
     return eff, adj

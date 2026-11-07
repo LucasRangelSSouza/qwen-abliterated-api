@@ -13,6 +13,7 @@ FOTO = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"\x00" * 64).decode()
 def test_normalize_swap_padroes_e_validacao():
     e, adj = mp.normalize_swap({"video": VIDEO, "image": FOTO})
     assert (e["resolution"], e["steps"], e["clip_seconds"], e["no_lip_sync"], e["segments"]) == ("480p", 4, 6.0, True, 1) and (e["width"], e["height"]) == (864, 480)
+    assert 0 <= mp.normalize_swap({"video": VIDEO, "image": FOTO, "seed": 6863573541682862})[0]["seed"] <= 4294967295
     assert "video" not in mp.public(e) and "image" not in e  # o conteudo nunca vai para o status do job
     e2, _ = mp.normalize_swap({"video": VIDEO, "image": FOTO, "resolution": "736p", "no_lip_sync": False, "steps": 6})
     assert (e2["resolution"], e2["no_lip_sync"], e2["steps"]) == ("736p", False, 6)

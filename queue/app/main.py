@@ -526,6 +526,7 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
                 return
             WAIT.labels(kind).observe(max(0.0, time.time() - ticket.t_enq))
             attempts = 0
+            reconnect_until = time.time() + s.upstream_retry_s
             while True:
                 sent = False
                 try:
@@ -559,12 +560,16 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
                             yield data
                     return
                 except (httpx.TransportError, httpx.HTTPError) as e:
-                    if sent or attempts >= 1:  # ja respondeu: nao da para refazer sem duplicar tokens
+                    if sent or time.time() > reconnect_until:  # ja respondeu: nao da para refazer sem duplicar tokens; sem byte enviado, tenta ate acabar a janela
                         code = "502"
                         log.warning("falha no upstream: %r", e)
                         yield _error_chunk(stream, notice.MENSAGEM_FALHA, "server_error", "upstream_error")
                         return
-                    attempts += 1  # nenhum byte enviado: volta para a fila e refaz uma vez
+                    attempts += 1  # nenhum byte enviado: segura o cliente vivo, espera o tunel/host voltar e refaz
+                    if attempts == 1:
+                        log.warning("ligacao com a GPU caiu (%r): segurando o pedido por ate %s s", e, int(s.upstream_retry_s))
+                    yield keep
+                    await asyncio.sleep(min(2.0 * attempts, 8.0))
                     try:
                         await q.ctl.ensure_ready(priority)
                     except GPUUnavailable as g:

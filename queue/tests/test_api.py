@@ -335,3 +335,14 @@ async def test_segunda_interrupcao_durante_a_limpeza_nao_vaza_a_vaga(redis, monk
         await asyncio.sleep(0.2)
         assert app.state.q.chat.inflight == 0 and app.state.q.chat.running == []
         await client.aclose()
+
+async def test_queda_curta_da_ligacao_com_a_gpu_vira_espera_e_nao_erro(rig):
+    client, _, st, _ = rig
+    def h(req, s):
+        if s["calls"] <= 2:  # a ligacao com a GPU cai nas duas primeiras tentativas e volta
+            raise httpx.ConnectError("All connection attempts failed")
+        return httpx.Response(200, json={"id": "x", "choices": [{"message": {"content": "voltou"}}]})
+    st["handler"] = h
+    r = await client.post("/v1/chat/completions", json=BODY, headers=H)
+    assert r.status_code == 200 and b"voltou" in r.content and b"upstream_error" not in r.content
+    assert st["calls"] == 3

@@ -129,6 +129,7 @@ class Settings:
     embed_max_inflight: int = 8
     embed_queue_max: int = 200
     max_context_tokens: int = 65536
+    upstream_retry_s: float = 150.0  # UPSTREAM_RETRY_S: queda curta da ligacao com a GPU (tunel/host) antes de qualquer byte: segura o pedido e tenta de novo por este tempo em vez de devolver erro
     presence_penalty: float = 0.5  # PRESENCE_PENALTY: padrao injetado no chat quando o cliente nao manda o seu. Medido em 07/11/2026 (codigo longo via ferramenta, 6 pedidos por valor): 1.5 estourou 6000 tokens em 3/6 e so 2/6 compilaram; 0 e 0.5 deram 6/6. 0 desliga
     repetition_penalty: float = 0.0  # REPETITION_PENALTY: desligado por padrao (1.1 quebrou geracao de codigo em modo agente); o cliente ainda pode mandar o seu
     request_timeout_s: float = 1800.0
@@ -238,6 +239,7 @@ class Settings:
             keepalive_s=_f("KEEPALIVE_S", cls.keepalive_s),
             notice_enabled=_b("NOTICE_ENABLED", cls.notice_enabled),
             notice_every_s=_f("NOTICE_EVERY_S", cls.notice_every_s),
+            upstream_retry_s=_f("UPSTREAM_RETRY_S", cls.upstream_retry_s),
             presence_penalty=_f("PRESENCE_PENALTY", cls.presence_penalty),
             repetition_penalty=_f("REPETITION_PENALTY", cls.repetition_penalty),
             notice_fields=tuple(x.strip() for x in os.environ.get("NOTICE_FIELDS", ",".join(cls.notice_fields)).split(",") if x.strip()),

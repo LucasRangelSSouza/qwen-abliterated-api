@@ -147,7 +147,7 @@ def recipe_wan22(p: dict, _ckpt: str, image_name: str | None = None) -> dict:
 
 def recipe_wan22_a14b(p: dict, _ckpt: str, image_name: str | None = None) -> dict:
     """Wan 2.2 A14B imagem para video (qualidade maxima; roda no worker sob demanda, PRO 6000 de 96 GB): dois modelos de 14B em sequencia
-    (ruido alto nos primeiros passos, ruido baixo nos demais), fp16, 16 fps. Fluxo validado em 08/11/2026 (carro 832x480 em 254 s; 1280x720 em 852 s)."""
+    (ruido alto nos primeiros passos, ruido baixo nos demais), fp16, 16 fps. Fluxo validado em 08/11/2026 (carro 832x480 em 254 s; 1280x720 em 852 s na S de Nevada e 1145 s na WS de Ontario)."""
     if not image_name:
         raise MediaError("o video de alta qualidade precisa de uma imagem inicial")
     e, _ = mp.normalize_video_wan14(p)
@@ -215,7 +215,7 @@ RECIPES = {
     "ltx-video": {"kind": "video", "title": "LTX-Video 2B (rapido; clipes de ate 4 s encadeados ate 60 s)", "build": recipe_ltx_video, "default_video": True, "timeout": 900},
     "openjutsu-swap": {"kind": "video", "title": "Openjutsu (troca de personagem em video, MiniMax H3)", "build": None, "timeout": 3600},
     "wan22-ti2v": {"kind": "video", "title": "Wan 2.2 5B (alta qualidade, 1280x704, 24 fps; clipes de 5 s encadeados ate 60 s)", "build": recipe_wan22, "timeout": 2400},
-    HEAVY_RECIPE: {"kind": "video", "title": "Wan 2.2 14B (qualidade maxima, 720p, 16 fps; maquina dedicada sob demanda: 4 a 14 min por clipe de 5 s, encadeados ate 60 s)",
+    HEAVY_RECIPE: {"kind": "video", "title": "Wan 2.2 14B (qualidade maxima, 720p, 16 fps; maquina dedicada sob demanda: 5 a 20 min por clipe de 5 s, encadeados ate 60 s)",
                    "build": recipe_wan22_a14b, "timeout": 2400, "heavy": True},
 }
 

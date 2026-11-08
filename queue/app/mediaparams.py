@@ -213,7 +213,7 @@ WAN14_FPS = 16
 WAN14_CLIP_FRAMES = 81  # 5,06 s por clipe (o que o modelo foi treinado para fazer)
 WAN14_SIZES = {"alta": {"paisagem": (1280, 720), "retrato": (720, 1280), "quadrado": (960, 960)},
                "padrao": {"paisagem": (832, 480), "retrato": (480, 832), "quadrado": (640, 640)}}
-WAN14_SECONDS_PER_CLIP = {"alta": 860.0, "padrao": 260.0}  # tempo medido de um clipe cheio, ja contando carregar os modelos
+WAN14_SECONDS_PER_CLIP = {"alta": 1100.0, "padrao": 260.0}  # clipe cheio, ja contando carregar os modelos. 720p: 852 s (PRO 6000 S, Nevada) e 1145 s (WS, Ontario): usa o pior medido para nao prometer demais
 NEG_WAN14 = ("色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，"
              "形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走")
 

@@ -27,7 +27,7 @@ log = logging.getLogger("llm-queue.worker")
 
 LABEL = "mi-worker-video"
 SCRIPT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "remote", "worker-provision.sh")
-COLD_START_S = 300      # estimativa de partida a frio mostrada ao cliente: alugar (~2 min) + instalar (~2,5 min); o 1o pedido ainda carrega os modelos
+COLD_START_S = 480      # partida a frio mostrada ao cliente: alugar + instalar 81 GB + subir o ComfyUI. Medido em producao (08/11/2026): ~8 min ate o 1o pedido comecar a gerar
 LOG_KEY = "llmq:worker:runs"
 RECONCILE_EVERY_S = 300
 ADOPT_GRACE_S = 300     # apos reiniciar o servico, uma maquina ja de pe pode ser adotada por um pedido novo dentro deste prazo; depois disso e sobra e e destruida

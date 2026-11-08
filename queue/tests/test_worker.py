@@ -227,7 +227,7 @@ def test_parametros_wan14_qualidade_automatica():
 
 
 def test_estimativa_do_wan14_segue_o_tempo_medido():
-    assert mp.wan14_eta_s(mp.normalize_video_wan14({"prompt": "x", "seconds": 5})[0]) == 860          # 720p, 1 clipe: ~14 min
+    assert mp.wan14_eta_s(mp.normalize_video_wan14({"prompt": "x", "seconds": 5})[0]) == 1100         # 720p, 1 clipe: ~18 min
     assert mp.wan14_eta_s(mp.normalize_video_wan14({"prompt": "x", "seconds": 5, "quality": "padrao"})[0]) == 260  # 480p: ~4 min
     assert mp.wan14_eta_s(mp.normalize_video_wan14({"prompt": "x", "seconds": 15})[0]) == 3 * 260
 
@@ -372,9 +372,9 @@ async def test_estimativa_inclui_a_partida_da_maquina_e_a_fila(redis):
         await asyncio.sleep(0.05)
         pa, pb = await m.progress(a["id"]), await m.progress(b["id"])
         assert pa["status"] == "running" and pa["message"] == "Preparando o seu vídeo..." and pa["progress"] == 0
-        assert pa["eta_s"] == COLD_START_S + 860  # partida da maquina + o proprio video em 720p
+        assert pa["eta_s"] == COLD_START_S + 1100  # partida da maquina + o proprio video em 720p
         assert pb["status"] == "queued" and pb["position"] == 1
-        assert pb["eta_s"] >= 860 + 260  # o que esta na frente + o proprio (+ a partida, ainda nao pronta)
+        assert pb["eta_s"] >= 1100 + 260  # o que esta na frente + o proprio (+ a partida, ainda nao pronta)
         for word in ("GPU", "fila de espera", "Vast", "worker"):
             assert word not in pa["message"] and word not in pb["message"]
         gate.set()

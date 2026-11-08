@@ -114,10 +114,11 @@ _PERSON_SQL = (
 
 def _person_view(ctx: Ctx, r, windows: dict) -> dict:
     now = ctx.clock()
+    ef = ctx.ledger.limits(r["id"])  # limite efetivo AO VIVO (o do plano para quem tem conta)
     return {
         "id": r["id"], "name": r["name"], "note": r["note"], "status": r["status"], "safety_level": r["safety_level"], "key_last4": r["key_last4"],
-        "limits": {"session_limit_tokens": r["sl"], "week_limit_tokens": r["wl"], "session_seconds": r["ss"], "week_seconds": r["ws"]},
-        **{k: {kk: vv for kk, vv in view(windows.get(k), r["sl" if k == "session" else "wl"], now).items() if kk != "remaining"} for k in KINDS},
+        "limits": {"session_limit_tokens": ef["session_limit_tokens"], "week_limit_tokens": ef["week_limit_tokens"], "session_seconds": r["ss"], "week_seconds": r["ws"]},
+        **{k: {kk: vv for kk, vv in view(windows.get(k), ef[k + "_limit_tokens"], now).items() if kk != "remaining"} for k in KINDS},
         "last_used_at": iso(r["last_used"]),
     }
 
@@ -208,6 +209,9 @@ async def people_patch(pid: int, request: Request):
         for f in ("session_limit_tokens", "week_limit_tokens"):
             if f in b:
                 c.execute(f"UPDATE limits SET {f}=? WHERE person_id=?", (_limit(b[f], f), pid))
+                c.execute("UPDATE limits SET custom=1 WHERE person_id=?", (pid,))  # editado a mao: passa a valer no lugar do plano
+        if b.get("follow_plan") is True:
+            c.execute("UPDATE limits SET custom=0 WHERE person_id=?", (pid,))  # volta a seguir o limite do plano
         for f in ("session_seconds", "week_seconds"):
             if f in b:
                 c.execute(f"UPDATE limits SET {f}=? WHERE person_id=?", (_seconds(ctx, b[f], f), pid))

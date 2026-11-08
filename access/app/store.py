@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS keys(
   key_hash TEXT NOT NULL UNIQUE, key_last4 TEXT NOT NULL, created_at REAL NOT NULL, revoked_at REAL);
 CREATE TABLE IF NOT EXISTS limits(
   person_id INTEGER PRIMARY KEY REFERENCES people(id), session_limit_tokens INTEGER, week_limit_tokens INTEGER,
-  session_seconds INTEGER NOT NULL DEFAULT 18000, week_seconds INTEGER NOT NULL DEFAULT 604800);
+  session_seconds INTEGER NOT NULL DEFAULT 18000, week_seconds INTEGER NOT NULL DEFAULT 604800, custom INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS windows(
   person_id INTEGER NOT NULL REFERENCES people(id), kind TEXT NOT NULL CHECK(kind IN ('session','week')),
   start_ts REAL NOT NULL, end_ts REAL NOT NULL, used_tokens INTEGER NOT NULL DEFAULT 0,
@@ -79,6 +79,8 @@ class Store:
                 c.execute("ALTER TABLE keys ADD COLUMN label TEXT")  # "app:<computador>" nas chaves emitidas no login
             if "safety_level" not in {r["name"] for r in c.execute("PRAGMA table_info(people)").fetchall()}:
                 c.execute("ALTER TABLE people ADD COLUMN safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2,3))")
+            if "custom" not in {r["name"] for r in c.execute("PRAGMA table_info(limits)").fetchall()}:
+                c.execute("ALTER TABLE limits ADD COLUMN custom INTEGER NOT NULL DEFAULT 0")  # 1 = limite editado a mao na pessoa (vale no lugar do plano)
             cols_vms = {r["name"] for r in c.execute("PRAGMA table_info(vms)").fetchall()}
             for col, tipo in (("external_id", "TEXT"), ("billing_status", "TEXT"), ("next_payment_at", "REAL")):  # cobranca propria da VM (produto da Cakto)
                 if col not in cols_vms:

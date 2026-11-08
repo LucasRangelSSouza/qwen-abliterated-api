@@ -88,6 +88,7 @@ class PgStore:
                         THEN ALTER TABLE {tb} DROP CONSTRAINT IF EXISTS {tb}_safety_level_check; ALTER TABLE {tb} ADD CONSTRAINT {tb}_safety_level_check CHECK(safety_level IN (1,2,3)); END IF; END $$""")
                 except Exception:  # noqa: BLE001
                     pass
+            c.execute("ALTER TABLE limits ADD COLUMN IF NOT EXISTS custom BIGINT NOT NULL DEFAULT 0")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS external_id TEXT")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS billing_status TEXT")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS next_payment_at DOUBLE PRECISION")

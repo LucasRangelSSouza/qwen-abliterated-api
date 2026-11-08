@@ -334,3 +334,38 @@ async def test_produto_com_nome_lite_vira_o_plano_light(rig: Rig):
     assert A.plan_from_hint(ctx, "segundo cérebro ultra lite") == "ultra"  # o maior vence
     planos = {p[0]: p for p in A.DEFAULT_PLANS}
     assert planos["light"][1] == "Lite" and planos["max"][2] == 5 * planos["light"][2] and planos["ultra"][2] == 20 * planos["light"][2]
+
+
+async def test_limite_do_plano_vale_ao_vivo_sem_copia_velha(make_rig):
+    """Mudou o plano no painel, mudou para quem ja tem conta, na hora. So a edicao manual (custom) segue o proprio valor."""
+    r = await make_rig(cakto_webhook_secret=SEG)
+    await r.login()
+    await webhook(r, compra(email="live@x.com", plano="Segundo Cérebro Max"))
+    ctx = r.app.state.ctx
+    pid = ctx.store.one("SELECT person_id FROM accounts WHERE email=?", ("live@x.com",))["person_id"]
+    assert ctx.ledger.limits(pid)["session_limit_tokens"] == 5_000_000
+    # troca o plano no painel: a conta ja existente passa a valer o novo limite, sem nenhum evento de cobranca
+    assert (await r.client.put("/admin/api/plans/max", json={"session_limit_tokens": 7_000_000, "week_limit_tokens": 70_000_000})).status_code == 200
+    lim = ctx.ledger.limits(pid)
+    assert lim["session_limit_tokens"] == 7_000_000 and lim["week_limit_tokens"] == 70_000_000
+    assert ctx.ledger.windows(pid)["session"]["limit"] == 7_000_000
+    pessoa = [p for p in (await r.client.get("/admin/api/people")).json() if p["id"] == pid][0]
+    assert pessoa["limits"]["session_limit_tokens"] == 7_000_000  # o painel mostra o efetivo, nao a copia
+    # o bloqueio usa o limite vivo: reserva acima do plano novo e recusada
+    from app.ledger import Blocked
+    import pytest
+    with pytest.raises(Blocked):
+        ctx.ledger.reserve(pid, 7_000_001)
+    ctx.ledger.release(ctx.ledger.reserve(pid, 7_000_000))
+    # edicao manual na pessoa: vale no lugar do plano ate mandar voltar a seguir o plano
+    assert (await r.client.patch(f"/admin/api/people/{pid}", json={"session_limit_tokens": 123})).status_code == 200
+    await r.client.put("/admin/api/plans/max", json={"session_limit_tokens": 9_000_000})
+    assert ctx.ledger.limits(pid)["session_limit_tokens"] == 123
+    assert (await r.client.patch(f"/admin/api/people/{pid}", json={"follow_plan": True})).status_code == 200
+    assert ctx.ledger.limits(pid)["session_limit_tokens"] == 9_000_000
+
+
+async def test_pessoa_sem_conta_mantem_o_proprio_limite(rig: Rig):
+    pid, _key = await rig.person("manual", session_limit_tokens=1000)
+    await rig.client.put("/admin/api/plans/max", json={"session_limit_tokens": 9_000_000})
+    assert rig.app.state.ctx.ledger.limits(pid)["session_limit_tokens"] == 1000

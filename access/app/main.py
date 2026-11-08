@@ -83,6 +83,8 @@ def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = No
     app.include_router(proxy.router)
     app.include_router(accounts_routes.router)
     app.include_router(free.router)
+    from app import versao
+    app.include_router(versao.router)
     app.include_router(enroll.router)
     app.include_router(admin.api)
     app.include_router(admin.static)  # por ultimo: o catch-all /admin/{path} nao pode engolir /admin/api

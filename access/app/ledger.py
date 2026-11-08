@@ -47,15 +47,27 @@ class Ledger:
         self.store, self.clock, self.retention_days = store, clock, retention_days
         self._last_purge = 0.0
 
+    # Limite de tokens AO VIVO. Conta com assinatura: vale o limite do plano da assinatura mais recente, lido do banco a CADA chamada (mudou o plano no painel,
+    # mudou para todo mundo na hora; nao existe copia que fique velha). Pessoa sem conta, conta sem assinatura ou limite editado a mao (custom=1): a linha propria.
+    _DO_PLANO = ("SELECT p.session_limit_tokens sl, p.week_limit_tokens wl FROM accounts a JOIN subscriptions s ON s.account_id=a.id "
+                 "JOIN plans p ON p.id=s.plan WHERE a.person_id=? ORDER BY s.updated_at DESC, s.id DESC LIMIT 1")
+
+    @staticmethod
+    def _aplicar_plano(lim: dict, plano) -> dict:
+        if plano is not None and not lim.get("custom"):
+            lim = {**lim, "session_limit_tokens": plano["sl"], "week_limit_tokens": plano["wl"]}
+        return lim
+
     def limits(self, person_id: int) -> dict:
         r = self.store.one("SELECT * FROM limits WHERE person_id=?", (person_id,))
-        return dict(r) if r else {"person_id": person_id, "session_limit_tokens": None, "week_limit_tokens": None,
-                                  "session_seconds": 18000, "week_seconds": 604800}
+        lim = dict(r) if r else {"person_id": person_id, "session_limit_tokens": None, "week_limit_tokens": None,
+                                 "session_seconds": 18000, "week_seconds": 604800}
+        return self._aplicar_plano(lim, self.store.one(self._DO_PLANO, (person_id,)))
 
     def reserve(self, person_id: int, amount: int) -> Reservation:
         now = self.clock()
         with self.store.tx() as c:
-            lim = c.execute("SELECT * FROM limits WHERE person_id=?", (person_id,)).fetchone()
+            lim = self._aplicar_plano(dict(c.execute("SELECT * FROM limits WHERE person_id=?", (person_id,)).fetchone()), c.execute(self._DO_PLANO, (person_id,)).fetchone())
             plan = []
             for kind in KINDS:
                 limit, secs = lim[f"{kind}_limit_tokens"], lim[f"{kind}_seconds"]

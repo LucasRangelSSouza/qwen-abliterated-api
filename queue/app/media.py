@@ -21,6 +21,7 @@ from app import longvideo, metrics, notice
 from app import mediaparams as mp
 from app.config import Settings
 from app.gpu.tunnel import Tunnel
+from app.gpu.worker import WorkerUnavailable
 from app.scheduler import Lane, QueueFull
 
 log = logging.getLogger("llm-queue.media")
@@ -42,6 +43,7 @@ MSG = {
     ("image", "done"): "Pronto.",
     ("video", "done"): "Pronto.",
 }
+MSG_PREPARANDO = {"image": "Preparando a sua imagem...", "video": "Preparando o seu vídeo..."}
 
 
 async def _ws_connect(url: str):
@@ -142,6 +144,41 @@ def recipe_wan22(p: dict, _ckpt: str, image_name: str | None = None) -> dict:
     return wf
 
 
+def recipe_wan22_a14b(p: dict, _ckpt: str, image_name: str | None = None) -> dict:
+    """Wan 2.2 A14B imagem para video (qualidade maxima; roda no worker sob demanda, PRO 6000 de 96 GB): dois modelos de 14B em sequencia
+    (ruido alto nos primeiros passos, ruido baixo nos demais), fp16, 16 fps. Fluxo validado em 08/11/2026 (carro 832x480 em 254 s; 1280x720 em 852 s)."""
+    if not image_name:
+        raise MediaError("o video de alta qualidade precisa de uma imagem inicial")
+    e, _ = mp.normalize_video_wan14(p)
+    steps = int(e["steps"])
+    half = steps // 2
+    return {
+        "1": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan2.2_i2v_high_noise_14B_fp16.safetensors", "weight_dtype": "default"}},
+        "2": {"class_type": "UNETLoader", "inputs": {"unet_name": "wan2.2_i2v_low_noise_14B_fp16.safetensors", "weight_dtype": "default"}},
+        "3": {"class_type": "CLIPLoader", "inputs": {"clip_name": "umt5_xxl_fp16.safetensors", "type": "wan"}},
+        "4": {"class_type": "VAELoader", "inputs": {"vae_name": "wan_2.1_vae.safetensors"}},
+        "5": {"class_type": "CLIPTextEncode", "inputs": {"text": e["prompt"], "clip": ["3", 0]}},
+        "6": {"class_type": "CLIPTextEncode", "inputs": {"text": e["negative_prompt"], "clip": ["3", 0]}},
+        "7": {"class_type": "LoadImage", "inputs": {"image": image_name}},
+        "8": {"class_type": "WanImageToVideo", "inputs": {"positive": ["5", 0], "negative": ["6", 0], "vae": ["4", 0], "width": e["width"], "height": e["height"],
+                                                          "length": e["frames"], "batch_size": 1, "start_image": ["7", 0]}},
+        "9": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["1", 0], "shift": 5.0}},
+        "10": {"class_type": "ModelSamplingSD3", "inputs": {"model": ["2", 0], "shift": 5.0}},
+        "11": {"class_type": "KSamplerAdvanced", "inputs": {"model": ["9", 0], "add_noise": "enable", "noise_seed": e["seed"], "steps": steps, "cfg": e["cfg"], "sampler_name": "euler",
+                                                            "scheduler": "simple", "positive": ["8", 0], "negative": ["8", 1], "latent_image": ["8", 2],
+                                                            "start_at_step": 0, "end_at_step": half, "return_with_leftover_noise": "enable"}},
+        "12": {"class_type": "KSamplerAdvanced", "inputs": {"model": ["10", 0], "add_noise": "disable", "noise_seed": 0, "steps": steps, "cfg": e["cfg"], "sampler_name": "euler",
+                                                            "scheduler": "simple", "positive": ["8", 0], "negative": ["8", 1], "latent_image": ["11", 0],
+                                                            "start_at_step": half, "end_at_step": 10000, "return_with_leftover_noise": "disable"}},
+        "13": {"class_type": "VAEDecode", "inputs": {"samples": ["12", 0], "vae": ["4", 0]}},
+        "14": {"class_type": "CreateVideo", "inputs": {"images": ["13", 0], "fps": float(e["fps"])}},
+        "15": {"class_type": "SaveVideo", "inputs": {"video": ["14", 0], "filename_prefix": "video/midia", "format": "mp4", "codec": "h264"}},
+    }
+
+
+HEAVY_RECIPE = "wan22-a14b"  # a receita que roda no worker sob demanda
+
+
 # --- troca de personagem (Openjutsu): fluxo do repositorio D3voz/openjutsu (MIT), chamado direto na API do ComfyUI
 SWAP_TEMPLATE = os.path.join(os.path.dirname(__file__), "workflows", "openjutsu_simple.api.json")
 SWAP_INPUT_DIR = "/workspace/ComfyUI/input"  # onde o ComfyUI da maquina de midia guarda os arquivos enviados
@@ -177,20 +214,25 @@ RECIPES = {
     "ltx-video": {"kind": "video", "title": "LTX-Video 2B (rapido; clipes de ate 4 s encadeados ate 60 s)", "build": recipe_ltx_video, "default_video": True, "timeout": 900},
     "openjutsu-swap": {"kind": "video", "title": "Openjutsu (troca de personagem em video, MiniMax H3)", "build": None, "timeout": 3600},
     "wan22-ti2v": {"kind": "video", "title": "Wan 2.2 5B (alta qualidade, 1280x704, 24 fps; clipes de 5 s encadeados ate 60 s)", "build": recipe_wan22, "timeout": 2400},
+    HEAVY_RECIPE: {"kind": "video", "title": "Wan 2.2 14B (qualidade maxima, 720p, 16 fps; maquina dedicada sob demanda: 4 a 14 min por clipe de 5 s, encadeados ate 60 s)",
+                   "build": recipe_wan22_a14b, "timeout": 2400, "heavy": True},
 }
 
 
 # --------------------------------------------------------------------------- servico
 
 class Media:
-    def __init__(self, s: Settings, vast, tunnel: Tunnel, redis, http: httpx.AsyncClient, clock=time.time, ws_connect=None):
+    def __init__(self, s: Settings, vast, tunnel: Tunnel, redis, http: httpx.AsyncClient, clock=time.time, ws_connect=None, worker=None):
+        """`worker` (EphemeralWorker): esta Media atende so o video pesado numa maquina alugada sob demanda; sem ele e a GPU fixa de imagem/video rapido."""
         self.s, self.vast, self.tun, self.r, self.http, self.now = s, vast, tunnel, redis, http, clock
-        self.lane = Lane("image", 1, s.media_queue_max, s.media_per_consumer)
+        self.worker = worker
+        self.lane = Lane("video-worker" if worker else "image", 1, s.media_queue_max, s.media_per_consumer)
         self.live: dict[str, dict] = {}        # pedidos que ainda nao terminaram (fila + rodando)
         self.tasks: dict[str, asyncio.Task] = {}
         self._inst_cache: tuple[float, object] | None = None
         self._tun_lock = asyncio.Lock()
-        self.comfy = f"http://127.0.0.1:{s.media_local_port}"
+        self.local_port = s.worker_local_port if worker else s.media_local_port
+        self.comfy = f"http://127.0.0.1:{self.local_port}"
         self._keep: asyncio.Task | None = None
         self.tickets: dict[str, object] = {}   # vaga de cada pedido vivo (para dizer a posicao na fila)
         self.prog: dict[str, int] = {}         # progresso real 0..100 dos pedidos em execucao
@@ -198,6 +240,9 @@ class Media:
 
     # ---- vigia do tunel
     def start(self) -> None:
+        if self.worker is not None:
+            self.worker.start()  # o vigia do worker: destroi a maquina ociosa
+            return
         if self._keep is None:
             self._keep = asyncio.create_task(self._keeper())
 
@@ -206,6 +251,8 @@ class Media:
         if k:
             k.cancel()
             await asyncio.gather(k, return_exceptions=True)
+        if self.worker is not None:
+            await self.worker.stop()
         await self.tun.close()
 
     async def _keeper(self) -> None:
@@ -235,6 +282,12 @@ class Media:
         return inst
 
     async def _ensure_tunnel(self) -> None:
+        if self.worker is not None:  # worker sob demanda: aluga e instala se precisar, e abre o tunel
+            try:
+                await self.worker.ensure()
+            except WorkerUnavailable as e:
+                raise MediaUnavailable(f"maquina de video indisponivel: {e}")
+            return
         async with self._tun_lock:
             if await self.tun.healthy():
                 return
@@ -258,6 +311,8 @@ class Media:
             return None
 
     async def status(self) -> dict:
+        if self.worker is not None:
+            return {**self.worker.status(), "lane": self.lane.stats(), "today": await self._today_stats(), "recipes": [{"id": HEAVY_RECIPE, "kind": "video", "title": RECIPES[HEAVY_RECIPE]["title"]}]}
         inst = await self.instance()
         tun_ok = await self.tun.healthy()
         comfy = await self.comfy_health() if tun_ok else None
@@ -283,13 +338,16 @@ class Media:
 
     # ---- jobs
     async def submit(self, consumer: str, end_user: str, params: dict, cls: str = "interactive", kind: str = "image") -> dict:
-        if kind == "video" and not self.s.media_video_enabled:
+        if kind == "video" and not self.s.media_video_enabled and self.worker is None:  # o worker tem 96 GB e RAM de sobra: o bloqueio e so da GPU fixa
             raise MediaUnavailable("geracao de video indisponivel nesta maquina de midia (sem memoria para video e imagem juntos); use a skill video-motion no computador")
-        recipe = params.get("recipe") or next(k for k, v in RECIPES.items() if v.get("default" if kind == "image" else "default_video"))
+        recipe = params.get("recipe") or (HEAVY_RECIPE if self.worker is not None else next(k for k, v in RECIPES.items() if v.get("default" if kind == "image" else "default_video")))
         if recipe not in RECIPES or RECIPES[recipe]["kind"] != kind:
             raise MediaError(f"receita desconhecida: {recipe}")
+        if bool(RECIPES[recipe].get("heavy")) != (self.worker is not None):  # a receita pesada so roda no worker, e o worker so roda ela
+            raise MediaError(f"receita indisponivel aqui: {recipe}")
         try:
-            eff, adjusted = (mp.normalize_image if kind == "image" else mp.normalize_swap if recipe == "openjutsu-swap" else mp.normalize_video_wan if recipe == "wan22-ti2v" else mp.normalize_video)(params)
+            eff, adjusted = (mp.normalize_image if kind == "image" else mp.normalize_swap if recipe == "openjutsu-swap" else mp.normalize_video_wan14 if recipe == HEAVY_RECIPE
+                             else mp.normalize_video_wan if recipe == "wan22-ti2v" else mp.normalize_video)(params)
         except mp.ParamError as e:
             raise MediaError(str(e))
         params = {**params, **eff}
@@ -306,12 +364,19 @@ class Media:
         return job
 
     async def _run(self, job: dict, params: dict, t) -> None:
+        entered = False
         try:
             await self.lane.acquire(t, self.now())
-            job.update(state="executando", started=self.now())
+            job.update(state="executando", started=self.now(), phase="preparando" if self.worker is not None else "gerando")
             await self._save(job)
+            if self.worker is not None:
+                self.worker.enter()  # a maquina nao pode ser destruida por ociosidade enquanto este pedido existe
+                entered = True
             await self._ensure_tunnel()
+            job.update(phase="gerando", gen_started=self.now())
             n_seg = int(params.get("segments") or 1) if job["kind"] == "video" else 1
+            if job["recipe"] == HEAVY_RECIPE and not params.get("image_to_video"):
+                params = await self._start_frame(job, params)  # o Wan parte de uma imagem: sem imagem do cliente, o Flux cria o primeiro quadro (a imagem sai boa e o video herda o enquadramento)
             if job["recipe"] == "openjutsu-swap":
                 files = await self._run_swap(job, params)
             elif n_seg > 1:
@@ -334,6 +399,8 @@ class Media:
             log.exception("media: falha inesperada")
             job.update(state="failed", finished=self.now(), error=f"erro inesperado ({type(e).__name__})")
         finally:
+            if entered:
+                self.worker.leave()
             await self.lane.cancel(t)
             if job.get("started"):
                 job["seconds"] = round((job["finished"] or self.now()) - job["started"], 1)
@@ -355,6 +422,17 @@ class Media:
         if r.status_code != 200:
             raise MediaError("um arquivo enviado foi recusado")
         return r.json()["name"]
+
+    async def _start_frame(self, job: dict, params: dict) -> dict:
+        """Primeiro quadro do video pesado quando o cliente nao mandou imagem: o Flux (rapido, 2 a 4 s com a maquina quente) cria a imagem no enquadramento pedido."""
+        job["flux_only"] = True  # enquanto o Flux roda, a barra usa a escala normal; o Wan usa a escala dos dois amostradores
+        try:
+            wf = recipe_flux_schnell({"prompt": params["prompt"], "width": params["width"], "height": params["height"], "seed": params.get("seed")}, self.s.media_ckpt)
+            files = await self._comfy_run(wf, {**job, "kind": "image"}, 300)
+        finally:
+            job.pop("flux_only", None)
+            self.prog[job["id"]] = 2  # o Wan recomeca a barra do zero
+        return {**params, "image": base64.b64encode(files[0][0]).decode(), "image_to_video": True}
 
     async def _run_swap(self, job: dict, params: dict) -> list[tuple[bytes, str]]:
         """Troca de personagem: envia video e foto ao ComfyUI, roda o fluxo do Openjutsu e busca o MP4 montado."""
@@ -416,6 +494,7 @@ class Media:
         base = int(params.get("seed") or 0)
         last = ""
         for k in range(n_seg):
+            self.prog[job["id"]] = 2  # cada clipe recomeca a barra (o job soma as fatias)
             pk = {**params, "segments": 1, "seed": base + k}
             if k:
                 pk.update(image=last, image_to_video=True, strength=params.get("strength") or 1.0)
@@ -439,7 +518,7 @@ class Media:
     async def _watch(self, jid: str) -> None:
         """Acompanha o ComfyUI pelo WebSocket (clientId = id do pedido): 'progress' traz passo/total da amostragem. 5% = carregando modelos, 97% = decodificando."""
         try:
-            conn = await self.ws_connect(f"ws://127.0.0.1:{self.s.media_local_port}/ws?clientId={jid}")
+            conn = await self.ws_connect(f"ws://127.0.0.1:{self.local_port}/ws?clientId={jid}")
             async with conn as ws:
                 async for raw in ws:
                     if isinstance(raw, (bytes, bytearray)):
@@ -450,7 +529,11 @@ class Media:
                     if m.get("type") == "execution_start":
                         self.prog[jid] = max(cur, 3)
                     elif m.get("type") == "progress" and d.get("max"):
-                        self.prog[jid] = max(cur, min(97, 5 + int(92 * d["value"] / d["max"])))
+                        base, span = 5, 92
+                        if (self.live.get(jid) or {}).get("recipe") == HEAVY_RECIPE and not (self.live.get(jid) or {}).get("flux_only"):
+                            # Wan 14B tem dois amostradores em sequencia, cada um reporta 0..max: o 1o (no 11) vale ate ~50% da barra, o 2o (no 12) o resto
+                            base, span = (5, 45) if str(d.get("node")) == "11" else (50, 47) if str(d.get("node")) == "12" else (5, 92)
+                        self.prog[jid] = max(cur, min(97, base + int(span * d["value"] / d["max"])))
         except asyncio.CancelledError:
             raise
         except Exception as e:  # noqa: BLE001
@@ -507,6 +590,15 @@ class Media:
         raw = await self.r.get(f"llmq:media:job:{jid}")
         return json.loads(raw) if raw else None
 
+    def _est(self, job: dict) -> int:
+        """Duracao esperada de um pedido (sem a partida do worker): o video pesado depende de tamanho e duracao; os demais usam a media."""
+        if job.get("recipe") == HEAVY_RECIPE and job.get("params"):
+            return mp.wan14_eta_s(job["params"])
+        return ETA_DEFAULT_S.get(job.get("kind", "image"), 30)
+
+    def _job_of(self, ticket) -> dict:
+        return self.live.get(next((i for i, tk in self.tickets.items() if tk is ticket), ""), {})
+
     async def progress(self, jid: str) -> dict | None:
         """Contrato de progresso para o app (GET /v1/media/jobs/{id}). Nunca devolve texto de infraestrutura."""
         job = await self.get(jid)
@@ -523,12 +615,16 @@ class Media:
             status, pct, eta, msg = "done", 100, 0, MSG[(kind, "done")]
         elif state == "failed":
             status, pct, msg = "failed", int(self.prog.get(jid, 0)), notice.MENSAGEM_FALHA
+        elif state == "executando" and job.get("phase") == "preparando":
+            # worker sob demanda ainda subindo: a espera inclui a partida da maquina (o cliente nao ve nada de infraestrutura)
+            status, pct, msg = "running", 0, MSG_PREPARANDO[kind]
+            eta = (self.worker.startup_eta_s() if self.worker else 0) + self._est(job)
         elif state == "executando":
             status, pct = "running", int(self.prog.get(jid, 0))
             if job.get("segments", 1) > 1:  # video longo: cada clipe vale uma fatia da barra
                 pct = int((job.get("seg_done", 0) * 100 + pct) / job["segments"])
-            run = max(0.0, self.now() - (job.get("started") or self.now()))
-            est = ETA_DEFAULT_S[kind]
+            run = max(0.0, self.now() - (job.get("gen_started") or job.get("started") or self.now()))
+            est = self._est(job)
             eta = int(round(run * (100 - pct) / pct)) if pct >= 10 and run > 3 else max(1, int(est - run))
             msg = MSG[(kind, "running")]
         else:
@@ -537,12 +633,14 @@ class Media:
             waiting = list(self.lane.waiting)
             position = waiting.index(t) + 1 if t in waiting else 1
             ahead = waiting[:position - 1]
-            eta = sum(ETA_DEFAULT_S.get(getattr(x, "kind", "image"), 30) for x in ahead)
+            eta = sum(self._est(self._job_of(x) or {"kind": getattr(x, "kind", "image")}) for x in ahead)
             for r in self.lane.running:  # o que esta rodando agora ainda leva o que falta dele
-                rj = self.live.get(next((i for i, tk in self.tickets.items() if tk is r), ""), {})
-                rest = ETA_DEFAULT_S[rj.get("kind", "image")] * (100 - self.prog.get(rj.get("id", ""), 0)) / 100
+                rj = self._job_of(r)
+                rest = self._est(rj) * (100 - self.prog.get(rj.get("id", ""), 0)) / 100
                 eta += int(rest)
-            eta += ETA_DEFAULT_S[kind]
+            eta += self._est(job)
+            if self.worker is not None and self.worker.state != "ready":
+                eta += self.worker.startup_eta_s()
         out = {"id": jid, "kind": kind, "type": kind, "status": status, "position": position, "eta_s": eta, "progress": pct, "message": msg,
                "params": job.get("params"), "adjusted": job.get("adjusted") or []}
         if status == "done":

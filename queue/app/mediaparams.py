@@ -208,6 +208,61 @@ def with_style(prompt: str, style: str | None) -> str:
     return f"{prompt}, {STYLES[style]}" if style else prompt
 
 
+# --- Wan 2.2 A14B (worker sob demanda numa RTX PRO 6000 de 96 GB). Medido em 08/11/2026: 81 quadros em 832x480 = 254 s; em 1280x720 = 852 s.
+WAN14_FPS = 16
+WAN14_CLIP_FRAMES = 81  # 5,06 s por clipe (o que o modelo foi treinado para fazer)
+WAN14_SIZES = {"alta": {"paisagem": (1280, 720), "retrato": (720, 1280), "quadrado": (960, 960)},
+               "padrao": {"paisagem": (832, 480), "retrato": (480, 832), "quadrado": (640, 640)}}
+WAN14_SECONDS_PER_CLIP = {"alta": 860.0, "padrao": 260.0}  # tempo medido de um clipe cheio, ja contando carregar os modelos
+NEG_WAN14 = ("色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，"
+             "形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走")
+
+
+def wan14_eta_s(eff: dict) -> int:
+    """Tempo esperado de geracao (sem contar a partida da maquina): clipes x tempo medido do clipe, proporcional aos quadros."""
+    per = WAN14_SECONDS_PER_CLIP.get(eff.get("quality") or "padrao", 260.0)
+    return int(per * int(eff.get("segments") or 1) * (int(eff.get("frames") or WAN14_CLIP_FRAMES) / WAN14_CLIP_FRAMES))
+
+
+def normalize_video_wan14(p: dict) -> tuple[dict, list]:
+    """Wan 2.2 14B (qualidade maxima, 16 fps, clipes de ate 5 s). `quality` = alta (720p, ~14 min por clipe) | padrao (480p, ~4 min) | auto (padrao: video acima de 5 s;
+    alta: video de ate 5 s, para a producao inteira caber em ~20 min). Video maior que 5 s vira cadeia: o ultimo quadro de um clipe e a imagem inicial do proximo."""
+    adj: list = []
+    fmt = str(p.get("format") or p.get("formato") or "paisagem").lower()
+    if fmt not in WAN14_SIZES["alta"]:
+        raise ParamError(f"Parâmetro inválido: format deve ser um de {', '.join(WAN14_SIZES['alta'])}.")
+    total = _num(p, ("seconds", "segundos"), 5.0, 1.0, VIDEO_MAX_TOTAL, adj, "seconds")
+    clip_max = (WAN14_CLIP_FRAMES - 1) / WAN14_FPS + 0.07  # 81 quadros duram 5,06 s: esse e o teto de UM clipe
+    segments = max(1, math.ceil(total / clip_max - 1e-9))
+    quality = _choice(p, "quality", ("auto", "alta", "padrao"), "auto")
+    if quality == "auto":
+        quality = "alta" if segments == 1 else "padrao"
+    w, h = WAN14_SIZES[quality][fmt]
+    secs = total / segments
+    frames = min(int(round(secs * WAN14_FPS / 4)) * 4 + 1, WAN14_CLIP_FRAMES)  # o modelo pede 4n+1 quadros
+    image = p.get("image") or p.get("start_image")
+    if image:
+        raw = str(image)
+        if raw.startswith("data:"):
+            raw = raw.split(",", 1)[-1]
+        try:
+            blob = base64.b64decode(raw, validate=False)
+        except (binascii.Error, ValueError):
+            raise ParamError("Parâmetro inválido: image deve ser uma imagem em base64.")
+        if not blob.startswith((b"\x89PNG", b"\xff\xd8", b"RIFF")):
+            raise ParamError("Parâmetro inválido: image deve ser PNG, JPEG ou WEBP.")
+        if len(blob) > MAX_IMAGE_BYTES:
+            raise ParamError("Parâmetro inválido: a imagem inicial é grande demais (máximo 6 MB).")
+    eff = {
+        "prompt": _prompt(p), "negative_prompt": str(p.get("negative_prompt") or NEG_WAN14)[:MAX_PROMPT_CHARS],
+        "width": w, "height": h, "quality": quality, "seconds": round(frames / WAN14_FPS, 2), "fps": WAN14_FPS, "frames": frames, "segments": segments,
+        "total_seconds": round(frames / WAN14_FPS * segments, 2),
+        "steps": _num(p, ("steps",), 20, 8, 40, adj, "steps", True), "cfg": _num(p, ("cfg", "guidance"), 3.5, 1.0, 8.0, adj, "cfg"),
+        "seed": _seed(p), "sampler": "euler", "image_to_video": bool(image), "strength": None,
+    }
+    return eff, adj
+
+
 WAN_SIZES = {"paisagem": (1280, 704), "retrato": (704, 1280), "quadrado": (960, 960)}
 WAN_CLIP_FRAMES = 121  # 5 s a 24 fps por clipe (o que cabe numa 3090 de 24 GB); acima disso vira cadeia de clipes
 WAN_FPS = 24

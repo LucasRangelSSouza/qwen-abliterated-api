@@ -25,7 +25,8 @@ from app.gpu.controller import READY, GPUController, GPUUnavailable
 from app.gpu.ledger import Ledger
 from app.gpu.tunnel import NoTunnel, SshTunnel
 from app.gpu.vast import RealVast
-from app.media import EXT, Media, MediaError, MediaUnavailable
+from app.gpu.worker import EphemeralWorker
+from app.media import EXT, HEAVY_RECIPE, Media, MediaError, MediaUnavailable
 from app.scheduler import Lane, QueueFull
 
 log = logging.getLogger("llm-queue")
@@ -76,7 +77,8 @@ class App:
         self.embed = Lane("embed", s.embed_max_inflight, s.embed_queue_max, s.embed_max_inflight)
         self.consumers = self._load_consumers()
         self.recent: collections.deque = collections.deque(maxlen=60)  # ultimos pedidos encerrados (so metadados)
-        self.media: Media | None = None
+        self.media: Media | None = None   # GPU fixa: imagem, video rapido, troca de personagem
+        self.heavy: Media | None = None   # worker sob demanda (PRO 6000): video de qualidade maxima
 
     def _load_consumers(self) -> dict:
         try:
@@ -102,7 +104,7 @@ class App:
 
 
 def create_app(s: Settings | None = None, *, controller: GPUController | None = None, redis=None, http: httpx.AsyncClient | None = None,
-               consumers: dict | None = None, media: Media | None = None) -> FastAPI:
+               consumers: dict | None = None, media: Media | None = None, heavy: Media | None = None) -> FastAPI:
     s = s or Settings.from_env()
 
     @asynccontextmanager
@@ -132,6 +134,13 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             mtun = NoTunnel() if s.tunnel_mode == "none" else SshTunnel(s.ssh_key_path, [(s.media_local_port, 8188)])
             app.state.q.media = Media(s, mvast, mtun, r, client)
             app.state.q.media.start()
+        if heavy is not None:
+            app.state.q.heavy = heavy
+        elif s.worker_enabled and s.vast_api_key:
+            wvast = RealVast(s.vast_api_key, s.vast_base, s.worker_gpu_names[0], 1)
+            wtun = NoTunnel() if s.tunnel_mode == "none" else SshTunnel(s.ssh_key_path, [(s.worker_local_port, 8188)])
+            app.state.q.heavy = Media(s, wvast, wtun, r, client, worker=EphemeralWorker(s, wvast, wtun, r))
+            app.state.q.heavy.start()
         if consumers is not None:
             app.state.q.consumers = consumers
         try:
@@ -139,6 +148,8 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         finally:
             if media is None and app.state.q.media is not None:
                 await app.state.q.media.stop()
+            if heavy is None and app.state.q.heavy is not None:
+                await app.state.q.heavy.stop()
             if controller is None:
                 await ctl.stop_loop()
             if http is None:
@@ -201,9 +212,16 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
 
     # ---- midia (imagem): fila propria, uma por vez, na GPU de midia
     def _media(q: App) -> Media:
-        if q.media is None:
+        m = q.media or q.heavy
+        if m is None:
             raise HTTPException(503, detail=_err("Este recurso não está disponível no momento.", "service_unavailable", "media_disabled"))
-        return q.media
+        return m
+
+    def _owner(q: App, job_id: str) -> Media:
+        """Quem tem o pedido vivo (fila e progresso moram na Media que o atende); os ja encerrados leem do Redis, que as duas dividem."""
+        if q.heavy is not None and job_id in q.heavy.live:
+            return q.heavy
+        return _media(q)
 
     @app.post("/v1/videos/generations")
     async def videos_generations(request: Request):
@@ -223,6 +241,8 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             assert isinstance(body, dict)
         except Exception:  # noqa: BLE001
             raise HTTPException(400, detail=_err("corpo invalido", "invalid_request_error", "invalid_body"))
+        if kind == "video" and q.heavy is not None and body.get("recipe") in (None, "", HEAVY_RECIPE):
+            m, body = q.heavy, {**body, "recipe": HEAVY_RECIPE}  # video sem receita escolhida = qualidade maxima, na maquina sob demanda
         cls = request.headers.get("x-queue-class", "interactive")
         end_user = request.headers.get("x-end-user", "")[:60]
         try:
@@ -254,7 +274,7 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
     async def job_get(job_id: str, request: Request):
         q: App = request.app.state.q
         c = q.auth(request)
-        job = await _media(q).get(job_id)
+        job = await _owner(q, job_id).get(job_id)
         if not job or job.get("consumer") != c["name"]:
             raise HTTPException(404, detail=_err("pedido nao encontrado", "invalid_request_error", "not_found"))
         return {k: v for k, v in job.items() if k != "consumer"}
@@ -264,7 +284,7 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         """Contrato de progresso do app: {id, kind, status: queued|running|done|failed, position, eta_s, progress 0..100, message[, result, mime, seconds, size]}."""
         q: App = request.app.state.q
         c = q.auth(request)
-        m = _media(q)
+        m = _owner(q, job_id)
         job = await m.get(job_id)
         if not job or job.get("consumer") != c["name"]:
             raise HTTPException(404, detail=_err("Pedido não encontrado.", "invalid_request_error", "not_found"))
@@ -291,16 +311,24 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
     @app.get("/admin/media/status")
     async def admin_media_status(request: Request):
         q = _admin(request)
-        if q.media is None:
+        if q.media is None and q.heavy is None:
             return {"enabled": False}
-        return await q.media.status()
+        out = await q.media.status() if q.media is not None else {"enabled": False}
+        if q.heavy is not None:
+            out["worker"] = await q.heavy.status()  # maquina de video sob demanda (estado, custo da sessao, quando sera destruida)
+        return out
 
     @app.get("/admin/media/jobs")
     async def admin_media_jobs(request: Request, limit: int = 40):
         q = _admin(request)
-        if q.media is None:
+        if q.media is None and q.heavy is None:
             return {"enabled": False, "waiting": [], "running": [], "recent": [], "lane": None}
-        return {"enabled": True, **await q.media.jobs(max(1, min(limit, 100)))}
+        base = await (q.media or q.heavy).jobs(max(1, min(limit, 100)))
+        if q.media is not None and q.heavy is not None:  # junta a fila da maquina de video na visao do painel
+            hv = await q.heavy.jobs(max(1, min(limit, 100)))
+            base["waiting"] += hv["waiting"]
+            base["running"] += hv["running"]
+        return {"enabled": True, **base}
 
     @app.get("/admin/media/image/{job_id}")
     async def admin_media_image(job_id: str, request: Request):

@@ -149,6 +149,22 @@ class Settings:
     # video desligado por padrao: na GPU de midia de 16 GB de RAM, Flux + T5 + LTX nao cabem juntos e o ComfyUI morria (137) logo depois do video,
     # derrubando a imagem dos clientes. Ligue com MEDIA_VIDEO_ENABLED=true so numa maquina com RAM suficiente (32 GB ou mais).
     media_video_enabled: bool = False
+    # --- worker de video sob demanda (serverless proprio): aluga uma RTX PRO 6000 na Vast quando chega pedido de video de alta qualidade
+    # (Wan 2.2 14B), instala e roda os pedidos em fila, e DESTROI a maquina depois de `worker_idle_s` sem pedido. Sem pedido = sem custo.
+    worker_enabled: bool = False        # WORKER_ENABLED
+    worker_local_port: int = 18189      # porta local do tunel ate o ComfyUI do worker (8188 na maquina)
+    worker_gpu_names: tuple = ("RTX PRO 6000 S", "RTX PRO 6000 WS")  # WORKER_GPU_NAMES (a Max-Q e limitada em potencia: fica de fora)
+    worker_image: str = "pytorch/pytorch:2.7.0-cuda12.8-cudnn9-devel"
+    worker_disk_gb: int = 120           # os modelos somam ~81 GB
+    worker_max_dph: float = 1.80        # WORKER_MAX_DPH_USD: teto do preco TOTAL por hora (GPU + disco); acima disso nao aluga
+    worker_min_down_mbps: int = 1000    # rede lenta transforma 81 GB de modelos em partida de 30 min: so aceita host rapido
+    worker_min_reliability: float = 0.95
+    worker_idle_s: float = 600.0        # WORKER_IDLE_S: sem pedido por este tempo, destroi a maquina (pedidos seguidos aproveitam a maquina quente)
+    worker_max_age_h: float = 8.0       # trava de seguranca: maquina com mais que isso de vida e destruida assim que ficar ociosa
+    worker_start_timeout_s: float = 1500.0  # tempo maximo para alugar + instalar; passou disso tenta outra oferta
+    worker_wait_s: float = 3600.0       # quanto o pedido espera por uma maquina (ofertas escassas) antes de falhar
+    worker_min_credit_usd: float = 3.0  # saldo abaixo disso: nao aluga
+    worker_job_timeout_s: float = 2400.0
     extra: dict = field(default_factory=dict)
 
     @property
@@ -226,6 +242,20 @@ class Settings:
             media_sync_wait_s=_f("MEDIA_SYNC_WAIT_S", cls.media_sync_wait_s),
             media_ckpt=os.environ.get("MEDIA_CKPT", cls.media_ckpt),
             media_video_enabled=os.environ.get("MEDIA_VIDEO_ENABLED", "false").strip().lower() in ("1", "true", "yes", "sim"),
+            worker_enabled=_b("WORKER_ENABLED", cls.worker_enabled),
+            worker_local_port=_i("WORKER_LOCAL_PORT", cls.worker_local_port),
+            worker_gpu_names=tuple(x.strip() for x in os.environ.get("WORKER_GPU_NAMES", ",".join(cls.worker_gpu_names)).split(",") if x.strip()),
+            worker_image=os.environ.get("WORKER_IMAGE", cls.worker_image),
+            worker_disk_gb=_i("WORKER_DISK_GB", cls.worker_disk_gb),
+            worker_max_dph=_f("WORKER_MAX_DPH_USD", cls.worker_max_dph),
+            worker_min_down_mbps=_i("WORKER_MIN_DOWN_MBPS", cls.worker_min_down_mbps),
+            worker_min_reliability=_f("WORKER_MIN_RELIABILITY", cls.worker_min_reliability),
+            worker_idle_s=_f("WORKER_IDLE_S", cls.worker_idle_s),
+            worker_max_age_h=_f("WORKER_MAX_AGE_H", cls.worker_max_age_h),
+            worker_start_timeout_s=_f("WORKER_START_TIMEOUT_S", cls.worker_start_timeout_s),
+            worker_wait_s=_f("WORKER_WAIT_S", cls.worker_wait_s),
+            worker_min_credit_usd=_f("WORKER_MIN_CREDIT_USD", cls.worker_min_credit_usd),
+            worker_job_timeout_s=_f("WORKER_JOB_TIMEOUT_S", cls.worker_job_timeout_s),
             static_retry_s=_f("GPU_STATIC_RETRY_S", cls.static_retry_s),
             static_retry_max_s=_f("GPU_STATIC_RETRY_MAX_S", cls.static_retry_max_s),
             static_llm_start_cmd=os.environ.get("GPU_STATIC_LLM_START_CMD", cls.static_llm_start_cmd),

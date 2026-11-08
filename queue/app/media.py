@@ -12,12 +12,13 @@ import logging
 import os
 import random
 import re
+import shlex
 import time
 import uuid
 
 import httpx
 
-from app import longvideo, metrics, notice
+from app import dubbing, longvideo, metrics, notice
 from app import mediaparams as mp
 from app.config import Settings
 from app.gpu.tunnel import Tunnel
@@ -26,25 +27,28 @@ from app.scheduler import Lane, QueueFull
 
 log = logging.getLogger("llm-queue.media")
 
-EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "video/mp4": "mp4", "video/webm": "webm"}
-MIME_BY_EXT = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "mp4": "video/mp4", "webm": "video/webm"}
+EXT = {"image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "video/mp4": "mp4", "video/webm": "webm", "audio/wav": "wav", "audio/mpeg": "mp3"}
+MIME_BY_EXT = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp", "mp4": "video/mp4", "webm": "video/webm", "wav": "audio/wav", "mp3": "audio/mpeg"}
 JOB_TTL_S = 48 * 3600
 RECENT_MAX = 100
 MAX_PROMPT_CHARS = 4000
 
 
 # Estimativa de duracao quando ainda nao ha medida real (3090: imagem ~30 s, video de 4 s ~40 s, ja contando a troca de modelo).
-ETA_DEFAULT_S = {"image": 30, "video": 60}
-ETA_BY_RECIPE = {"openjutsu-swap": 540, "wan22-ti2v": 470}
+ETA_DEFAULT_S = {"image": 30, "video": 60, "audio": 60}
+ETA_BY_RECIPE = {"openjutsu-swap": 540, "wan22-ti2v": 470}  # voz-clonar, voz-trocar e dublar: ver _est (ESTIMATIVA ate medir em producao)
 MSG = {
     ("image", "queued"): "Sua imagem está na fila para ser gerada.",
     ("video", "queued"): "Seu vídeo está na fila para ser gerado.",
     ("image", "running"): "Gerando a sua imagem...",
     ("video", "running"): "Gerando o seu vídeo...",
+    ("audio", "queued"): "Seu áudio está na fila para ser gerado.",
+    ("audio", "running"): "Gerando o seu áudio...",
+    ("audio", "done"): "Pronto.",
     ("image", "done"): "Pronto.",
     ("video", "done"): "Pronto.",
 }
-MSG_PREPARANDO = {"image": "Preparando a sua imagem...", "video": "Preparando o seu vídeo..."}
+MSG_PREPARANDO = {"image": "Preparando a sua imagem...", "video": "Preparando o seu vídeo...", "audio": "Preparando o seu áudio..."}
 
 
 async def _ws_connect(url: str):
@@ -219,20 +223,32 @@ RECIPES = {
                    "build": recipe_wan22_a14b, "timeout": 2400, "heavy": True},
 }
 
+for _k, _pools in {"flux-schnell": ("pequena", "fixa"), "ltx-video": ("fixa",), "openjutsu-swap": ("pequena", "fixa"), "wan22-ti2v": ("fixa",), HEAVY_RECIPE: ("grande",)}.items():
+    RECIPES[_k]["pools"] = _pools
+for _k, _perfil in {"flux-schnell": "imagem", "openjutsu-swap": "rosto", HEAVY_RECIPE: "video"}.items():
+    RECIPES[_k]["profile"] = _perfil
+# voz (sob demanda na classe pequena; modelos de licenca comercial: Qwen3-TTS Apache-2.0, Chatterbox MIT, faster-whisper MIT, demucs MIT)
+VOZ_RECIPES = ("voz-clonar", "voz-trocar", "dublar")
+RECIPES["voz-clonar"] = {"kind": "audio", "kinds": ("audio",), "title": "Clonagem de voz (Qwen3-TTS): le um texto com a voz de uma amostra de 3 a 25 s", "build": None, "timeout": 900, "pools": ("pequena",), "profile": "voz"}
+RECIPES["voz-trocar"] = {"kind": "audio", "kinds": ("audio", "video"), "title": "Troca de voz (Chatterbox VC): a fala de um audio ou video passa a soar como a voz da amostra", "build": None, "timeout": 1800, "pools": ("pequena",), "profile": "voz"}
+RECIPES["dublar"] = {"kind": "video", "kinds": ("video", "audio"), "title": "Redublagem: transcreve, traduz e fala com a voz clonada do proprio locutor, mantendo o fundo", "build": None, "timeout": 3000, "pools": ("pequena",), "profile": "voz"}
+
 
 # --------------------------------------------------------------------------- servico
 
 class Media:
-    def __init__(self, s: Settings, vast, tunnel: Tunnel, redis, http: httpx.AsyncClient, clock=time.time, ws_connect=None, worker=None):
+    def __init__(self, s: Settings, vast, tunnel: Tunnel, redis, http: httpx.AsyncClient, clock=time.time, ws_connect=None, worker=None, llm=None):
         """`worker` (EphemeralWorker): esta Media atende so o video pesado numa maquina alugada sob demanda; sem ele e a GPU fixa de imagem/video rapido."""
         self.s, self.vast, self.tun, self.r, self.http, self.now = s, vast, tunnel, redis, http, clock
         self.worker = worker
-        self.lane = Lane("video-worker" if worker else "image", 1, s.media_queue_max, s.media_per_consumer)
+        self.llm = llm                  # coroutine (sistema, usuario) -> texto: traducao das falas na dublagem
+        self.pool_name = worker.spec.name if worker is not None else "fixa"
+        self.lane = Lane(f"midia-{self.pool_name}", 1, s.media_queue_max, s.media_per_consumer)
         self.live: dict[str, dict] = {}        # pedidos que ainda nao terminaram (fila + rodando)
         self.tasks: dict[str, asyncio.Task] = {}
         self._inst_cache: tuple[float, object] | None = None
         self._tun_lock = asyncio.Lock()
-        self.local_port = s.worker_local_port if worker else s.media_local_port
+        self.local_port = worker.spec.local_port if worker is not None else s.media_local_port
         self.comfy = f"http://127.0.0.1:{self.local_port}"
         self._keep: asyncio.Task | None = None
         self.tickets: dict[str, object] = {}   # vaga de cada pedido vivo (para dizer a posicao na fila)
@@ -282,10 +298,10 @@ class Media:
         self._inst_cache = (self.now(), inst)
         return inst
 
-    async def _ensure_tunnel(self) -> None:
-        if self.worker is not None:  # worker sob demanda: aluga e instala se precisar, e abre o tunel
+    async def _ensure_tunnel(self, profile: str | None = None) -> None:
+        if self.worker is not None:  # worker sob demanda: aluga e instala o perfil se precisar, e abre o tunel
             try:
-                await self.worker.ensure()
+                await self.worker.ensure(profile)
             except WorkerUnavailable as e:
                 raise MediaUnavailable(f"maquina de video indisponivel: {e}")
             return
@@ -313,7 +329,7 @@ class Media:
 
     async def status(self) -> dict:
         if self.worker is not None:
-            return {**self.worker.status(), "lane": self.lane.stats(), "today": await self._today_stats(), "recipes": [{"id": HEAVY_RECIPE, "kind": "video", "title": RECIPES[HEAVY_RECIPE]["title"]}]}
+            return {**self.worker.status(), "lane": self.lane.stats(), "today": await self._today_stats(), "recipes": [{"id": k, "kind": v["kind"], "title": v["title"]} for k, v in RECIPES.items() if self.pool_name in v.get("pools", ())]}
         inst = await self.instance()
         tun_ok = await self.tun.healthy()
         comfy = await self.comfy_health() if tun_ok else None
@@ -341,14 +357,23 @@ class Media:
     async def submit(self, consumer: str, end_user: str, params: dict, cls: str = "interactive", kind: str = "image") -> dict:
         if kind == "video" and not self.s.media_video_enabled and self.worker is None:  # o worker tem 96 GB e RAM de sobra: o bloqueio e so da GPU fixa
             raise MediaUnavailable("geracao de video indisponivel nesta maquina de midia (sem memoria para video e imagem juntos); use a skill video-motion no computador")
-        recipe = params.get("recipe") or (HEAVY_RECIPE if self.worker is not None else next(k for k, v in RECIPES.items() if v.get("default" if kind == "image" else "default_video")))
-        if recipe not in RECIPES or RECIPES[recipe]["kind"] != kind:
+        recipe = params.get("recipe") or self._default_recipe(kind)
+        if recipe not in RECIPES or kind not in (RECIPES[recipe].get("kinds") or (RECIPES[recipe]["kind"],)):
             raise MediaError(f"receita desconhecida: {recipe}")
-        if bool(RECIPES[recipe].get("heavy")) != (self.worker is not None):  # a receita pesada so roda no worker, e o worker so roda ela
+        if self.pool_name not in RECIPES[recipe].get("pools", ("fixa",)):  # cada receita roda na sua classe de maquina
             raise MediaError(f"receita indisponivel aqui: {recipe}")
         try:
-            eff, adjusted = (mp.normalize_image if kind == "image" else mp.normalize_swap if recipe == "openjutsu-swap" else mp.normalize_video_wan14 if recipe == HEAVY_RECIPE
-                             else mp.normalize_video_wan if recipe == "wan22-ti2v" else mp.normalize_video)(params)
+            if recipe == "voz-clonar":
+                eff, adjusted = mp.normalize_voice_clone(params)
+            elif recipe == "voz-trocar":
+                eff, adjusted = mp.normalize_voice_convert(params, await self._duracao(params, ("media", "video", "audio")))
+                kind = "video" if eff["has_video"] else "audio"
+            elif recipe == "dublar":
+                eff, adjusted = mp.normalize_dub(params, await self._duracao(params, ("video", "media")))
+                kind = "video" if eff["has_video"] else "audio"
+            else:
+                eff, adjusted = (mp.normalize_image if kind == "image" else mp.normalize_swap if recipe == "openjutsu-swap" else mp.normalize_video_wan14 if recipe == HEAVY_RECIPE
+                                 else mp.normalize_video_wan if recipe == "wan22-ti2v" else mp.normalize_video)(params)
         except mp.ParamError as e:
             raise MediaError(str(e))
         params = {**params, **eff}
@@ -356,13 +381,31 @@ class Media:
         t.end_user, t.kind = end_user, kind
         jid = uuid.uuid4().hex[:12]
         job = {"id": jid, "state": "na_fila", "recipe": recipe, "kind": kind, "type": kind, "consumer": consumer, "end_user": end_user, "cls": cls,
-               "prompt": eff["prompt"][:300], "size": f"{eff['width']}x{eff['height']}", "params": mp.public(eff), "adjusted": adjusted,
+               "prompt": eff["prompt"][:300], "size": f"{eff['width']}x{eff['height']}" if eff["width"] else "", "params": mp.public(eff), "adjusted": adjusted,
                "enq": self.now(), "started": None, "finished": None, "seconds": None, "error": None}
         self.live[jid] = job
         self.tickets[jid] = t
         await self._save(job)
         self.tasks[jid] = asyncio.create_task(self._run(job, params, t))
         return job
+
+    def _default_recipe(self, kind: str) -> str:
+        if self.worker is not None:
+            if self.pool_name == "grande" and kind == "video":
+                return HEAVY_RECIPE
+            if self.pool_name == "pequena" and kind == "image":
+                return "flux-schnell"
+            raise MediaError("informe a receita (recipe)")
+        return next(k for k, v in RECIPES.items() if v.get("default" if kind == "image" else "default_video"))
+
+    async def _duracao(self, params: dict, chaves: tuple) -> float:
+        raw = next((params[k] for k in chaves if params.get(k)), None)
+        if not raw:
+            return 0.0
+        try:
+            return await longvideo.duration(mp._blob(raw, "media", mp.MAX_MEDIA_BYTES))
+        except Exception:  # noqa: BLE001
+            return 0.0
 
     async def _run(self, job: dict, params: dict, t) -> None:
         entered = False
@@ -373,12 +416,14 @@ class Media:
             if self.worker is not None:
                 self.worker.enter()  # a maquina nao pode ser destruida por ociosidade enquanto este pedido existe
                 entered = True
-            await self._ensure_tunnel()
+            await self._ensure_tunnel(RECIPES[job["recipe"]].get("profile"))
             job.update(phase="gerando", gen_started=self.now())
             n_seg = int(params.get("segments") or 1) if job["kind"] == "video" else 1
             if job["recipe"] == HEAVY_RECIPE and not params.get("image_to_video"):
                 params = await self._start_frame(job, params)  # o Wan parte de uma imagem: sem imagem do cliente, o Flux cria o primeiro quadro (a imagem sai boa e o video herda o enquadramento)
-            if job["recipe"] == "openjutsu-swap":
+            if job["recipe"] in VOZ_RECIPES:
+                files = await self._run_voz(job, params)
+            elif job["recipe"] == "openjutsu-swap":
                 files = await self._run_swap(job, params)
             elif n_seg > 1:
                 files = await self._run_chain(job, params, n_seg)
@@ -423,6 +468,88 @@ class Media:
         if r.status_code != 200:
             raise MediaError("um arquivo enviado foi recusado")
         return r.json()["name"]
+
+    # ---- voz: scripts em /workspace/voz da maquina (perfil `voz`); os arquivos do cliente entram por SSH e SAEM da maquina ao terminar (privacidade)
+    async def _put(self, path: str, blob: bytes) -> None:
+        rc, _ = await self.worker.sh(f"cat > {shlex.quote(path)}", stdin=blob, timeout=600)
+        if rc != 0:
+            raise MediaUnavailable("nao consegui enviar o arquivo para a maquina")
+
+    async def _get(self, path: str) -> bytes:
+        rc, out = await self.worker.sh(f"cat {shlex.quote(path)}", timeout=600)
+        if rc != 0 or not out:
+            raise MediaError("o resultado nao foi gerado")
+        return out
+
+    async def _step(self, wd: str, nome: str, cmd: str, timeout: float) -> None:
+        rc, _ = await self.worker.sh(f"cd {wd} && ({cmd}) > {wd}/{nome}.log 2>&1", timeout=timeout)
+        if rc != 0:
+            _, cauda = await self.worker.sh(f"tail -c 1800 {wd}/{nome}.log", timeout=30)
+            log.warning("voz: etapa %s falhou: %s", nome, cauda.decode(errors="replace"))
+            raise MediaError(f"falha na etapa {nome}")
+
+    async def _metricas(self, job: dict, wd: str, nome: str = "m.json") -> None:
+        try:
+            job["metrics"] = json.loads((await self._get(f"{wd}/{nome}")).decode())
+        except Exception:  # noqa: BLE001
+            pass
+
+    async def _run_voz(self, job: dict, params: dict) -> list[tuple[bytes, str]]:
+        jid, recipe = job["id"], job["recipe"]
+        wd = f"/workspace/voz/work/{jid}"
+        py = "bash /workspace/voz/run.sh main /workspace/voz"
+        dec = lambda raw: mp._blob(raw, "arquivo", mp.MAX_MEDIA_BYTES)  # noqa: E731
+        await self.worker.sh("curl -s -m 5 -X POST http://127.0.0.1:8188/free -H 'Content-Type: application/json' -d '{\"unload_models\":true,\"free_memory\":true}' >/dev/null 2>&1; true", timeout=20)  # libera a GPU do ComfyUI
+        await self.worker.sh(f"rm -rf {wd} && mkdir -p {wd}", timeout=30)
+        try:
+            if recipe == "voz-clonar":
+                await self._put(f"{wd}/text.txt", params["text"].encode())
+                await self._put(f"{wd}/ref.bin", dec(params["reference_audio"]))
+                ref_text = ""
+                if params.get("reference_text"):
+                    await self._put(f"{wd}/ref.txt", params["reference_text"].encode())
+                    ref_text = f" --ref-text {wd}/ref.txt"
+                self.prog[jid] = 10
+                await self._step(wd, "clone", f"{py}/clone.py --text {wd}/text.txt --lang {params['language']} --ref {wd}/ref.bin{ref_text} --out {wd}/out.wav --metrics {wd}/m.json", 900)
+                self.prog[jid] = 90
+                await self._metricas(job, wd)
+                return [(await self._get(f"{wd}/out.wav"), "audio/wav")]
+            if recipe == "voz-trocar":
+                await self._put(f"{wd}/in.bin", dec(params["media"]))
+                await self._put(f"{wd}/target.bin", dec(params["target_voice"]))
+                saida = "out.mp4" if params["has_video"] else "out.wav"
+                self.prog[jid] = 10
+                await self._step(wd, "converter", f"{py}/convert.py --in {wd}/in.bin --target {wd}/target.bin --out {wd}/{saida} --keep-bg {1 if params['keep_background'] else 0} --metrics {wd}/m.json", 1800)
+                self.prog[jid] = 90
+                await self._metricas(job, wd)
+                return [(await self._get(f"{wd}/{saida}"), "video/mp4" if params["has_video"] else "audio/wav")]
+            # dublar: A (separar + transcrever) -> traducao no servidor -> B (voz clonada + encaixe + mistura)
+            await self._put(f"{wd}/in.bin", dec(params["video"]))
+            await self._step(wd, "dub_a", f"{py}/dub_a.py --work {wd}" + (f" --src-lang {params['source_language']}" if params.get("source_language") else ""), 900)
+            self.prog[jid] = 35
+            info = json.loads((await self._get(f"{wd}/segments.json")).decode())
+            src = params.get("source_language") or info.get("language") or "en"
+            if self.llm is None:
+                raise MediaUnavailable("traducao indisponivel")
+            traduzido = await dubbing.traduzir(self.llm, info["segments"], src, params["target_language"])
+            await self._put(f"{wd}/translated.json", json.dumps(traduzido, ensure_ascii=False).encode())
+            self.prog[jid] = 55
+            ref = ""
+            if params.get("voice"):
+                await self._put(f"{wd}/voice.bin", dec(params["voice"]))
+                ref = f" --ref {wd}/voice.bin"
+            saida = "out.mp4" if params["has_video"] else "out.wav"
+            await self._step(wd, "dub_b", f"{py}/dub_b.py --work {wd} --lang {params['target_language']} --out {wd}/{saida}{ref} --metrics {wd}/m.json", 1200)
+            self.prog[jid] = 92
+            await self._metricas(job, wd)
+            if isinstance(job.get("metrics"), dict):
+                job["metrics"]["segmentos_traduzidos"] = len(traduzido)
+            return [(await self._get(f"{wd}/{saida}"), "video/mp4" if params["has_video"] else "audio/wav")]
+        finally:
+            try:
+                await self.worker.sh(f"rm -rf {wd}", timeout=60)  # nada do cliente fica na maquina
+            except Exception:  # noqa: BLE001
+                pass
 
     async def _start_frame(self, job: dict, params: dict) -> dict:
         """Primeiro quadro do video pesado quando o cliente nao mandou imagem: o Flux (rapido, 2 a 4 s com a maquina quente) cria a imagem no enquadramento pedido."""
@@ -595,6 +722,13 @@ class Media:
         """Duracao esperada de um pedido (sem a partida do worker): o video pesado depende de tamanho e duracao; os demais usam a media."""
         if job.get("recipe") == HEAVY_RECIPE and job.get("params"):
             return mp.wan14_eta_s(job["params"])
+        pj = job.get("params") or {}
+        if job.get("recipe") == "voz-clonar":  # ESTIMATIVA (ainda nao medida em producao): carregar o modelo + ~0,6 s de geracao por segundo de fala
+            return 45 + int(float(pj.get("seconds") or 5) * 0.6)
+        if job.get("recipe") == "voz-trocar":
+            return 90 + int(float(pj.get("duration_s") or 30) * 1.6)
+        if job.get("recipe") == "dublar":
+            return 150 + int(float(pj.get("duration_s") or 30) * 3.0)
         per = ETA_BY_RECIPE.get(job.get("recipe"))  # medido: troca de personagem ~9 min por 5 s em 480p; Wan 5B ~8 min por clipe de 5 s
         if per:
             return int(per * int((job.get("params") or {}).get("segments") or 1))
@@ -622,7 +756,7 @@ class Media:
         elif state == "executando" and job.get("phase") == "preparando":
             # worker sob demanda ainda subindo: a espera inclui a partida da maquina (o cliente nao ve nada de infraestrutura)
             status, pct, msg = "running", 0, MSG_PREPARANDO[kind]
-            eta = (self.worker.startup_eta_s() if self.worker else 0) + self._est(job)
+            eta = (self.worker.startup_eta_s(RECIPES[job["recipe"]].get("profile")) if self.worker else 0) + self._est(job)
         elif state == "executando":
             status, pct = "running", int(self.prog.get(jid, 0))
             if job.get("segments", 1) > 1:  # video longo: cada clipe vale uma fatia da barra
@@ -643,8 +777,8 @@ class Media:
                 rest = self._est(rj) * (100 - self.prog.get(rj.get("id", ""), 0)) / 100
                 eta += int(rest)
             eta += self._est(job)
-            if self.worker is not None and self.worker.state != "ready":
-                eta += self.worker.startup_eta_s()
+            if self.worker is not None and (self.worker.state != "ready" or RECIPES[job["recipe"]].get("profile") not in self.worker.profiles):
+                eta += self.worker.startup_eta_s(RECIPES[job["recipe"]].get("profile"))
         out = {"id": jid, "kind": kind, "type": kind, "status": status, "position": position, "eta_s": eta, "progress": pct, "message": msg,
                "params": job.get("params"), "adjusted": job.get("adjusted") or []}
         if status == "done":

@@ -25,8 +25,8 @@ from app.gpu.controller import READY, GPUController, GPUUnavailable
 from app.gpu.ledger import Ledger
 from app.gpu.tunnel import NoTunnel, SshTunnel
 from app.gpu.vast import RealVast
-from app.gpu.worker import EphemeralWorker
-from app.media import EXT, HEAVY_RECIPE, Media, MediaError, MediaUnavailable
+from app.gpu.worker import EphemeralWorker, WorkerSpec
+from app.media import EXT, HEAVY_RECIPE, RECIPES, Media, MediaError, MediaUnavailable
 from app.scheduler import Lane, QueueFull
 
 log = logging.getLogger("llm-queue")
@@ -78,7 +78,8 @@ class App:
         self.consumers = self._load_consumers()
         self.recent: collections.deque = collections.deque(maxlen=60)  # ultimos pedidos encerrados (so metadados)
         self.media: Media | None = None   # GPU fixa: imagem, video rapido, troca de personagem
-        self.heavy: Media | None = None   # worker sob demanda (PRO 6000): video de qualidade maxima
+        self.heavy: Media | None = None   # worker sob demanda GRANDE (PRO 6000): video de qualidade maxima
+        self.small: Media | None = None   # worker sob demanda PEQUENO (3090/4090): imagem, voz, dublagem e troca de rosto
 
     def _load_consumers(self) -> dict:
         try:
@@ -104,7 +105,7 @@ class App:
 
 
 def create_app(s: Settings | None = None, *, controller: GPUController | None = None, redis=None, http: httpx.AsyncClient | None = None,
-               consumers: dict | None = None, media: Media | None = None, heavy: Media | None = None) -> FastAPI:
+               consumers: dict | None = None, media: Media | None = None, heavy: Media | None = None, small: Media | None = None) -> FastAPI:
     s = s or Settings.from_env()
 
     @asynccontextmanager
@@ -141,11 +142,33 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             wtun = NoTunnel() if s.tunnel_mode == "none" else SshTunnel(s.ssh_key_path, [(s.worker_local_port, 8188)])
             app.state.q.heavy = Media(s, wvast, wtun, r, client, worker=EphemeralWorker(s, wvast, wtun, r))
             app.state.q.heavy.start()
+        async def llm(sistema: str, usuario: str) -> str:
+            """Traducao das falas da dublagem pelo LLM do proprio servidor (acorda a GPU do chat se estiver dormindo)."""
+            q = app.state.q
+            q.ctl.begin_request()
+            try:
+                await q.ctl.ensure_ready(False)
+                resp = await q.http.post(q.upstream("chat") + "/chat/completions", timeout=900,
+                                         json={"model": "qwen-abliterated", "temperature": 0.2, "max_tokens": 4096, "chat_template_kwargs": {"enable_thinking": False},
+                                               "messages": [{"role": "system", "content": sistema}, {"role": "user", "content": usuario}]})
+                resp.raise_for_status()
+                return resp.json()["choices"][0]["message"]["content"]
+            finally:
+                q.ctl.end_request()
+        if small is not None:
+            app.state.q.small = small
+        elif s.worker_small_enabled and s.vast_api_key:
+            svast = RealVast(s.vast_api_key, s.vast_base, s.worker_small_gpu_names[0], 1)
+            stun = NoTunnel() if s.tunnel_mode == "none" else SshTunnel(s.ssh_key_path, [(s.worker_small_local_port, 8188)])
+            app.state.q.small = Media(s, svast, stun, r, client, worker=EphemeralWorker(s, svast, stun, r, spec=WorkerSpec.small(s)), llm=llm)
+            app.state.q.small.start()
         if consumers is not None:
             app.state.q.consumers = consumers
         try:
             yield
         finally:
+            if small is None and app.state.q.small is not None:
+                await app.state.q.small.stop()
             if media is None and app.state.q.media is not None:
                 await app.state.q.media.stop()
             if heavy is None and app.state.q.heavy is not None:
@@ -212,16 +235,30 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
 
     # ---- midia (imagem): fila propria, uma por vez, na GPU de midia
     def _media(q: App) -> Media:
-        m = q.media or q.heavy
+        m = q.small or q.media or q.heavy
         if m is None:
             raise HTTPException(503, detail=_err("Este recurso não está disponível no momento.", "service_unavailable", "media_disabled"))
         return m
 
     def _owner(q: App, job_id: str) -> Media:
         """Quem tem o pedido vivo (fila e progresso moram na Media que o atende); os ja encerrados leem do Redis, que as duas dividem."""
-        if q.heavy is not None and job_id in q.heavy.live:
-            return q.heavy
+        for m in (q.heavy, q.small, q.media):
+            if m is not None and job_id in m.live:
+                return m
         return _media(q)
+
+    def _pick(q: App, kind: str, body: dict) -> tuple[Media, dict]:
+        """Escolhe a maquina pela receita: cada receita diz em que classes roda (grande, pequena ou a fixa legada) e a pequena tem preferencia sobre a fixa."""
+        rec = body.get("recipe")
+        if not rec:
+            rec = HEAVY_RECIPE if (kind == "video" and q.heavy is not None) else ("flux-schnell" if (kind == "image" and q.small is not None) else None)
+        by_pool = {"grande": q.heavy, "pequena": q.small, "fixa": q.media}
+        if rec in RECIPES:
+            for pool in ("pequena", "grande", "fixa"):
+                if pool in RECIPES[rec].get("pools", ()) and by_pool[pool] is not None:
+                    return by_pool[pool], {**body, "recipe": rec}
+        m = _media(q)
+        return m, ({**body, "recipe": rec} if rec else body)
 
     @app.post("/v1/videos/generations")
     async def videos_generations(request: Request):
@@ -232,21 +269,37 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
     async def images_generations(request: Request):
         return await _generate(request, "image")
 
-    async def _generate(request: Request, kind: str):
+    @app.post("/v1/audio/voice-clone")
+    async def audio_voice_clone(request: Request):
+        """Clonagem de voz: texto + amostra da voz (base64) -> audio WAV. Assincrono (202 + id)."""
+        return await _generate(request, "audio", "voz-clonar")
+
+    @app.post("/v1/audio/voice-convert")
+    async def audio_voice_convert(request: Request):
+        """Troca de voz de um audio ou video: `media` (base64) + `target_voice` (base64) -> audio WAV ou video MP4 com a nova voz."""
+        return await _generate(request, "audio", "voz-trocar")
+
+    @app.post("/v1/videos/dub")
+    async def videos_dub(request: Request):
+        """Redublagem: `video` (base64) + `target_language` -> video dublado com a voz clonada do locutor (ou `voice` em base64)."""
+        return await _generate(request, "video", "dublar")
+
+    async def _generate(request: Request, kind: str, recipe: str | None = None):
         q: App = request.app.state.q
         c = q.auth(request)
-        m = _media(q)
+        _media(q)
         try:
             body = await request.json()
             assert isinstance(body, dict)
         except Exception:  # noqa: BLE001
             raise HTTPException(400, detail=_err("corpo invalido", "invalid_request_error", "invalid_body"))
-        if kind == "video" and q.heavy is not None and body.get("recipe") in (None, "", HEAVY_RECIPE):
-            m, body = q.heavy, {**body, "recipe": HEAVY_RECIPE}  # video sem receita escolhida = qualidade maxima, na maquina sob demanda
+        if recipe:
+            body = {**body, "recipe": recipe}
+        m, body = _pick(q, kind, body)  # video sem receita = qualidade maxima na maquina grande; imagem na pequena
         cls = request.headers.get("x-queue-class", "interactive")
         end_user = request.headers.get("x-end-user", "")[:60]
         try:
-            cls = "batch" if kind == "video" else (cls if cls in ("interactive", "batch") else "interactive")
+            cls = "batch" if kind in ("video", "audio") else (cls if cls in ("interactive", "batch") else "interactive")
             job = await m.submit(c["name"], end_user, body, cls, kind)
         except QueueFull as e:
             raise HTTPException(429, detail=_err("fila de midia cheia", "rate_limit_error", "queue_full"), headers={"Retry-After": str(e.retry_after)})
@@ -256,7 +309,7 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
             log.info("video desligado: %s", e)
             raise HTTPException(503, detail=_err("Este recurso não está disponível no momento.", "service_unavailable", "video_disabled"))
         REQS.labels(c["name"], "image", "accepted").inc()
-        if kind == "video" or body.get("async") or request.headers.get("prefer", "").lower() == "respond-async":
+        if kind in ("video", "audio") or body.get("async") or request.headers.get("prefer", "").lower() == "respond-async":
             return JSONResponse({"id": job["id"], "status": job["state"], "poll": f"/v1/jobs/{job['id']}"}, status_code=202)
         job = await m.wait(job["id"], q.s.media_sync_wait_s) or job
         if job["state"] == "done":
@@ -311,21 +364,24 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
     @app.get("/admin/media/status")
     async def admin_media_status(request: Request):
         q = _admin(request)
-        if q.media is None and q.heavy is None:
+        if q.media is None and q.heavy is None and q.small is None:
             return {"enabled": False}
         out = await q.media.status() if q.media is not None else {"enabled": False}
         if q.heavy is not None:
-            out["worker"] = await q.heavy.status()  # maquina de video sob demanda (estado, custo da sessao, quando sera destruida)
+            out["worker"] = await q.heavy.status()  # maquina grande sob demanda (estado, custo da sessao, quando sera destruida)
+        if q.small is not None:
+            out["worker_small"] = await q.small.status()
         return out
 
     @app.get("/admin/media/jobs")
     async def admin_media_jobs(request: Request, limit: int = 40):
         q = _admin(request)
-        if q.media is None and q.heavy is None:
+        pools = [m for m in (q.small, q.media, q.heavy) if m is not None]
+        if not pools:
             return {"enabled": False, "waiting": [], "running": [], "recent": [], "lane": None}
-        base = await (q.media or q.heavy).jobs(max(1, min(limit, 100)))
-        if q.media is not None and q.heavy is not None:  # junta a fila da maquina de video na visao do painel
-            hv = await q.heavy.jobs(max(1, min(limit, 100)))
+        base = await pools[0].jobs(max(1, min(limit, 100)))
+        for outro in pools[1:]:  # junta as filas de todas as maquinas na visao do painel
+            hv = await outro.jobs(max(1, min(limit, 100)))
             base["waiting"] += hv["waiting"]
             base["running"] += hv["running"]
         return {"enabled": True, **base}

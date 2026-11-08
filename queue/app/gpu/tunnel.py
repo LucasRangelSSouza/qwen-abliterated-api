@@ -14,6 +14,7 @@ class Tunnel(Protocol):
     async def open(self, host: str, port: int) -> bool: ...
     async def healthy(self) -> bool: ...
     async def run(self, host: str, port: int, cmd: str, timeout: float = 90.0) -> bool: ...
+    async def run_out(self, host: str, port: int, cmd: str, timeout: float = 600.0, stdin: bytes | None = None) -> tuple[int, bytes]: ...
     async def close(self) -> None: ...
 
 
@@ -31,6 +32,9 @@ class NoTunnel:
 
     async def run(self, host: str, port: int, cmd: str, timeout: float = 90.0) -> bool:
         return False
+
+    async def run_out(self, host: str, port: int, cmd: str, timeout: float = 600.0, stdin: bytes | None = None) -> tuple[int, bytes]:
+        return 1, b""
 
     async def close(self) -> None:
         return None
@@ -93,6 +97,25 @@ class SshTunnel:
         if proc.returncode != 0:
             log.warning("ssh run saiu %s: %s", proc.returncode, (err or b"").decode(errors="replace").strip()[:200])
         return proc.returncode == 0
+
+    async def run_out(self, host: str, port: int, cmd: str, timeout: float = 600.0, stdin: bytes | None = None) -> tuple[int, bytes]:
+        """Roda um comando e devolve (codigo, stdout). `stdin` envia bytes (arquivo para a maquina); a saida pode ser um arquivo (cat) vindo da maquina."""
+        argv = [self.ssh_bin, "-i", self.key_path, "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no",
+                "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR", "-o", "ConnectTimeout=15", "-o", "ServerAliveInterval=20", "-p", str(port), f"{self.user}@{host}", cmd]
+        proc = await asyncio.create_subprocess_exec(*argv, stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
+                                                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        try:
+            out, err = await asyncio.wait_for(proc.communicate(stdin), timeout)
+        except Exception as e:  # noqa: BLE001
+            try:
+                proc.kill()
+            except Exception:  # noqa: BLE001
+                pass
+            log.warning("ssh run_out falhou: %r", e)
+            return 255, b""
+        if proc.returncode != 0:
+            log.warning("ssh run_out saiu %s: %s", proc.returncode, (err or b"").decode(errors="replace").strip()[:300])
+        return proc.returncode, out
 
     async def close(self) -> None:
         p, self.proc = self.proc, None

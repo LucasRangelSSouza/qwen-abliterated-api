@@ -201,7 +201,7 @@ def normalize_swap(p: dict) -> tuple[dict, list]:
 
 def public(eff: dict) -> dict:
     """O que o status do job mostra: tudo menos o texto base64 da imagem inicial."""
-    return {k: v for k, v in eff.items() if k != "image"}
+    return {k: v for k, v in eff.items() if k not in ("image", "video", "media", "audio", "voice", "target_voice", "reference_audio", "text")}
 
 
 def with_style(prompt: str, style: str | None) -> str:
@@ -303,3 +303,75 @@ def normalize_video_wan(p: dict) -> tuple[dict, list]:
         "seed": _seed(p), "sampler": "euler", "image_to_video": bool(image), "strength": None,
     }
     return eff, adj
+
+
+# ---------------------------------------------------------------- voz, dublagem e troca de rosto (sem travas no servidor: politica de uso e do agente)
+LANG_CODES = ("pt", "en", "es", "fr", "de", "it", "ja", "ko", "zh", "ru")
+MAX_AUDIO_BYTES = 12 * 1024 * 1024
+MAX_MEDIA_BYTES = 40 * 1024 * 1024
+DUB_MAX_S = 120.0
+CONVERT_MAX_S = 180.0
+CLONE_MAX_CHARS = 3000
+
+
+def looks_like_video(blob: bytes) -> bool:
+    return blob[4:8] == b"ftyp" or blob.startswith(b"\x1a\x45\xdf\xa3")
+
+
+def _lang(p: dict, names: tuple, default: str | None, label: str) -> str | None:
+    v = next((p[n] for n in names if p.get(n)), None)
+    if v is None:
+        return default
+    v = str(v).strip().lower()[:2]
+    if v not in LANG_CODES:
+        raise ParamError(f"Parâmetro inválido: {label} deve ser um de {', '.join(LANG_CODES)}.")
+    return v
+
+
+def _voz_base(prompt: str, seconds: float) -> dict:
+    return {"prompt": prompt[:300], "negative_prompt": "", "width": 0, "height": 0, "seconds": round(seconds, 2), "fps": 0, "frames": 0, "segments": 1, "total_seconds": round(seconds, 2),
+            "steps": None, "cfg": None, "seed": 0, "sampler": None, "image_to_video": False, "strength": None}
+
+
+def normalize_voice_clone(p: dict) -> tuple[dict, list]:
+    """Clonagem de voz: le um texto com a voz de uma amostra de 3 a 25 s (Qwen3-TTS)."""
+    text = str(p.get("text") or p.get("prompt") or "").strip()
+    if not text:
+        raise ParamError("O pedido precisa do texto a ser falado (text).")
+    if len(text) > CLONE_MAX_CHARS:
+        raise ParamError(f"Parâmetro inválido: o texto passa de {CLONE_MAX_CHARS} caracteres; divida em partes.")
+    ref = _blob(p.get("reference_audio") or p.get("ref_audio"), "reference_audio", MAX_AUDIO_BYTES)
+    if looks_like_video(ref):
+        raise ParamError("Parâmetro inválido: reference_audio deve ser um arquivo de áudio.")
+    eff = _voz_base(text, max(2.0, len(text) / 14.0))
+    eff.update(text=text, language=_lang(p, ("language", "lang", "idioma"), "pt", "language"), reference_text=str(p.get("reference_text") or "")[:600], reference_audio=p.get("reference_audio") or p.get("ref_audio"))
+    return eff, []
+
+
+def normalize_voice_convert(p: dict, duration_s: float = 0.0) -> tuple[dict, list]:
+    """Troca de voz: a fala de um audio ou video passa a soar como a voz da amostra (Chatterbox VC); o fundo e o resto do video ficam como estao."""
+    media = p.get("media") or p.get("video") or p.get("audio")
+    blob = _blob(media, "media", MAX_MEDIA_BYTES)
+    _blob(p.get("target_voice") or p.get("voice"), "target_voice", MAX_AUDIO_BYTES)
+    if duration_s and duration_s > CONVERT_MAX_S:
+        raise ParamError(f"Parâmetro inválido: o arquivo tem {int(duration_s)} s; o máximo é {int(CONVERT_MAX_S)} s (corte um trecho).")
+    eff = _voz_base("troca de voz", duration_s or 30.0)
+    eff.update(keep_background=bool(p.get("keep_background", True)), media=media, target_voice=p.get("target_voice") or p.get("voice"), duration_s=round(duration_s, 1), has_video=looks_like_video(blob))
+    return eff, []
+
+
+def normalize_dub(p: dict, duration_s: float = 0.0) -> tuple[dict, list]:
+    """Redublagem: transcreve a fala, traduz, fala de novo com a voz clonada do proprio locutor (ou de outra voz com consentimento) e remonta o video."""
+    blob = _blob(p.get("video") or p.get("media"), "video", MAX_MEDIA_BYTES)
+    target = _lang(p, ("target_language", "language", "idioma"), None, "target_language")
+    if not target:
+        raise ParamError("O pedido precisa do idioma da dublagem (target_language).")
+    voice = p.get("voice") or p.get("target_voice")
+    if voice:
+        _blob(voice, "voice", MAX_AUDIO_BYTES)
+    if duration_s and duration_s > DUB_MAX_S:
+        raise ParamError(f"Parâmetro inválido: o vídeo tem {int(duration_s)} s; a dublagem aceita até {int(DUB_MAX_S)} s (corte um trecho).")
+    eff = _voz_base(f"dublagem para {target}", duration_s or 30.0)
+    eff.update(target_language=target, source_language=_lang(p, ("source_language", "src_lang"), None, "source_language") or "", keep_background=bool(p.get("keep_background", True)),
+               video=p.get("video") or p.get("media"), voice=voice, duration_s=round(duration_s, 1), has_video=looks_like_video(blob))
+    return eff, []

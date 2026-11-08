@@ -30,13 +30,13 @@ class FakeVast:
         self.calls.append(("search",))
         return [dict(o) for o in self.offers]
 
-    async def search_gpu(self, names, disk_gb, max_dph, min_down_mbps, min_reliability) -> list[dict]:
+    async def search_gpu(self, names, disk_gb, max_dph, min_down_mbps, min_reliability, min_ram_gb=0.0) -> list[dict]:
         self.calls.append(("search_gpu",))
         out = []
         for o in self.offers:
             allin = o["dph_total"] + (o.get("storage_cost") or 0.2) * disk_gb / 730.0
             if o.get("gpu_name") in names and o.get("disk_space", 9999) >= disk_gb and o.get("inet_down", 9999) >= min_down_mbps \
-                    and o.get("reliability2", 1.0) >= min_reliability and allin <= max_dph:
+                    and o.get("reliability2", 1.0) >= min_reliability and allin <= max_dph and o.get("cpu_ram", 10**9) >= min_ram_gb * 1024:
                 out.append({**o, "allin_dph": round(allin, 4)})
         return sorted(out, key=lambda x: x["allin_dph"])
 

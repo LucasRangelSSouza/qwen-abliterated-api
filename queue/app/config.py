@@ -165,6 +165,17 @@ class Settings:
     worker_wait_s: float = 3600.0       # quanto o pedido espera por uma maquina (ofertas escassas) antes de falhar
     worker_min_credit_usd: float = 3.0  # saldo abaixo disso: nao aluga
     worker_job_timeout_s: float = 2400.0
+    hf_token: str = ""                                    # HF_TOKEN: leitura do repositorio PRIVADO de pesos (troca de rosto); vazio = so repositorios publicos
+    # classe PEQUENA (3090/4090 de ~US$ 0,3/h): imagem, voz, dublagem e troca de rosto. Substitui a GPU de midia fixa (que ficava ligada 24 h com ~2% de uso).
+    worker_small_enabled: bool = False                    # WORKER_SMALL_ENABLED
+    worker_small_gpu_names: tuple = ("RTX 3090", "RTX 4090")
+    worker_small_max_dph: float = 0.65                    # WORKER_SMALL_MAX_DPH_USD: preco TOTAL (GPU + disco) por hora
+    worker_small_disk_gb: int = 170                       # Flux 17 + troca de rosto ~55 + voz ~25 + ComfyUI e ambientes
+    worker_small_min_down_mbps: int = 800
+    worker_small_min_ram_gb: float = 64.0                 # o H3 le os pesos da RAM do host
+    worker_small_idle_s: float = 900.0                    # tem custo baixo: segura a maquina mais tempo para pedidos seguidos
+    worker_small_local_port: int = 18190
+    worker_small_cold_start_s: int = 360
     extra: dict = field(default_factory=dict)
 
     @property
@@ -256,6 +267,15 @@ class Settings:
             worker_wait_s=_f("WORKER_WAIT_S", cls.worker_wait_s),
             worker_min_credit_usd=_f("WORKER_MIN_CREDIT_USD", cls.worker_min_credit_usd),
             worker_job_timeout_s=_f("WORKER_JOB_TIMEOUT_S", cls.worker_job_timeout_s),
+            hf_token=_secret("HF_TOKEN"),
+            worker_small_enabled=_b("WORKER_SMALL_ENABLED", cls.worker_small_enabled),
+            worker_small_gpu_names=tuple(x.strip() for x in os.environ.get("WORKER_SMALL_GPU_NAMES", ",".join(cls.worker_small_gpu_names)).split(",") if x.strip()),
+            worker_small_max_dph=_f("WORKER_SMALL_MAX_DPH_USD", cls.worker_small_max_dph),
+            worker_small_disk_gb=_i("WORKER_SMALL_DISK_GB", cls.worker_small_disk_gb),
+            worker_small_min_down_mbps=_i("WORKER_SMALL_MIN_DOWN_MBPS", cls.worker_small_min_down_mbps),
+            worker_small_min_ram_gb=_f("WORKER_SMALL_MIN_RAM_GB", cls.worker_small_min_ram_gb),
+            worker_small_idle_s=_f("WORKER_SMALL_IDLE_S", cls.worker_small_idle_s),
+            worker_small_cold_start_s=_i("WORKER_SMALL_COLD_START_S", cls.worker_small_cold_start_s),
             static_retry_s=_f("GPU_STATIC_RETRY_S", cls.static_retry_s),
             static_retry_max_s=_f("GPU_STATIC_RETRY_MAX_S", cls.static_retry_max_s),
             static_llm_start_cmd=os.environ.get("GPU_STATIC_LLM_START_CMD", cls.static_llm_start_cmd),

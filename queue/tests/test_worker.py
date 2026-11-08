@@ -42,6 +42,8 @@ class FakeTunnel(NoTunnel):
     def __init__(self):
         super().__init__()
         self.provisioned = False
+        self.instalados: set[str] = set()
+        self.instalacoes: list[str] = []
         self.fail_provision = False
         self.ssh_down = False
         self.cmds: list[str] = []
@@ -53,11 +55,14 @@ class FakeTunnel(NoTunnel):
             return False
         if "base64 -d" in cmd:
             self.provisioned = not self.fail_provision
+            perfil = cmd.split("provision-", 1)[1].split(".sh", 1)[0]
+            self.instalacoes.append(perfil)
+            if self.provisioned:
+                self.instalados.add(perfil)
             return True
-        if cmd.startswith("test -f /workspace/provision.done &&"):
-            return False  # maquina nova: ainda nao instalada
-        if cmd == "test -f /workspace/provision.done":
-            return self.provisioned
+        if cmd.startswith("test -f /workspace/profile-"):  # marcador do perfil: so existe depois de instalar
+            perfil = cmd.rsplit("profile-", 1)[1].replace(".done", "")
+            return perfil in self.instalados
         if cmd.startswith("grep -q"):
             return self.fail_provision
         return True
@@ -363,9 +368,9 @@ async def test_estimativa_inclui_a_partida_da_maquina_e_a_fila(redis):
         gate = asyncio.Event()
         orig = w.ensure
 
-        async def slow_ensure():
+        async def slow_ensure(profile=None):
             await gate.wait()
-            await orig()
+            await orig(profile)
         w.ensure = slow_ensure
         a = await m.submit("p", "", {"prompt": "a", "seconds": 5}, "batch", "video")
         b = await m.submit("p", "", {"prompt": "b", "seconds": 5, "quality": "padrao"}, "batch", "video")

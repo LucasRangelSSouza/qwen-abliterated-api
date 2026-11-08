@@ -254,7 +254,8 @@ def normalize_video_wan14(p: dict) -> tuple[dict, list]:
         if len(blob) > MAX_IMAGE_BYTES:
             raise ParamError("Parâmetro inválido: a imagem inicial é grande demais (máximo 6 MB).")
     eff = {
-        "prompt": _prompt(p), "negative_prompt": str(p.get("negative_prompt") or NEG_WAN14)[:MAX_PROMPT_CHARS],
+        # o negativo do cliente SOMA ao oficial do Wan (que cobre mao, rosto, membros e "tres pernas"); substituir perderia essa protecao
+        "prompt": _prompt(p), "negative_prompt": ", ".join(x for x in (str(p.get("negative_prompt") or "").strip()[:MAX_PROMPT_CHARS], NEG_WAN14) if x),
         "width": w, "height": h, "quality": quality, "seconds": round(frames / WAN14_FPS, 2), "fps": WAN14_FPS, "frames": frames, "segments": segments,
         "total_seconds": round(frames / WAN14_FPS * segments, 2),
         "steps": _num(p, ("steps",), 20, 8, 40, adj, "steps", True), "cfg": _num(p, ("cfg", "guidance"), 3.5, 1.0, 8.0, adj, "cfg"),

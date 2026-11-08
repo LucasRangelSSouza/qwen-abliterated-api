@@ -217,6 +217,9 @@ def test_parametros_wan14_qualidade_automatica():
     assert (e["width"], e["height"], e["quality"], e["segments"]) == (832, 480, "padrao", 3)  # video longo: padrao, para a producao caber em ~20 min
     e, _ = mp.normalize_video_wan14({"prompt": "x", "seconds": 3, "format": "retrato", "quality": "padrao"})
     assert (e["width"], e["height"], e["frames"]) == (480, 832, 49)
+    e, _ = mp.normalize_video_wan14({"prompt": "x", "negative_prompt": "extra wheels"})
+    assert e["negative_prompt"].startswith("extra wheels, ") and mp.NEG_WAN14 in e["negative_prompt"]  # soma ao negativo oficial, nao substitui
+    assert mp.normalize_video_wan14({"prompt": "x"})[0]["negative_prompt"] == mp.NEG_WAN14
     with pytest.raises(mp.ParamError):
         mp.normalize_video_wan14({"prompt": "x", "format": "cubo"})
     with pytest.raises(mp.ParamError):

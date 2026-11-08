@@ -6,10 +6,10 @@ pip install -q uv
 V=/workspace/voz
 mkdir -p $V/work
 [ -x $V/venvs/main/bin/python ] || uv venv -q --python 3.12 $V/venvs/main
-uv pip install -q --python $V/venvs/main/bin/python qwen-tts faster-whisper demucs soundfile speechbrain huggingface_hub
+uv pip install -q --python $V/venvs/main/bin/python qwen-tts faster-whisper demucs soundfile speechbrain huggingface_hub 'setuptools<81'
 marca "venv main ok"
 [ -x $V/venvs/cb/bin/python ] || uv venv -q --python 3.11 $V/venvs/cb
-uv pip install -q --python $V/venvs/cb/bin/python chatterbox-tts
+uv pip install -q --python $V/venvs/cb/bin/python chatterbox-tts 'setuptools<81'
 marca "venv cb ok"
 # modelos ja na maquina (descobrir erro no meio do pedido custa mais)
 $V/venvs/main/bin/python $V/baixar_modelos.py main

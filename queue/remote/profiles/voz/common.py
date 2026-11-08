@@ -54,6 +54,16 @@ def split_points(path, max_s=25.0, min_s=4.0):
     return cuts
 
 
+def _onda_16k(path):
+    """Qualquer arquivo de audio/video -> onda float32 mono 16 kHz (via ffmpeg). O faster-whisper aceita a onda direto e nao precisa do PyAV."""
+    import numpy as np
+    import soundfile as sf
+    tmp = path + ".16k.wav"
+    to_wav(path, tmp, sr=16000)
+    onda, _ = sf.read(tmp, dtype="float32")
+    return np.asarray(onda, dtype=np.float32)
+
+
 def transcribe(path, language=None):
     """faster-whisper large-v3-turbo. GPU quando possivel; sem GPU (ou sem as bibliotecas CUDA) cai para CPU int8 em vez de falhar."""
     global _whisper
@@ -63,12 +73,13 @@ def transcribe(path, language=None):
             _whisper = WhisperModel("large-v3-turbo", device="cuda", compute_type="float16")
         except Exception:  # noqa: BLE001
             _whisper = WhisperModel("large-v3-turbo", device="cpu", compute_type="int8")
+    audio = _onda_16k(path)
     try:
-        segs, info = _whisper.transcribe(path, language=language, vad_filter=True, beam_size=5)
+        segs, info = _whisper.transcribe(audio, language=language, vad_filter=True, beam_size=5)
         out = [{"start": float(s.start), "end": float(s.end), "text": s.text.strip()} for s in segs if s.text.strip()]
     except Exception:  # noqa: BLE001
         _whisper = WhisperModel("large-v3-turbo", device="cpu", compute_type="int8")
-        segs, info = _whisper.transcribe(path, language=language, vad_filter=True, beam_size=5)
+        segs, info = _whisper.transcribe(audio, language=language, vad_filter=True, beam_size=5)
         out = [{"start": float(s.start), "end": float(s.end), "text": s.text.strip()} for s in segs if s.text.strip()]
     return out, info.language
 

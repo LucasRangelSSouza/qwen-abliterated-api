@@ -217,7 +217,7 @@ class EphemeralWorker:
         inst = await self._wait_running()
         await self._wait_ssh(inst)
         self.stage = "abrindo o tunel"
-        if not await self.tun.open(inst.ssh_host, int(inst.ssh_port)):
+        if not await self.tun.open(*self.ssh_target(inst)):
             raise RuntimeError("nao consegui abrir o tunel ate o worker")
 
     async def _adopt_existing(self):
@@ -262,8 +262,20 @@ class EphemeralWorker:
                     arquivos += f"cat > /workspace/{profile}/{nome} <<'__ARQUIVO__'\n{f.read()}\n__ARQUIVO__\n"
         return lib + "\n" + arquivos + "\n" + script
 
+    @staticmethod
+    def ssh_target(inst) -> tuple[str, int]:
+        """IP e porta DIRETOS da maquina quando a Vast os informa (o proxy sshN.vast.ai recusa conexoes em sequencia); senao, o proxy."""
+        raw = getattr(inst, "raw", None) or {}
+        try:
+            direto = (raw.get("ports") or {}).get("22/tcp")
+            if raw.get("public_ipaddr") and direto:
+                return str(raw["public_ipaddr"]), int(direto[0]["HostPort"])
+        except (KeyError, IndexError, TypeError, ValueError):
+            pass
+        return inst.ssh_host, int(inst.ssh_port)
+
     async def _wait_ssh(self, inst) -> None:
-        host, port = inst.ssh_host, int(inst.ssh_port)
+        host, port = self.ssh_target(inst)
         self._ssh = (host, port)
         self.stage = "verificando a maquina"
         for _ in range(24):  # o SSH demora uns segundos para aceitar depois de "running"
@@ -318,7 +330,7 @@ class EphemeralWorker:
             log.warning("worker: a maquina %s nao esta mais de pe (%s)", self.inst_id, getattr(inst, "actual_status", None))
             await self._destroy("maquina caiu")
             return False
-        if not await self.tun.healthy() and not await self.tun.open(inst.ssh_host, int(inst.ssh_port)):
+        if not await self.tun.healthy() and not await self.tun.open(*self.ssh_target(inst)):
             return False
         return True
 

@@ -102,20 +102,26 @@ class SshTunnel:
         """Roda um comando e devolve (codigo, stdout). `stdin` envia bytes (arquivo para a maquina); a saida pode ser um arquivo (cat) vindo da maquina."""
         argv = [self.ssh_bin, "-i", self.key_path, "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=no",
                 "-o", "UserKnownHostsFile=/dev/null", "-o", "LogLevel=ERROR", "-o", "ConnectTimeout=15", "-o", "ServerAliveInterval=20", "-p", str(port), f"{self.user}@{host}", cmd]
-        proc = await asyncio.create_subprocess_exec(*argv, stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
-                                                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        try:
-            out, err = await asyncio.wait_for(proc.communicate(stdin), timeout)
-        except Exception as e:  # noqa: BLE001
+        for tentativa in range(4):  # 255 = o proprio SSH falhou (conexao recusada, banner): tenta de novo; o codigo do comando remoto nunca e 255 aqui
+            proc = await asyncio.create_subprocess_exec(*argv, stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
+                                                        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
             try:
-                proc.kill()
-            except Exception:  # noqa: BLE001
-                pass
-            log.warning("ssh run_out falhou: %r", e)
-            return 255, b""
-        if proc.returncode != 0:
-            log.warning("ssh run_out saiu %s: %s", proc.returncode, (err or b"").decode(errors="replace").strip()[:300])
-        return proc.returncode, out
+                out, err = await asyncio.wait_for(proc.communicate(stdin), timeout)
+            except Exception as e:  # noqa: BLE001
+                try:
+                    proc.kill()
+                except Exception:  # noqa: BLE001
+                    pass
+                log.warning("ssh run_out falhou: %r", e)
+                return 255, b""
+            if proc.returncode == 255 and tentativa < 3:
+                log.info("ssh run_out: SSH recusou (%s); nova tentativa", (err or b"").decode(errors="replace").strip()[:120])
+                await asyncio.sleep(3 * (tentativa + 1))
+                continue
+            if proc.returncode != 0:
+                log.warning("ssh run_out saiu %s: %s", proc.returncode, (err or b"").decode(errors="replace").strip()[:300])
+            return proc.returncode, out
+        return 255, b""
 
     async def close(self) -> None:
         p, self.proc = self.proc, None

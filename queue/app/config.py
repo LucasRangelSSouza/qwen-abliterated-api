@@ -176,6 +176,9 @@ class Settings:
     worker_small_idle_s: float = 900.0                    # tem custo baixo: segura a maquina mais tempo para pedidos seguidos
     worker_small_local_port: int = 18190
     worker_small_cold_start_s: int = 360
+    # Licenca do MiniMax H3 (troca de rosto): uso comercial autorizado so FORA de EUA, UE, Reino Unido e Coreia do Sul. Desligado por padrao; para ligar:
+    # WORKER_SMALL_BLOCKED_COUNTRIES=US,GB,KR,DE,FR,... (codigos ISO; a Vast informa o pais na oferta). Reduz a oferta de maquinas.
+    worker_small_blocked_countries: tuple = ()
     extra: dict = field(default_factory=dict)
 
     @property
@@ -276,6 +279,7 @@ class Settings:
             worker_small_min_ram_gb=_f("WORKER_SMALL_MIN_RAM_GB", cls.worker_small_min_ram_gb),
             worker_small_idle_s=_f("WORKER_SMALL_IDLE_S", cls.worker_small_idle_s),
             worker_small_cold_start_s=_i("WORKER_SMALL_COLD_START_S", cls.worker_small_cold_start_s),
+            worker_small_blocked_countries=tuple(x.strip().upper() for x in os.environ.get("WORKER_SMALL_BLOCKED_COUNTRIES", "").split(",") if x.strip()),
             static_retry_s=_f("GPU_STATIC_RETRY_S", cls.static_retry_s),
             static_retry_max_s=_f("GPU_STATIC_RETRY_MAX_S", cls.static_retry_max_s),
             static_llm_start_cmd=os.environ.get("GPU_STATIC_LLM_START_CMD", cls.static_llm_start_cmd),

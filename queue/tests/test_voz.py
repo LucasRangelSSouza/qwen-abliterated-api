@@ -323,3 +323,16 @@ def test_rotas_de_voz_e_dublagem_e_roteamento_por_receita(redis):
         assert st["worker_small"]["pool"] == "pequena" and "voz" in st["worker_small"]["profiles"] and st["worker"]["pool"] == "grande"
         # erro de parametro vira 422 com mensagem clara
         assert c.post("/v1/audio/voice-clone", json={"text": ""}, headers=h).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_bloqueio_de_paises_por_licenca_e_opcional():
+    boa = {**offer(1, 0.30, name="RTX 3090", sc=0.1), "geolocation": "Estonia, EE", "cpu_ram": 128 * 1024}
+    ok = {**offer(2, 0.40, name="RTX 3090", sc=0.1), "geolocation": "Alberta, CA", "cpu_ram": 128 * 1024}
+    clock = Clock()
+    for bloqueados, esperado in (((), 1), (("EE", "US"), 2)):
+        s = settings(worker_small_enabled=True, worker_small_blocked_countries=bloqueados)
+        vast = FakeVast(offers=[boa, ok], boot_polls=1)
+        w = EphemeralWorker(s, vast, VozTunnel(), None, clock=clock, sleep=clock.sleep, script="x", spec=WorkerSpec.small(s))
+        await w.ensure("imagem")
+        assert ("create", esperado, "ok") in vast.calls

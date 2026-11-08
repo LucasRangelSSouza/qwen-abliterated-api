@@ -62,7 +62,7 @@ def _inst(d: dict) -> Instance:
 
 class VastAPI(Protocol):
     async def search_offers(self) -> list[dict]: ...
-    async def search_gpu(self, names: tuple, disk_gb: int, max_dph: float, min_down_mbps: float, min_reliability: float, min_ram_gb: float = 0.0) -> list[dict]: ...
+    async def search_gpu(self, names: tuple, disk_gb: int, max_dph: float, min_down_mbps: float, min_reliability: float, min_ram_gb: float = 0.0, blocked_countries: tuple = ()) -> list[dict]: ...
     async def create_instance(self, offer_id: int, image: str, disk_gb: int, label: str, onstart: str, env: dict) -> CreateResult: ...
     async def get_instance(self, instance_id: int) -> Instance | None: ...
     async def list_instances(self) -> list[Instance]: ...
@@ -109,7 +109,7 @@ class RealVast:
             raise VastError(f"busca falhou: HTTP {r.status_code} {r.text[:200]}")
         return list(self._body(r).get("offers", []))
 
-    async def search_gpu(self, names: tuple, disk_gb: int, max_dph: float, min_down_mbps: float, min_reliability: float, min_ram_gb: float = 0.0) -> list[dict]:
+    async def search_gpu(self, names: tuple, disk_gb: int, max_dph: float, min_down_mbps: float, min_reliability: float, min_ram_gb: float = 0.0, blocked_countries: tuple = ()) -> list[dict]:
         """Ofertas de 1 GPU (qualquer nome da lista) com disco, rede e confiabilidade minimos e preco TOTAL (GPU + disco) dentro do teto, do mais barato ao mais caro.
         O `dph_total` da oferta e so da GPU: soma-se o disco (storage_cost em US$/GB/mes, 730 h) como a Vast cobra na instancia criada (medido: 1,201 + 0,022 = 1,222)."""
         q = {"verified": {"eq": True}, "rentable": {"eq": True}, "type": "on-demand", "limit": 300, "order": [["dph_total", "asc"]],
@@ -122,7 +122,8 @@ class RealVast:
             allin = float(o.get("dph_total") or 0) + float(o.get("storage_cost") or 0) * disk_gb / 730.0
             if (float(o.get("disk_space") or 0) >= disk_gb and float(o.get("inet_down") or 0) >= min_down_mbps
                     and float(o.get("reliability2") or o.get("reliability") or 0) >= min_reliability and 0 < allin <= max_dph
-                    and float(o.get("cpu_ram") or 0) >= min_ram_gb * 1024):  # cpu_ram vem em MB
+                    and float(o.get("cpu_ram") or 0) >= min_ram_gb * 1024  # cpu_ram vem em MB
+                    and (o.get("geolocation") or "").split(",")[-1].strip().upper() not in blocked_countries):
                 out.append({**o, "allin_dph": round(allin, 4)})
         return sorted(out, key=lambda x: x["allin_dph"])
 

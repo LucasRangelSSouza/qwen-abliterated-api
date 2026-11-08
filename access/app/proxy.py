@@ -231,6 +231,22 @@ async def images_generations(request: Request):
     return await _media_generate(request, "/v1/images/generations", "image")
 
 
+# voz e dublagem: mesmas regras da imagem (autentica, repassa ao llm-queue com a chave de servico, registra quem pediu); o resultado sai por /v1/jobs/{id}/file
+@router.post("/v1/audio/voice-clone")
+async def audio_voice_clone(request: Request):
+    return await _media_generate(request, "/v1/audio/voice-clone", "audio")
+
+
+@router.post("/v1/audio/voice-convert")
+async def audio_voice_convert(request: Request):
+    return await _media_generate(request, "/v1/audio/voice-convert", "audio")
+
+
+@router.post("/v1/videos/dub")
+async def videos_dub(request: Request):
+    return await _media_generate(request, "/v1/videos/dub", "video")
+
+
 async def _media_generate(request: Request, path: str, route: str):
     ctx = _ctx(request)
     p = authenticate(ctx, request)

@@ -60,3 +60,13 @@ async def test_faturamento_e_metricas_leem_do_queue(rig: Rig):
     m = (await rig.client.get("/admin/api/metrics?machine=image")).json()
     assert m["machine"] == "image" and m["totals"]["requests"] == 3
     assert (await rig.client.get("/admin/api/metrics?machine=lixo")).json()["machine"] == "llm"  # maquina invalida cai em llm
+
+
+async def test_voz_e_dublagem_repassam_ao_queue_com_chave_de_servico(rig: Rig):
+    h = {"Authorization": f"Bearer {OWNER_KEY}"}
+    for rota, corpo in (("/v1/audio/voice-clone", {"text": "oi", "reference_audio": "AAAA"}), ("/v1/audio/voice-convert", {"media": "AAAA", "target_voice": "AAAA"}), ("/v1/videos/dub", {"video": "AAAA", "target_language": "pt"})):
+        assert (await rig.client.post(rota, json=corpo)).status_code == 401  # sem chave: nada passa
+        await rig.client.post(rota, json=corpo, headers=h)
+        path, body, headers = rig.up.calls[-1]
+        assert path == rota and body == corpo
+        assert headers["authorization"] == f"Bearer {UP_KEY}" and headers["x-end-user"] == "dono"

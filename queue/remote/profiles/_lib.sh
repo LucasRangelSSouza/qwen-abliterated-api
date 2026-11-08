@@ -8,7 +8,7 @@ T0=$(date +%s)
 marca() { echo "[$(( $(date +%s) - T0 ))s] $*" >> /workspace/provision.log; }
 
 apt_base() {
-  local pk="git ffmpeg libgl1 libglib2.0-0 aria2 sox libsndfile1"
+  local pk="git ffmpeg libgl1 libglib2.0-0 aria2 sox libsndfile1 gcc g++"
   (apt-get install -y -qq $pk >/dev/null 2>&1) || (apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq $pk >/dev/null 2>&1) || true
   marca "apt ok"
 }
@@ -57,7 +57,8 @@ comfy_start() {
   pkill -f "python main.py --listen" 2>/dev/null || true
   sleep 2
   cd /workspace/ComfyUI
-  nohup setsid python main.py --listen 127.0.0.1 --port 8188 --disable-auto-launch --disable-metadata >> /workspace/comfy.log 2>&1 < /dev/null &
+  # flags do ComfyUI ficam em /workspace/comfy.args (o perfil rosto grava --reserve-vram 6: sem isso o encoder int4 de 14 GB estoura a VRAM da 3090 ao carregar)
+  nohup setsid python main.py --listen 127.0.0.1 --port 8188 --disable-auto-launch --disable-metadata $(cat /workspace/comfy.args 2>/dev/null) >> /workspace/comfy.log 2>&1 < /dev/null &
   cd /workspace
   for _ in $(seq 1 100); do
     if curl -sf -m 3 http://127.0.0.1:8188/system_stats >/dev/null; then marca "ComfyUI respondendo"; return 0; fi

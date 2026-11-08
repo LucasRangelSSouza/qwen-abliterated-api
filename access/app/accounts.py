@@ -24,7 +24,7 @@ DEFAULT_PLANS = [  # editaveis no painel. tokens None = sem limite; max_devices 
     # id, nome, tokens/sessao (5 h), tokens/semana, imagens/mes, nivel de seguranca, computadores, preco (centavos)
     ("light", "Light", 1_000_000, 10_000_000, 300, 2, 0, 11900),
     ("max", "Max", 3_000_000, 30_000_000, 1000, 1, 0, 49700),
-    ("ultra", "Ultra", None, None, 4000, 1, 0, 149700),
+    ("ultra", "Ultra", None, None, 4000, 1, 0, 119700),
     ("enterprise", "Enterprise", None, None, 10000, 1, 0, 0),  # sob contrato (contato pelo WhatsApp): o administrador atribui, nao ha checkout
 ]
 LEGACY_PLANS = ("pro", "infinity")  # nomes antigos: quem ja assina continua valendo; "pro" virou "light" (migrado em ensure_plans)

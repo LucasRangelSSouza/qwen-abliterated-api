@@ -248,7 +248,7 @@ async def test_cadastro_manual_busca_e_filtro(make_rig):
 async def test_planos_editaveis_e_validados(rig: Rig):
     await rig.login()
     planos = (await rig.client.get("/admin/api/plans")).json()["plans"]
-    assert [p["id"] for p in planos] == ["light", "max", "ultra", "enterprise"] and planos[0]["price_cents"] == 12000
+    assert [p["id"] for p in planos] == ["light", "max", "ultra", "enterprise"] and planos[0]["price_cents"] == 11900
     assert planos[2]["session_limit_tokens"] is None and planos[3]["safety_level"] == 1 and all(p["max_devices"] == 0 for p in planos)
     assert (await rig.client.put("/admin/api/plans/light", json={"price_cents": 29900, "week_limit_tokens": 12_000_000})).json()["price_cents"] == 29900
     for ruim in ({"safety_level": 3}, {"max_devices": -1}, {"price_cents": -1}, {"nome": "x"}, {"name": "  "}):
@@ -324,4 +324,4 @@ async def test_pacote_de_skills_so_fora_do_light_e_pro_antigo_migra(make_rig):
         c.execute("INSERT INTO plans(id,name,session_limit_tokens,week_limit_tokens,image_quota_month,safety_level,max_devices,price_cents) VALUES('pro','Pro',1000000,10000000,300,2,0,24700)")
     A.ensure_plans(ctx)
     ids = {p["id"]: p for p in ctx.store.query("SELECT * FROM plans")}
-    assert "pro" not in ids and ids["light"]["name"] == "Light" and ids["light"]["price_cents"] == 12000 and ids["light"]["week_limit_tokens"] == 10000000
+    assert "pro" not in ids and ids["light"]["name"] == "Light" and ids["light"]["price_cents"] == 11900 and ids["light"]["week_limit_tokens"] == 10000000

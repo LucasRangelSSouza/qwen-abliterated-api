@@ -22,7 +22,7 @@ from app.ctx import Ctx
 
 DEFAULT_PLANS = [  # editaveis no painel. tokens None = sem limite; max_devices 0 = computadores ilimitados; safety_level = padrao da pessoa nova
     # id, nome, tokens/sessao (5 h), tokens/semana, imagens/mes, nivel de seguranca, computadores, preco (centavos)
-    ("light", "Light", 1_000_000, 10_000_000, 300, 2, 0, 12000),
+    ("light", "Light", 1_000_000, 10_000_000, 300, 2, 0, 11900),
     ("max", "Max", 3_000_000, 30_000_000, 1000, 1, 0, 49700),
     ("ultra", "Ultra", None, None, 4000, 1, 0, 149700),
     ("enterprise", "Enterprise", None, None, 10000, 1, 0, 0),  # sob contrato (contato pelo WhatsApp): o administrador atribui, nao ha checkout
@@ -73,7 +73,7 @@ def ensure_plans(ctx: Ctx) -> None:
     have = {r["id"] for r in ctx.store.query("SELECT id FROM plans")}
     if "pro" in have and "light" not in have:  # o plano Pro virou Light (R$ 120): mesmo id de contas e assinaturas, so o nome e o preco mudam
         with ctx.store.tx() as c:
-            c.execute("UPDATE plans SET id='light', name='Light', price_cents=12000 WHERE id='pro'")
+            c.execute("UPDATE plans SET id='light', name='Light', price_cents=11900 WHERE id='pro'")
             c.execute("UPDATE subscriptions SET plan='light' WHERE plan='pro'")
         have = {r["id"] for r in ctx.store.query("SELECT id FROM plans")}
     falta = [p for p in DEFAULT_PLANS if p[0] not in have]

@@ -41,6 +41,7 @@ class Settings:
     session_ttl_s: float = 12 * 3600
     request_timeout_s: float = 1800.0
     cakto_webhook_secret: str = ""  # CAKTO_WEBHOOK_SECRET: sem ele o webhook responde 503 (nunca fica aberto)
+    site_origins: str = "https://brain.rangeltech.net,https://remoto.rangeltech.net"  # SITE_ORIGINS: origens que podem chamar /v1/free pelo navegador
     secrets_key: str = ""           # SECRETS_KEY: chave mestra que cifra credenciais guardadas no banco (Contabo); sem ela nao guarda
 
     @property
@@ -70,4 +71,5 @@ class Settings:
             panel_dir=e("ACCESS_PANEL_DIR", cls.panel_dir),
             cakto_webhook_secret=_secret("CAKTO_WEBHOOK_SECRET"),
             secrets_key=_secret("SECRETS_KEY"),
+            site_origins=e("SITE_ORIGINS", cls.site_origins),
         )

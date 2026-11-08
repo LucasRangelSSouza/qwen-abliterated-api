@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS vms(
   created_at REAL NOT NULL, updated_at REAL NOT NULL, suspended_at REAL, last_error TEXT,
   external_id TEXT, billing_status TEXT, next_payment_at REAL);
 CREATE INDEX IF NOT EXISTS vms_account ON vms(account_id);
+CREATE TABLE IF NOT EXISTS free_trials(
+  account_id INTEGER PRIMARY KEY REFERENCES accounts(id), ident TEXT NOT NULL UNIQUE, used INTEGER NOT NULL DEFAULT 0, verified INTEGER NOT NULL DEFAULT 0,
+  code_hash TEXT, code_expires REAL, code_tries INTEGER NOT NULL DEFAULT 0, ip TEXT, created_at REAL NOT NULL, last_at REAL);
 CREATE TABLE IF NOT EXISTS billing_events(
   id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, event_id TEXT NOT NULL, kind TEXT NOT NULL, received_at REAL NOT NULL,
   processed INTEGER NOT NULL DEFAULT 0, error TEXT, payload TEXT NOT NULL, UNIQUE(provider, event_id));

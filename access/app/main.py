@@ -76,8 +76,13 @@ def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = No
         return RedirectResponse("/admin/", status_code=307)
 
     from app import accounts_routes  # registra o CRM no router do painel antes dele ser incluido
+    from app import free
+    from fastapi.middleware.cors import CORSMiddleware
+    # o teste grátis é chamado do site de vendas (outro domínio): só as origens do site, só as rotas públicas /v1/free
+    app.add_middleware(CORSMiddleware, allow_origins=[o for o in (s.site_origins or '').split(',') if o], allow_methods=['GET', 'POST', 'OPTIONS'], allow_headers=['content-type', 'authorization'], max_age=3600)
     app.include_router(proxy.router)
     app.include_router(accounts_routes.router)
+    app.include_router(free.router)
     app.include_router(enroll.router)
     app.include_router(admin.api)
     app.include_router(admin.static)  # por ultimo: o catch-all /admin/{path} nao pode engolir /admin/api

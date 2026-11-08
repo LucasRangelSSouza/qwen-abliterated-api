@@ -35,6 +35,7 @@ MAX_PROMPT_CHARS = 4000
 
 # Estimativa de duracao quando ainda nao ha medida real (3090: imagem ~30 s, video de 4 s ~40 s, ja contando a troca de modelo).
 ETA_DEFAULT_S = {"image": 30, "video": 60}
+ETA_BY_RECIPE = {"openjutsu-swap": 540, "wan22-ti2v": 470}
 MSG = {
     ("image", "queued"): "Sua imagem está na fila para ser gerada.",
     ("video", "queued"): "Seu vídeo está na fila para ser gerado.",
@@ -594,6 +595,9 @@ class Media:
         """Duracao esperada de um pedido (sem a partida do worker): o video pesado depende de tamanho e duracao; os demais usam a media."""
         if job.get("recipe") == HEAVY_RECIPE and job.get("params"):
             return mp.wan14_eta_s(job["params"])
+        per = ETA_BY_RECIPE.get(job.get("recipe"))  # medido: troca de personagem ~9 min por 5 s em 480p; Wan 5B ~8 min por clipe de 5 s
+        if per:
+            return int(per * int((job.get("params") or {}).get("segments") or 1))
         return ETA_DEFAULT_S.get(job.get("kind", "image"), 30)
 
     def _job_of(self, ticket) -> dict:

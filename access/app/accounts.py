@@ -22,9 +22,10 @@ from app.ctx import Ctx
 
 DEFAULT_PLANS = [  # editaveis no painel. tokens None = sem limite; max_devices 0 = computadores ilimitados; safety_level = padrao da pessoa nova
     # id, nome, tokens/sessao (5 h), tokens/semana, imagens/mes, nivel de seguranca, computadores, preco (centavos)
-    ("light", "Light", 1_000_000, 10_000_000, 300, 2, 0, 11900),
-    ("max", "Max", 3_000_000, 30_000_000, 1000, 1, 0, 49700),
-    ("ultra", "Ultra", None, None, 4000, 1, 0, 119700),
+    # uso em multiplos do Lite (1x): Max 5x, Ultra 20x. Imagens/mes: ainda nao cobradas (so informadas no site)
+    ("light", "Lite", 1_000_000, 10_000_000, 100, 2, 0, 11900),
+    ("max", "Max", 5_000_000, 50_000_000, 1000, 1, 0, 49700),
+    ("ultra", "Ultra", 20_000_000, 200_000_000, 4000, 1, 0, 119700),
     ("enterprise", "Enterprise", None, None, 10000, 1, 0, 0),  # sob contrato (contato pelo WhatsApp): o administrador atribui, nao ha checkout
 ]
 LEGACY_PLANS = ("pro", "infinity")  # nomes antigos: quem ja assina continua valendo; "pro" virou "light" (migrado em ensure_plans)
@@ -220,9 +221,9 @@ def plan_from_hint(ctx: Ctx, hint: str) -> str | None:
     for frag, pid in mapping.items():
         if frag.lower() in hint:
             return pid
-    for pid in ("enterprise", "infinity", "ultra", "max", "light", "pro"):  # do maior para o menor: "Ultra Max" nao vira Light
+    for pid in ("enterprise", "infinity", "ultra", "max", "light", "lite", "pro"):  # do maior para o menor: "Ultra Max" nao vira Lite
         if pid in hint:
-            return "light" if pid == "pro" else pid
+            return "light" if pid in ("pro", "lite") else pid
     return None
 
 

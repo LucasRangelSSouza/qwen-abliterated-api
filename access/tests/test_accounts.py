@@ -66,7 +66,7 @@ async def test_compra_cria_conta_e_pessoa_desabilitada(make_rig):
     assert a["next_payment_at"].startswith("2026-12-04") and a["amount_cents"] == 50000 and a["safety_level"] == 1
     assert d["summary"] == {"total": 1, "active": 1, "late": 0, "ended": 0, "awaiting": 1, "mrr_cents": 50000}
     pessoa = (await r.client.get("/admin/api/people")).json()[0]
-    assert pessoa["limits"]["session_limit_tokens"] == 3_000_000  # limites do plano Max
+    assert pessoa["limits"]["session_limit_tokens"] == 5_000_000  # limites do plano Max (5x o Lite)
 
 
 async def test_evento_repetido_nao_duplica(make_rig):
@@ -249,7 +249,7 @@ async def test_planos_editaveis_e_validados(rig: Rig):
     await rig.login()
     planos = (await rig.client.get("/admin/api/plans")).json()["plans"]
     assert [p["id"] for p in planos] == ["light", "max", "ultra", "enterprise"] and planos[0]["price_cents"] == 11900
-    assert planos[2]["session_limit_tokens"] is None and planos[3]["safety_level"] == 1 and all(p["max_devices"] == 0 for p in planos)
+    assert planos[2]["session_limit_tokens"] == 20_000_000 and planos[3]["session_limit_tokens"] is None and planos[3]["safety_level"] == 1 and all(p["max_devices"] == 0 for p in planos)
     assert (await rig.client.put("/admin/api/plans/light", json={"price_cents": 29900, "week_limit_tokens": 12_000_000})).json()["price_cents"] == 29900
     for ruim in ({"safety_level": 3}, {"max_devices": -1}, {"price_cents": -1}, {"nome": "x"}, {"name": "  "}):
         assert (await rig.client.put("/admin/api/plans/light", json=ruim)).status_code == 422
@@ -325,3 +325,12 @@ async def test_pacote_de_skills_so_fora_do_light_e_pro_antigo_migra(make_rig):
     A.ensure_plans(ctx)
     ids = {p["id"]: p for p in ctx.store.query("SELECT * FROM plans")}
     assert "pro" not in ids and ids["light"]["name"] == "Light" and ids["light"]["price_cents"] == 11900 and ids["light"]["week_limit_tokens"] == 10000000
+
+
+async def test_produto_com_nome_lite_vira_o_plano_light(rig: Rig):
+    from app import accounts as A
+    ctx = rig.app.state.ctx
+    assert A.plan_from_hint(ctx, "segundo cérebro lite anual") == "light"
+    assert A.plan_from_hint(ctx, "segundo cérebro ultra lite") == "ultra"  # o maior vence
+    planos = {p[0]: p for p in A.DEFAULT_PLANS}
+    assert planos["light"][1] == "Lite" and planos["max"][2] == 5 * planos["light"][2] and planos["ultra"][2] == 20 * planos["light"][2]

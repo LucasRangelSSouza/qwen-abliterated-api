@@ -32,7 +32,11 @@ CREATE TABLE IF NOT EXISTS safety_log(
 CREATE INDEX IF NOT EXISTS safety_log_ts ON safety_log(ts);
 CREATE TABLE IF NOT EXISTS plans(
   id TEXT PRIMARY KEY, name TEXT NOT NULL, session_limit_tokens INTEGER, week_limit_tokens INTEGER, image_quota_month INTEGER NOT NULL DEFAULT 0,
+  video_quota_month INTEGER, audio_quota_month INTEGER,
   safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2,3)), max_devices INTEGER NOT NULL DEFAULT 3, price_cents INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS media_usage(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, person_id INTEGER NOT NULL, kind TEXT NOT NULL, units INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS media_usage_person ON media_usage(person_id, kind, ts);
 CREATE TABLE IF NOT EXISTS accounts(
   id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL DEFAULT '', pw_hash TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','blocked')), person_id INTEGER NOT NULL REFERENCES people(id),
@@ -81,6 +85,10 @@ class Store:
                 c.execute("ALTER TABLE people ADD COLUMN safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2,3))")
             if "custom" not in {r["name"] for r in c.execute("PRAGMA table_info(limits)").fetchall()}:
                 c.execute("ALTER TABLE limits ADD COLUMN custom INTEGER NOT NULL DEFAULT 0")  # 1 = limite editado a mao na pessoa (vale no lugar do plano)
+            cols_plans = {r["name"] for r in c.execute("PRAGMA table_info(plans)").fetchall()}
+            for col in ("video_quota_month", "audio_quota_month"):  # cota de midia por plano (NULL = ainda nao configurada, nao bloqueia)
+                if col not in cols_plans:
+                    c.execute(f"ALTER TABLE plans ADD COLUMN {col} INTEGER")
             cols_vms = {r["name"] for r in c.execute("PRAGMA table_info(vms)").fetchall()}
             for col, tipo in (("external_id", "TEXT"), ("billing_status", "TEXT"), ("next_payment_at", "REAL")):  # cobranca propria da VM (produto da Cakto)
                 if col not in cols_vms:

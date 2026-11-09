@@ -66,7 +66,6 @@ class WorkerSpec:
     cold_start_s: int
     local_port: int
     default_profile: str
-    blocked_countries: tuple = ()
 
     @classmethod
     def big(cls, s: Settings) -> "WorkerSpec":
@@ -77,7 +76,7 @@ class WorkerSpec:
     def small(cls, s: Settings) -> "WorkerSpec":
         return cls("pequena", "mi-worker-small", s.worker_small_gpu_names, s.worker_small_max_dph, s.worker_small_disk_gb, s.worker_small_min_down_mbps,
                    s.worker_min_reliability, s.worker_small_min_ram_gb, s.worker_small_idle_s, s.worker_max_age_h, s.worker_start_timeout_s, s.worker_wait_s,
-                   s.worker_min_credit_usd, s.worker_image, s.worker_small_cold_start_s, s.worker_small_local_port, "imagem", s.worker_small_blocked_countries)
+                   s.worker_min_credit_usd, s.worker_image, s.worker_small_cold_start_s, s.worker_small_local_port, "imagem")
 
 
 class EphemeralWorker:
@@ -200,7 +199,7 @@ class EphemeralWorker:
         if inst is None:
             self.stage = "procurando maquina"
             offers = await self.vast.search_gpu(self.spec.gpu_names, self.spec.disk_gb, self.spec.max_dph,
-                                                self.spec.min_down_mbps, self.spec.min_reliability, self.spec.min_ram_gb, self.spec.blocked_countries)
+                                                self.spec.min_down_mbps, self.spec.min_reliability, self.spec.min_ram_gb)
             if not offers:
                 raise RuntimeError(f"nenhuma oferta com ate US$ {self.spec.max_dph}/h, rede >= {self.spec.min_down_mbps} Mbps e confiabilidade >= {self.spec.min_reliability}")
             for o in offers[:6]:

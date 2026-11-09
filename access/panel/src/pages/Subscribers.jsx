@@ -177,6 +177,8 @@ function PlansCard() {
               <Field label="Tokens por semana" htmlFor={`pw-${p.id}`}><Input id={`pw-${p.id}`} type="number" min="0" placeholder="vazio = sem limite" value={val('week_limit_tokens', p.week_limit_tokens ?? '')} onChange={(e) => set(p.id, 'week_limit_tokens', e.target.value)} /></Field>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Imagens por mês" htmlFor={`pi-${p.id}`}><Input id={`pi-${p.id}`} type="number" min="0" value={val('image_quota_month', p.image_quota_month)} onChange={(e) => set(p.id, 'image_quota_month', e.target.value)} /></Field>
+                <Field label="Vídeos por mês (clipes de 5 s; 720p conta 3)" htmlFor={`pv-${p.id}`}><Input id={`pv-${p.id}`} type="number" min="0" value={val('video_quota_month', p.video_quota_month ?? '')} onChange={(e) => set(p.id, 'video_quota_month', e.target.value)} /></Field>
+                <Field label="Áudios por mês (voz e dublagem)" htmlFor={`pa-${p.id}`}><Input id={`pa-${p.id}`} type="number" min="0" value={val('audio_quota_month', p.audio_quota_month ?? '')} onChange={(e) => set(p.id, 'audio_quota_month', e.target.value)} /></Field>
                 <Field label="Computadores (0 = ilimitado)" htmlFor={`pd-${p.id}`}><Input id={`pd-${p.id}`} type="number" min="0" value={val('max_devices', p.max_devices)} onChange={(e) => set(p.id, 'max_devices', e.target.value)} /></Field>
               </div>
               <Button icon={Save} variant="secondary" disabled={!Object.keys(c).length} onClick={() => save(p)}>Salvar plano</Button>

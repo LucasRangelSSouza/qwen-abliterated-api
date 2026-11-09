@@ -1,6 +1,4 @@
 # perfil ROSTO: troca de personagem (Openjutsu / MiniMax H3 + SAM 3.1), ~55 GB. Revisoes fixadas = as que rodam em producao (06/11/2026).
-# LICENCA do MiniMax H3 (Community License): uso comercial autorizado fora de EUA, UE, Reino Unido e Coreia do Sul; exibir "MiniMax H3" no produto; termos de uso
-# repassando as restricoes (sem imitar alguem sem consentimento); rotulo de conteudo sintetico. Ver docs/OPERACAO.md.
 apt_base
 comfy_install 1332fabfcc507aa7c548cd5152071ed494c207e8
 no https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop.git 43afeffcc570beb5f7382593e79e4b211c7e02f6

@@ -326,7 +326,7 @@ async def plans_put(pid: str, request: Request):
     b = await _json(request)
     if A.get_plan(ctx, pid) is None:
         raise fail(404, "plano nao encontrado", "invalid_request_error", "not_found")
-    cols = {"name": str, "session_limit_tokens": int, "week_limit_tokens": int, "image_quota_month": int, "safety_level": int, "max_devices": int, "price_cents": int}
+    cols = {"name": str, "session_limit_tokens": int, "week_limit_tokens": int, "image_quota_month": int, "video_quota_month": int, "audio_quota_month": int, "safety_level": int, "max_devices": int, "price_cents": int}
     extra = set(b) - set(cols)
     if extra:
         raise fail(422, "campos desconhecidos: " + ", ".join(sorted(extra)), "invalid_request_error", "invalid_plan")

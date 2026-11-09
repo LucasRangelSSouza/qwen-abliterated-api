@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from app.dberr import DB_ERRORS
 from app.auth import Principal, bearer, sha256
 from app.ctx import Ctx, err, fail
+from app import mediaquota
 from app.ledger import Blocked, iso
 from app.tokens import Meter, estimate_in, max_out
 
@@ -208,9 +209,10 @@ async def usage(request: Request):
         return {"person": p.name, "session": free, "week": dict(free)}
     try:
         w = ctx.ledger.windows(p.person_id)
+        media = mediaquota.view(ctx.store, p.person_id, ctx.clock())
     except DB_ERRORS:
         raise fail(503, "banco de chaves indisponivel", "service_unavailable", "database_unavailable")
-    return {"person": p.name, "session": w["session"], "week": w["week"]}
+    return {"person": p.name, "session": w["session"], "week": w["week"], "media": media}
 
 
 # ---- imagem: fila propria (uma por vez) no llm-queue; nao gasta tokens da janela, so autentica, mostra quem pediu e registra o uso
@@ -259,11 +261,24 @@ async def _media_generate(request: Request, path: str, route: str):
     for h in ("x-queue-class", "prefer"):
         if h in request.headers:
             headers[h] = request.headers[h]
+    cota = None
+    if p.kind == "person":  # chaves do dono e da plataforma nao tem cota; assinante vale a cota do plano
+        try:
+            cota = mediaquota.reserve(ctx.store, p.person_id, route, mediaquota.units_for(route, path, body), ctx.clock())
+        except mediaquota.QuotaExceeded as q:
+            quando = mediaquota.datetime.fromtimestamp(q.resets_at, mediaquota.timezone.utc).strftime("%d/%m")
+            _log(ctx, p, route, 0, 0, 0, "quota", None)
+            raise fail(429, f"Você já usou a cota de {mediaquota.LABEL[q.kind]} do seu plano neste mês ({q.used} de {q.limit}). Ela renova em {quando}.", "rate_limit_error", "media_quota_exceeded")
+        except DB_ERRORS:
+            raise fail(503, "banco de chaves indisponivel", "service_unavailable", "database_unavailable")
     try:
         r = await ctx.http.post(ctx.s.upstream_base + path, json=body, headers=headers, timeout=240)
     except httpx.HTTPError:
+        mediaquota.undo(ctx.store, cota)
         _log(ctx, p, route, 0, 0, 0, "upstream_error", None)
         return JSONResponse(err("falha ao falar com o servico de imagem", "server_error", "upstream_error"), status_code=502)
+    if r.status_code not in (200, 202):
+        mediaquota.undo(ctx.store, cota)  # pedido recusado ou falho: nao gasta a cota
     _log(ctx, p, route, 0, 0, 0, "ok" if r.status_code in (200, 202) else "upstream_error", None)
     return Response(r.content, status_code=r.status_code, headers=_pass_headers(r.headers), media_type=r.headers.get("content-type", "application/json"))
 

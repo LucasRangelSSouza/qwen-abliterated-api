@@ -82,4 +82,20 @@ Clonar voz, trocar voz e dublar foram **medidos só com arquivos curtos** (4 a 1
 | Preço mínimo por pedido (piso) | Protege o N = 1 sem mexer na tabela |
 | Franquia por plano em créditos em vez de "100 imagens" | Vídeo e imagem passam a consumir da mesma conta |
 | Limite de vídeo 720p só nos planos Max e Ultra | Tira o item de maior risco do plano de entrada |
-| Bloquear países por licença do MiniMax H3 (`WORKER_SMALL_BLOCKED_COUNTRIES`) | Menos oferta de máquinas, preço pode subir; reduz risco jurídico |
+
+## 7. Cota de mídia por plano (regra: custo de GPU ≤ 1/3 da mensalidade)
+
+Aplicada no llm-access (`app/mediaquota.py`, tabela `media_usage`): o pedido passa pela cota antes de ir ao llm-queue; acima dela volta HTTP 429 `media_quota_exceeded` com mensagem em português ("Você já usou a cota de vídeos do seu plano neste mês (X de Y). Ela renova em dd/mm."). Mês civil (UTC). Falha do servidor não gasta cota. Chaves do dono e da plataforma não têm cota. `GET /v1/usage` devolve `media` com limite, uso e restante. Editável no painel (Assinantes > Planos) ou por `PUT /admin/api/plans/<id>`; `NULL` = plano sem cota configurada (não bloqueia).
+
+Unidades: imagem = 1 (campo `n`); áudio (clonar voz, trocar voz) = 1; vídeo = clipes de 5 s em 480p, com o 720p contando **3** (custo medido 2,9x); dublagem = 1; troca de rosto = 1 por 5 s.
+
+Orçamento: a mídia pode gastar no máximo **25% da mensalidade** no pior caso (todas as cotas usadas); os outros ~8 pontos até o teto de 1/3 ficam de folga para variação da Vast (Wan até 2x entre máquinas), taxa do Cakto e LLM. Premissas do pior caso: máquina pequena aberta em 10 (Lite), 25 (Max) e 30 (Ultra) sessões por mês a R$ 0,84; vídeos com 1, 2 e 3 pedidos por sessão da máquina grande (R$ 2,75 por sessão).
+
+| Plano | Preço | Imagens | Vídeos (clipes 480p) | ou em 720p | Áudios | Custo no pior caso | % da mensalidade |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Lite | R$ 119 | 100 | 5 | 1 clipe | 20 | R$ 29,3 | 24,6% |
+| Max | R$ 497 | 1.000 | 30 | 10 clipes | 150 | R$ 112,8 | 22,7% |
+| Ultra | R$ 1.197 | 4.000 | 100 | 33 clipes | 500 | R$ 294,1 | 24,6% |
+| Enterprise | contrato | 10.000 | 300 | 100 clipes | 3.000 | definir no contrato | — |
+
+Teto de 1/3 (R$ 39,7 / 165,7 / 399,0) respeitado com folga. O custo de GPU é o único variável por cliente; os R$ 208/mês das GPUs do chat são fixos e não entram na conta por plano. Subir uma cota é seguro até o teto de 1/3: no Max, por exemplo, cada vídeo extra de 480p custa ~R$ 2,2 no pior caso.

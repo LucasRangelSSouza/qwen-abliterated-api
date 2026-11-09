@@ -21,12 +21,12 @@ from app.auth import new_api_key, sha256
 from app.ctx import Ctx
 
 DEFAULT_PLANS = [  # editaveis no painel. tokens None = sem limite; max_devices 0 = computadores ilimitados; safety_level = padrao da pessoa nova
-    # id, nome, tokens/sessao (5 h), tokens/semana, imagens/mes, nivel de seguranca, computadores, preco (centavos)
-    # uso em multiplos do Lite (1x): Max 5x, Ultra 20x. Imagens/mes: ainda nao cobradas (so informadas no site)
-    ("light", "Lite", 1_000_000, 10_000_000, 100, 2, 0, 11900),
-    ("max", "Max", 5_000_000, 50_000_000, 1000, 1, 0, 49700),
-    ("ultra", "Ultra", 20_000_000, 200_000_000, 4000, 1, 0, 119700),
-    ("enterprise", "Enterprise", None, None, 10000, 1, 0, 0),  # sob contrato (contato pelo WhatsApp): o administrador atribui, nao ha checkout
+    # id, nome, tokens/sessao (5 h), tokens/semana, imagens/mes, nivel de seguranca, computadores, preco (centavos), videos/mes, audios/mes
+    # uso em multiplos do Lite (1x): Max 5x, Ultra 20x. Cota de midia por mes (video em clipes de 5 s 480p; 720p conta 3): GPU <= 25% da mensalidade (docs/PRECIFICACAO_MIDIA.md §7)
+    ("light", "Lite", 1_000_000, 10_000_000, 100, 2, 0, 11900, 5, 20),
+    ("max", "Max", 5_000_000, 50_000_000, 1000, 1, 0, 49700, 30, 150),
+    ("ultra", "Ultra", 20_000_000, 200_000_000, 4000, 1, 0, 119700, 100, 500),
+    ("enterprise", "Enterprise", None, None, 10000, 1, 0, 0, 300, 3000),  # sob contrato (contato pelo WhatsApp): o administrador atribui, nao ha checkout
 ]
 LEGACY_PLANS = ("pro", "infinity")  # nomes antigos: quem ja assina continua valendo; "pro" virou "light" (migrado em ensure_plans)
 PLANS_WITHOUT_SKILL_PACK = ("light", "pro")  # o pacote de skills profissionais nao vai no plano Light (o instalador e o mesmo para todos)
@@ -78,11 +78,12 @@ def ensure_plans(ctx: Ctx) -> None:
             c.execute("UPDATE subscriptions SET plan='light' WHERE plan='pro'")
         have = {r["id"] for r in ctx.store.query("SELECT id FROM plans")}
     falta = [p for p in DEFAULT_PLANS if p[0] not in have]
-    if not falta:
-        return
     with ctx.store.tx() as c:
         for p in falta:
-            c.execute("INSERT INTO plans(id,name,session_limit_tokens,week_limit_tokens,image_quota_month,safety_level,max_devices,price_cents) VALUES(?,?,?,?,?,?,?,?)", p)
+            c.execute("INSERT INTO plans(id,name,session_limit_tokens,week_limit_tokens,image_quota_month,safety_level,max_devices,price_cents,video_quota_month,audio_quota_month) VALUES(?,?,?,?,?,?,?,?,?,?)", p)
+        for p in DEFAULT_PLANS:  # plano que ja existia antes da cota de midia: preenche so o que ainda e NULL (o que o admin editou nao e tocado)
+            c.execute("UPDATE plans SET video_quota_month=? WHERE id=? AND video_quota_month IS NULL", (p[8], p[0]))
+            c.execute("UPDATE plans SET audio_quota_month=? WHERE id=? AND audio_quota_month IS NULL", (p[9], p[0]))
 
 
 def get_plan(ctx: Ctx, plan_id: str | None):

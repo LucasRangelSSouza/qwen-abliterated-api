@@ -229,7 +229,8 @@ async def test_v1_usage_formato_e_auth(rig: Rig):
     _, key = await rig.person(session_limit_tokens=100, session_seconds=HORA)
     assert await rig.usage(key) == {"person": "ana",
         "session": {"limit": 100, "used": 0, "remaining": 100, "resets_at": None},
-        "week": {"limit": None, "used": 0, "remaining": None, "resets_at": None}}
+        "week": {"limit": None, "used": 0, "remaining": None, "resets_at": None},
+        "media": {k: {"limit": None, "used": 0, "remaining": None, "resets_at": "2027-02-01T00:00:00Z"} for k in ("image", "video", "audio")}}
     await rig.chat(key)
     u = await rig.usage(key)
     assert u["session"]["used"] == 30 and u["session"]["remaining"] == 70 and u["session"]["resets_at"].endswith("Z")

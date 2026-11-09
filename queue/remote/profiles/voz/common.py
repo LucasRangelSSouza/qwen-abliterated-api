@@ -95,9 +95,11 @@ def similarity(a, b):
             from speechbrain.pretrained import EncoderClassifier
         enc = EncoderClassifier.from_hparams(source="speechbrain/spkrec-ecapa-voxceleb", savedir="/workspace/voz/ecapa", run_opts={"device": "cpu"})
 
+        import soundfile as sf
+
         def emb(p):
-            w, sr = torchaudio.load(p)
-            w = w.mean(0, keepdim=True)
+            dados, sr = sf.read(p, dtype="float32", always_2d=True)  # soundfile: o torchaudio.load novo exige torchcodec
+            w = torch.from_numpy(dados.mean(axis=1))[None, :]
             if sr != 16000:
                 w = torchaudio.functional.resample(w, sr, 16000)
             return enc.encode_batch(w).squeeze()

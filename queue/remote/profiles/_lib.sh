@@ -57,7 +57,7 @@ comfy_start() {
   pkill -f "python main.py --listen" 2>/dev/null || true
   sleep 2
   cd /workspace/ComfyUI
-  # flags do ComfyUI ficam em /workspace/comfy.args (o perfil rosto grava --reserve-vram 6: sem isso o encoder int4 de 14 GB estoura a VRAM da 3090 ao carregar)
+  # flags do ComfyUI ficam em /workspace/comfy.args (o perfil rosto grava --reserve-vram 9: sem reserva o encoder int4 de 14 GB estoura a VRAM da 3090)
   nohup setsid python main.py --listen 127.0.0.1 --port 8188 --disable-auto-launch --disable-metadata $(cat /workspace/comfy.args 2>/dev/null) >> /workspace/comfy.log 2>&1 < /dev/null &
   cd /workspace
   for _ in $(seq 1 100); do

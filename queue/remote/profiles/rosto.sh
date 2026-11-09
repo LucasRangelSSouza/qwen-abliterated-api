@@ -29,6 +29,6 @@ confere $M/checkpoints/sam3.1_multiplex_fp16.safetensors 1500000000
 confere $M/text_encoders/qwen3vl_32b_minimax_h3_int4_convrot.safetensors 14000000000
 confere $M/text_encoders/qwen3vl_8b_int8_convrot.safetensors 9000000000
 marca "modelos prontos"
-echo "--reserve-vram 6" > /workspace/comfy.args  # medido em 08/11/2026: sem isto o carregamento do encoder estoura a VRAM
+echo "--reserve-vram 9" > /workspace/comfy.args  # medido em 08/11/2026: sem reserva o encoder estoura a VRAM; com 6 GB uma 3090 ainda estourava na amostragem, com 9 passa nas duas maquinas testadas
 comfy_start
 pronto rosto

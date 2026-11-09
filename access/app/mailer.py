@@ -91,6 +91,32 @@ def send_password_done(ctx, to: str, name: str = "") -> bool:
     return send(to, "Como entrar no Segundo Cérebro", texto, corpo)
 
 
+def send_vm_preparing(ctx, to: str, name: str = "") -> bool:
+    """Senha definida mas a maquina virtual ainda nao esta pronta: explica o que foi comprado e que os dados de acesso chegam por e-mail."""
+    site = site_url()
+    ola = f"Olá, {name}!" if name else "Olá!"
+    paras = [ola + " Obrigado pela sua compra do Segundo Cérebro com Máquina virtual.",
+             "Você comprou um produto que vem com um workspace só seu: um espaço totalmente seu na nuvem, pronto para você fazer o que quiser. Suba o que quiser, instale o que quiser, trabalhe com o seu Segundo Cérebro sem dividir nada com ninguém.",
+             "Estamos provisionando esse espaço agora. Aguarde alguns minutos: assim que ele estiver pronto, enviamos um novo e-mail com todos os seus dados de login.",
+             "Enquanto isso, você não precisa fazer nada. Se tiver qualquer dúvida, é só responder este e-mail."]
+    texto = "\n\n".join(paras) + f"\n\n{site}\n"
+    corpo = render_html("Seu espaço exclusivo está sendo preparado", paras, "Conhecer o Segundo Cérebro", site, "Você recebe os dados de acesso por e-mail assim que a sua máquina estiver pronta.")
+    return send(to, "Seu espaço exclusivo no Segundo Cérebro está sendo preparado", texto, corpo)
+
+
+def send_vm_ready(ctx, to: str, name: str = "") -> bool:
+    """A maquina virtual ficou pronta: onde entrar e com que e-mail (a senha e a que a pessoa criou)."""
+    remoto = "https://remoto.rangeltech.net"
+    ola = f"Olá, {name}!" if name else "Olá!"
+    paras = [ola + " O seu espaço exclusivo está pronto.",
+             f"Para entrar, abra remoto.rangeltech.net no navegador, digite o e-mail {to} e a senha que você criou, e toque em Entrar. Você cai direto na sua máquina virtual.",
+             "Ela é só sua: suba o que quiser, instale o que quiser e peça ao Segundo Cérebro o que precisar.",
+             "Se esquecer a senha, use Esqueci a senha na tela de entrada do aplicativo ou fale com a gente."]
+    texto = "\n\n".join(paras) + f"\n\nEntrar: {remoto}\n"
+    corpo = render_html("Seu espaço exclusivo está pronto", paras, "Entrar agora", remoto, "Qualquer dúvida, responda este e-mail.")
+    return send(to, "Seu espaço exclusivo no Segundo Cérebro está pronto", texto, corpo)
+
+
 def send_reset(ctx, to: str, token: str) -> bool:
     link = setup_link(token)
     texto = f"Use este link para definir uma nova senha (vale por 7 dias):\n{link}\n"

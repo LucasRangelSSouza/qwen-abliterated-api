@@ -184,7 +184,11 @@ async def auth_set_password(request: Request):
     with ctx.store.tx() as c:
         c.execute("UPDATE accounts SET pw_hash=?, setup_hash=NULL, setup_expires=NULL WHERE id=?", (A.hash_password(str(b["password"])), acc["id"]))
     try:
-        mailer.send_password_done(ctx, acc["email"], acc["name"] or "")  # criacao ou recuperacao: ensina onde e como entrar
+        vm = ctx.store.one("SELECT status FROM vms WHERE account_id=? AND status NOT IN ('canceled','error') ORDER BY id DESC LIMIT 1", (acc["id"],))
+        if vm is not None and vm["status"] != "running":  # comprou maquina virtual que ainda nao ficou pronta: explica o espaco exclusivo em vez de mandar entrar
+            mailer.send_vm_preparing(ctx, acc["email"], acc["name"] or "")
+        else:
+            mailer.send_password_done(ctx, acc["email"], acc["name"] or "")  # criacao ou recuperacao: ensina onde e como entrar
     except Exception:  # noqa: BLE001  e-mail nunca derruba a troca de senha
         pass
     return {"ok": True}

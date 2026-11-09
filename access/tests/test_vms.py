@@ -382,3 +382,30 @@ async def test_evento_de_assinatura_criada_logo_apos_a_aprovacao_nao_bloqueia_o_
     sub = ctx.store.one("SELECT * FROM subscriptions WHERE external_id='s-1'")
     assert sub["status"] == "active" and A.sub_allows_use(ctx, sub)
     assert ctx.store.one("SELECT billing_status FROM vms")["billing_status"] == "active"
+
+async def test_vm_ainda_nao_pronta_manda_email_do_espaco_exclusivo_e_pronta_manda_os_dados_de_login(rig2, monkeypatch):
+    from app import mailer
+    enviados = []
+    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html_body=None: enviados.append((to, subject, text)) or True)
+    r, ctx, fake = rig2
+    aid, _pid = conta(ctx, email="cliente@x.com")
+    vm_id = V.solicitar(ctx, aid)
+    await V.provisionar(ctx, vm_id)
+    # cliente define a senha com a maquina ainda provisionando: recebe o e-mail do workspace, nao o "como entrar"
+    from tests.test_accounts import definir_senha
+    await r.login()
+    await definir_senha(r, aid)
+    assert len(enviados) == 1 and "preparado" in enviados[0][1] and "workspace" in enviados[0][2] and "remoto.rangeltech.net" not in enviados[0][2]
+    # Contabo recusa o cartao: o motivo aparece no painel e ninguem recebe e-mail de "pronta"
+    inst = list(fake.instances.values())[-1]
+    inst["status"], inst["errorMessage"] = "pending_payment", "insufficient_funds,O cartão de crédito não tem fundos suficientes."
+    await V.sincronizar(ctx)
+    assert "insufficient_funds" in ctx.store.one("SELECT last_error FROM vms")["last_error"] and ctx.store.one("SELECT status FROM vms")["status"] == "provisioning"
+    assert len(enviados) == 1
+    # pagamento passou: maquina sobe, erro some e o e-mail de pronta sai uma vez so
+    inst["status"], inst["errorMessage"] = "running", None
+    await V.sincronizar(ctx)
+    assert ctx.store.one("SELECT status FROM vms")["status"] == "running" and ctx.store.one("SELECT last_error FROM vms")["last_error"] is None
+    assert len(enviados) == 2 and "pronto" in enviados[1][1] and "cliente@x.com" in enviados[1][2]
+    await V.sincronizar(ctx)
+    assert len(enviados) == 2

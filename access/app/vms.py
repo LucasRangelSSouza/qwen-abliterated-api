@@ -355,14 +355,33 @@ async def sincronizar(ctx: Ctx, contabo: Contabo | None = None) -> int:
                 continue
             ip = ((i.get("ipConfig") or {}).get("v4") or {}).get("ip") or i.get("mainIp")
             campos = {"ip": ip, "cores": i.get("cpuCores"), "ram_mb": i.get("ramMb"), "disk_mb": i.get("diskMb")}
-            if vm["status"] == "provisioning" and i.get("status") == "running":
+            ficou_pronta = vm["status"] == "provisioning" and i.get("status") == "running"
+            if ficou_pronta:
                 campos["status"] = "running"
+            # a Contabo diz por que nao sobe (ex.: cartao sem fundos): vai para o painel em vez de ficar "provisionando" sem explicacao
+            if i.get("errorMessage") or i.get("status") in ("pending_payment", "error", "failed"):
+                campos["last_error"] = f"Contabo: {i.get('status')} - {i.get('errorMessage') or 'sem detalhe'}"[:300]
+            elif i.get("status") == "running" and vm["last_error"]:
+                campos["last_error"] = None
             _mudar(ctx, vm["id"], **campos)
+            if ficou_pronta:
+                _avisar_pronta(ctx, vm["account_id"])
             n += 1
     finally:
         if contabo is None:
             await c.aclose()
     return n
+
+
+def _avisar_pronta(ctx: Ctx, account_id: int) -> None:
+    """Maquina virtual ficou pronta: e-mail com onde entrar. Nunca derruba a sincronizacao."""
+    try:
+        from app import mailer
+        acc = ctx.store.one("SELECT email,name FROM accounts WHERE id=?", (account_id,))
+        if acc:
+            mailer.send_vm_ready(ctx, acc["email"], acc["name"] or "")
+    except Exception:  # noqa: BLE001
+        pass
 
 
 async def provisionar_pagas(ctx: Ctx, contabo: Contabo | None = None) -> int:

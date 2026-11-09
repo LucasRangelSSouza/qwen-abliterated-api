@@ -276,8 +276,9 @@ def _apply(ctx: Ctx, ev: dict, now: float) -> None:
             c.execute("INSERT INTO subscriptions(account_id,plan,status,provider,external_id,next_payment_at,amount_cents,started_at,updated_at,blocked_by_billing) VALUES(?,?,?,?,?,?,?,?,?,0)",
                       (acc["id"], plan_id or "light", ev["status"], "cakto", ev["external_id"] or None, ev["next_payment_at"], ev["amount_cents"], now, now))
         else:
+            novo = sub["status"] if ev["status"] == "pending" and sub["status"] in ("active", "late") else ev["status"]  # "criada/aguardando" chega junto com a aprovacao e nao pode rebaixar quem ja esta pago
             c.execute("UPDATE subscriptions SET status=?, plan=?, next_payment_at=COALESCE(?, next_payment_at), amount_cents=COALESCE(?, amount_cents), updated_at=? WHERE id=?",
-                      (ev["status"], plan_id or sub["plan"], ev["next_payment_at"], ev["amount_cents"], now, sub["id"]))
+                      (novo, plan_id or sub["plan"], ev["next_payment_at"], ev["amount_cents"], now, sub["id"]))
     sub = current_sub(ctx, acc["id"])
     if plan:
         apply_plan_limits(ctx, acc["person_id"], plan)

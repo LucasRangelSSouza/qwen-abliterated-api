@@ -372,3 +372,13 @@ async def test_pagamento_do_combo_adota_a_vm_que_ja_existe_sem_comprar_outra(rig
     # renovacao do mes seguinte: mesmo id de assinatura, continua a mesma VM
     assert (await cakto(r, "purchase_approved", email="juca@x.com", produto="Segundo Cérebro Lite + Máquina virtual", sub="combo-juca", ev="j2", proximo="2027-01-04T10:00:00Z")).status_code == 200
     assert len(ctx.store.query("SELECT id FROM vms")) == 1 and fake.mutacoes() == []
+
+async def test_evento_de_assinatura_criada_logo_apos_a_aprovacao_nao_bloqueia_o_cliente(rig2):
+    """A Cakto manda purchase_approved e, 200 ms depois, subscription_created: o segundo nao pode deixar a assinatura e a VM como pending."""
+    r, ctx, fake = rig2
+    from app import accounts as A
+    assert (await cakto(r, "purchase_approved", email="novo@x.com", produto="Segundo Cérebro Lite + Máquina virtual", sub="s-1", ev="n1")).status_code == 200
+    assert (await cakto(r, "subscription_created", email="novo@x.com", produto="Segundo Cérebro Lite + Máquina virtual", sub="s-1", ev="n2")).status_code == 200
+    sub = ctx.store.one("SELECT * FROM subscriptions WHERE external_id='s-1'")
+    assert sub["status"] == "active" and A.sub_allows_use(ctx, sub)
+    assert ctx.store.one("SELECT billing_status FROM vms")["billing_status"] == "active"

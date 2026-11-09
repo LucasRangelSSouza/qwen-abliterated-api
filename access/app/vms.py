@@ -308,7 +308,8 @@ def registrar_pagamento(ctx: Ctx, account_id: int, ev: dict) -> int | None:
             return None  # so uma compra paga abre pedido
         vm_id = solicitar(ctx, account_id)
         vm = ctx.store.one("SELECT * FROM vms WHERE id=?", (vm_id,))
-    _mudar(ctx, vm["id"], external_id=ev.get("external_id") or vm["external_id"], billing_status=ev["status"],
+    cobranca = vm["billing_status"] if ev["status"] == "pending" and vm["billing_status"] in ("active", "late") else ev["status"]  # evento "criada" nao rebaixa VM ja paga
+    _mudar(ctx, vm["id"], external_id=ev.get("external_id") or vm["external_id"], billing_status=cobranca,
            next_payment_at=ev.get("next_payment_at") or vm["next_payment_at"])
     return vm["id"]
 

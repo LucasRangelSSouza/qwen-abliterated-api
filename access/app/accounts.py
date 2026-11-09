@@ -17,6 +17,7 @@ import re
 import secrets
 from datetime import datetime, timezone
 
+from app import credits
 from app.auth import new_api_key, sha256
 from app.ctx import Ctx
 
@@ -203,6 +204,7 @@ def parse_cakto(payload: dict) -> dict:
         "event": event, "status": status,
         "email": norm_email(_dig(payload, "data.customer.email", "customer.email", "data.email", "email") or ""),
         "name": str(_dig(payload, "data.customer.name", "customer.name", "data.name", "name") or "")[:80],
+        "product_id": str(_dig(payload, "data.product.id", "product.id", "data.offer.product_id") or ""),
         "plan_hint": str(_dig(payload, "data.product.name", "data.offer.name", "data.plan", "product.name", "offer.name", "plan") or "").lower(),
         "external_id": str(_dig(payload, "data.subscription.id", "subscription.id", "data.subscription_id", "data.id", "data.order.id", "id") or ""),
         "event_id": str(_dig(payload, "event_id", "data.event_id", "data.transaction_id", "data.id", "id") or ""),
@@ -260,6 +262,10 @@ def _apply(ctx: Ctx, ev: dict, now: float) -> None:
         return  # evento que a gente nao usa (ou sem e-mail): fica so no registro
     plan_id = plan_from_hint(ctx, ev["plan_hint"])
     acc = find_account(ctx, ev["email"])
+    kind = credits.kind_of_product(ctx.store, ev["product_id"], ev["plan_hint"])
+    if kind:  # credito avulso (Spec 24): nunca cria conta, nunca mexe em plano, assinatura ou VM
+        _apply_credit(ctx, acc, kind, ev, now)
+        return
     if acc is None:
         acc, token = create_account(ctx, ev["email"], ev["name"], plan_id)
         _notify_new_account(ctx, acc, token)
@@ -293,6 +299,24 @@ def _apply(ctx: Ctx, ev: dict, now: float) -> None:
             set_person_status(ctx, acc["person_id"], "active")
             with ctx.store.tx() as c:
                 c.execute("UPDATE subscriptions SET blocked_by_billing=0 WHERE id=?", (sub["id"],))
+
+
+def _apply_credit(ctx: Ctx, acc, kind: str, ev: dict, now: float) -> None:
+    """Compra de pacote de credito (R$ 100). Aprovada concede (idempotente pelo id do pedido); reembolso e chargeback revogam o que sobrou."""
+    ref = ev["external_id"]
+    if ev["status"] in ("refunded", "chargeback"):
+        if ref:
+            credits.revoke_by_external(ctx.store, ref, now)
+        return
+    if ev["status"] != "active":
+        return  # pix gerado, boleto, aguardando...: so a aprovacao concede
+    if acc is None:
+        raise ValueError("credito pago por e-mail sem conta; conceda na mao no painel")
+    session_limit = ctx.ledger.limits(acc["person_id"])["session_limit_tokens"]
+    units = credits.units_for_pack(ctx.store, kind, session_limit)
+    if not units:
+        raise ValueError("plano sem limite de uso nao compra credito de uso; conceda na mao ou reembolse")
+    credits.grant(ctx.store, acc["person_id"], kind, units, now, "purchase", ref or None)
 
 
 def _notify_new_account(ctx: Ctx, acc: dict, token: str) -> None:

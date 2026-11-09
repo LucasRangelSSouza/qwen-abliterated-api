@@ -9,6 +9,7 @@ from collections import defaultdict, deque
 from fastapi import APIRouter, Request
 
 from app import accounts as A
+from app import credits
 from app import mailer
 from app.admin import _db, _ip, _json, api, require
 from app.auth import sha256
@@ -133,6 +134,37 @@ async def auth_whoami(request: Request):
     lvl = ctx.store.one("SELECT safety_level FROM people WHERE id=?", (p.person_id,))
     return {"account_id": acc["id"], "email": acc["email"], "name": acc["name"], "safety_level": int(lvl["safety_level"]) if lvl else 1,
             "plan": {"id": sub["plan"], "skill_pack": A.skill_pack(sub["plan"])}}
+
+
+@router.get("/v1/credits")
+@_db
+async def client_credits(request: Request):
+    """O que o pop-up de limite estourado precisa (Spec 24): saldos de credito, pacotes de R$ 100 com o checkout ja com o e-mail do cliente e o proximo plano."""
+    from urllib.parse import quote
+    from app.proxy import authenticate
+    ctx = request.app.state.ctx
+    p = authenticate(ctx, request)
+    acc = ctx.store.one("SELECT id,email FROM accounts WHERE person_id=?", (p.person_id,)) if p.kind == "person" else None
+    if acc is None:
+        raise fail(403, "esta chave nao pertence a uma conta", "invalid_request_error", "no_account")
+    now = ctx.clock()
+    sub = A.current_sub(ctx, acc["id"])
+    plan_id = sub["plan"] if sub else None
+    nxt = credits.NEXT_PLAN.get(plan_id or "")
+    nxt_row = ctx.store.one("SELECT id,name FROM plans WHERE id=?", (nxt,)) if nxt else None
+    site = mailer.site_url()
+    session_limit = ctx.ledger.limits(p.person_id)["session_limit_tokens"]
+    ofertas = credits.offers(ctx.store)
+    packs = []
+    for kind in credits.KINDS:
+        units = credits.units_for_pack(ctx.store, kind, session_limit)
+        if not units:
+            continue  # plano sem limite de uso nao compra credito de uso
+        url = f"https://pay.cakto.com.br/{ofertas[kind]}?email={quote(acc['email'])}" if kind in ofertas else None
+        packs.append({"kind": kind, "label": credits.LABEL[kind], "price_brl": credits.PRICE_BRL, "units": units, "expires_days": int(credits.expiry_days(ctx.store)), "checkout_url": url})
+    url_prox = "https://wa.me/5562985613482" if nxt == "enterprise" else f"{site}/#planos"  # Enterprise e venda consultiva
+    return {"plan": plan_id, "next_plan": ({"id": nxt_row["id"], "name": nxt_row["name"], "url": url_prox} if nxt_row else None),
+            "balances": credits.balances(ctx.store, p.person_id, now), "packs": packs}
 
 
 @router.post("/v1/auth/set-password")
@@ -354,7 +386,9 @@ def billing_settings(request: Request):
     ctx = require(request)
     raw = ctx.store.get_setting("billing_plan_map")
     return {"grace_days": A.grace_days(ctx), "auto_enable": A.auto_enable(ctx), "plan_map": json.loads(raw) if raw else {}, "webhook_configured": bool(ctx.s.cakto_webhook_secret),
-            "smtp_configured": mailer.configured(), "site_url": mailer.site_url()}
+            "smtp_configured": mailer.configured(), "site_url": mailer.site_url(),
+            "credit_offers": credits.offers(ctx.store), "credit_products": credits._json_setting(ctx.store, "credit_products"),
+            "credit_pack_units": credits._json_setting(ctx.store, "credit_pack_units"), "credit_expiry_days": credits.expiry_days(ctx.store)}
 
 
 @api.put("/billing/settings")
@@ -374,7 +408,60 @@ async def billing_settings_put(request: Request):
         if not isinstance(b["plan_map"], dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in b["plan_map"].items()):
             raise fail(422, "plan_map deve ser {trecho do nome: id do plano}", "invalid_request_error", "invalid_billing_settings")
         ctx.store.set_setting("billing_plan_map", json.dumps(b["plan_map"], ensure_ascii=False))
+    for key in ("credit_offers", "credit_products"):  # {tipo: id da oferta/produto na Cakto}
+        if key in b:
+            v = b[key]
+            if not isinstance(v, dict) or any(k not in credits.KINDS or not isinstance(x, str) for k, x in v.items()):
+                raise fail(422, f"{key} deve ser {{tokens|image|video|audio: texto}}", "invalid_request_error", "invalid_billing_settings")
+            ctx.store.set_setting(key, json.dumps(v, ensure_ascii=False))
+    if "credit_pack_units" in b:
+        v = b["credit_pack_units"]
+        if not isinstance(v, dict) or any(k not in (*credits.KINDS, "tokens_mult") or isinstance(x, bool) or not isinstance(x, (int, float)) or x <= 0 for k, x in v.items()):
+            raise fail(422, "credit_pack_units deve ser {image|video|audio|tokens_mult: numero > 0}", "invalid_request_error", "invalid_billing_settings")
+        ctx.store.set_setting("credit_pack_units", json.dumps(v))
+    if "credit_expiry_days" in b:
+        v = b["credit_expiry_days"]
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not 1 <= v <= 365:
+            raise fail(422, "credit_expiry_days deve ser de 1 a 365", "invalid_request_error", "invalid_billing_settings")
+        ctx.store.set_setting("credit_expiry_days", str(v))
     return billing_settings(request)
+
+
+@api.get("/people/{pid}/credits")
+@_db
+def person_credits(pid: int, request: Request):
+    ctx = require(request)
+    now = ctx.clock()
+    return {"balances": credits.balances(ctx.store, pid, now), "rows": credits.listing(ctx.store, pid, now)}
+
+
+@api.post("/people/{pid}/credits")
+@_db
+async def person_credits_grant(pid: int, request: Request):
+    """Concede um pacote na mao (compra que nao veio pelo webhook, cortesia). units omitido = o tamanho do pacote de R$ 100."""
+    ctx = require(request)
+    b = await _json(request)
+    kind = b.get("kind")
+    if kind not in credits.KINDS:
+        raise fail(422, "kind deve ser tokens, image, video ou audio", "invalid_request_error", "invalid_credit")
+    if ctx.store.one("SELECT id FROM people WHERE id=?", (pid,)) is None:
+        raise fail(404, "pessoa nao encontrada", "invalid_request_error", "not_found")
+    units = b.get("units")
+    if units is None:
+        units = credits.units_for_pack(ctx.store, kind, ctx.ledger.limits(pid)["session_limit_tokens"])
+    if isinstance(units, bool) or not isinstance(units, int) or units <= 0:
+        raise fail(422, "units deve ser inteiro > 0", "invalid_request_error", "invalid_credit")
+    cid = credits.grant(ctx.store, pid, kind, units, ctx.clock(), "admin")
+    return {"id": cid, "kind": kind, "units": units}
+
+
+@api.delete("/credits/{cid}")
+@_db
+def credit_revoke(cid: int, request: Request):
+    ctx = require(request)
+    if not credits.revoke(ctx.store, cid, ctx.clock()):
+        raise fail(404, "pacote nao encontrado ou ja revogado", "invalid_request_error", "not_found")
+    return {"ok": True}
 
 
 @api.get("/billing/events")

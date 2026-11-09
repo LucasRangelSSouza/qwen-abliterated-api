@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS plans(
   safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2,3)), max_devices INTEGER NOT NULL DEFAULT 3, price_cents INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS media_overrides(
   person_id INTEGER PRIMARY KEY, image_quota_month INTEGER, video_quota_month INTEGER, audio_quota_month INTEGER);
+CREATE TABLE IF NOT EXISTS credits(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, person_id INTEGER NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('tokens','image','video','audio')),
+  units INTEGER NOT NULL, remaining INTEGER NOT NULL, granted_at REAL NOT NULL, expires_at REAL NOT NULL,
+  source TEXT NOT NULL DEFAULT 'purchase', external_id TEXT UNIQUE, revoked_at REAL);
+CREATE INDEX IF NOT EXISTS credits_person ON credits(person_id, kind, expires_at);
 CREATE TABLE IF NOT EXISTS media_usage(
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, person_id INTEGER NOT NULL, kind TEXT NOT NULL, units INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS media_usage_person ON media_usage(person_id, kind, ts);

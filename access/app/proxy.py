@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from app.dberr import DB_ERRORS
 from app.auth import Principal, bearer, sha256
 from app.ctx import Ctx, err, fail
-from app import mediaquota
+from app import credits, mediaquota
 from app.ledger import Blocked, iso
 from app.tokens import Meter, estimate_in, max_out
 
@@ -63,7 +63,8 @@ def _blocked(ctx: Ctx, b: Blocked) -> JSONResponse:
            f"(faltam {falta}); reduza max_tokens ou aguarde.{when}")
     headers = {"Retry-After": str(max(1, math.ceil(b.resets_at - now)))} if b.resets_at else {}
     body = err(msg, "rate_limit_error", "usage_limit_reached", window=b.window, resets_at=iso(b.resets_at),
-               remaining_tokens=b.remaining, requested_tokens=b.needed, missing_tokens=falta)
+               remaining_tokens=b.remaining, requested_tokens=b.needed, missing_tokens=falta,
+               kind="tokens", credits_available="tokens" in credits.offers(ctx.store))
     return JSONResponse(body, status_code=429, headers=headers)
 
 
@@ -267,7 +268,8 @@ async def _media_generate(request: Request, path: str, route: str):
         except mediaquota.QuotaExceeded as q:
             quando = mediaquota.datetime.fromtimestamp(q.resets_at, mediaquota.timezone.utc).strftime("%d/%m")
             _log(ctx, p, route, 0, 0, 0, "quota", None)
-            raise fail(429, f"Você já usou a cota de {mediaquota.LABEL[q.kind]} do seu plano neste mês ({q.used} de {q.limit}). Ela renova em {quando}.", "rate_limit_error", "media_quota_exceeded")
+            raise fail(429, f"Você já usou a cota de {mediaquota.LABEL[q.kind]} do seu plano neste mês ({q.used} de {q.limit}). Ela renova em {quando}.", "rate_limit_error", "media_quota_exceeded",
+                       kind=q.kind, credits_available=q.kind in credits.offers(ctx.store))
         except DB_ERRORS:
             raise fail(503, "banco de chaves indisponivel", "service_unavailable", "database_unavailable")
     try:

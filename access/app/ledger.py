@@ -4,6 +4,7 @@ entao pedido que falha antes de qualquer token real nao abre janela."""
 from __future__ import annotations
 
 import json
+from app import credits
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -28,6 +29,7 @@ class Reservation:
     person_id: int
     amount: int
     held: list = field(default_factory=list)  # (kind, start_ts da janela que recebeu a reserva)
+    credit_parts: list = field(default_factory=list)  # (id do pacote, tokens debitados): pedido pago com credito avulso, fora das janelas
 
 
 def _active(w, now: float) -> bool:
@@ -69,6 +71,7 @@ class Ledger:
         with self.store.tx() as c:
             lim = self._aplicar_plano(dict(c.execute("SELECT * FROM limits WHERE person_id=?", (person_id,)).fetchone()), c.execute(self._DO_PLANO, (person_id,)).fetchone())
             plan = []
+            blocked = None
             for kind in KINDS:
                 limit, secs = lim[f"{kind}_limit_tokens"], lim[f"{kind}_seconds"]
                 w = c.execute("SELECT * FROM windows WHERE person_id=? AND kind=?", (person_id, kind)).fetchone()
@@ -77,8 +80,14 @@ class Ledger:
                     taken = w["used_tokens"] + w["reserved_tokens"] if act else 0
                     remaining = max(0, limit - taken)
                     if amount > remaining:
-                        raise Blocked(kind, w["end_ts"] if act else None, remaining, amount, limit)
+                        blocked = Blocked(kind, w["end_ts"] if act else None, remaining, amount, limit)
+                        break
                 plan.append((kind, w, act, secs))
+            if blocked is not None:  # plano estourado: credito avulso (Spec 24) cobre o pedido inteiro, sem tocar nas janelas
+                parts = credits.take(c, person_id, "tokens", amount, now)
+                if parts is None:
+                    raise blocked
+                return Reservation(person_id, amount, credit_parts=parts)
             res = Reservation(person_id, amount)
             for kind, w, act, secs in plan:
                 if act:
@@ -92,6 +101,10 @@ class Ledger:
             return res
 
     def _settle(self, res: Reservation, charge: int) -> None:
+        if res.credit_parts:  # pago com credito: devolve o que sobrou da reserva (tudo, se o pedido falhou)
+            with self.store.tx() as c:
+                credits.give_back(c, res.credit_parts, max(0, res.amount - charge))
+            return
         with self.store.tx() as c:
             for kind, start in res.held:  # janela trocada (reset do admin ou vencida e reaberta): ignora
                 c.execute("UPDATE windows SET reserved_tokens=MAX(0, reserved_tokens-?), used_tokens=used_tokens+? "

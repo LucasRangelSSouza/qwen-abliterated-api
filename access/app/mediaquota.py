@@ -3,7 +3,10 @@ Limite NULL = plano ainda sem cota configurada (nao bloqueia); 0 = o plano nao i
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
+
+from app import credits
 
 KINDS = ("image", "video", "audio")
 COLUMN = {"image": "image_quota_month", "video": "video_quota_month", "audio": "audio_quota_month"}
@@ -75,20 +78,37 @@ class QuotaExceeded(Exception):
         self.kind, self.limit, self.used, self.resets_at = kind, limit, used, resets_at
 
 
-def reserve(store, person_id: int, kind: str, units: int, now: float) -> int | None:
-    """Confere e grava o consumo numa transacao so. Devolve o id da linha (para desfazer) ou None se o plano nao tem cota."""
+@dataclass
+class Hold:
+    """O que uma reserva consumiu: a linha de uso do plano (se houve) e os pacotes de credito avulso debitados (Spec 24). Serve para desfazer."""
+    row_id: int | None = None
+    parts: list = field(default_factory=list)
+
+
+def reserve(store, person_id: int, kind: str, units: int, now: float) -> Hold | None:
+    """Confere e grava o consumo numa transacao so. O que passar da cota do plano sai do credito avulso; sem saldo, QuotaExceeded.
+    Devolve None se o plano nao tem cota configurada (nao bloqueia)."""
     ini, fim = month_bounds(now)
     with store.tx() as c:
         q, _ = quota(c, person_id, kind)
         if q is None:
             return None
         gasto = _used(c, person_id, kind, ini)
-        if gasto + units > q:
-            raise QuotaExceeded(kind, q, gasto, fim)
-        return c.execute("INSERT INTO media_usage(ts,person_id,kind,units) VALUES(?,?,?,?)", (now, person_id, kind, units)).lastrowid
+        do_plano = max(0, min(units, q - gasto))
+        parts = []
+        if do_plano < units:
+            parts = credits.take(c, person_id, kind, units - do_plano, now)
+            if parts is None:
+                raise QuotaExceeded(kind, q, gasto, fim)
+        rid = c.execute("INSERT INTO media_usage(ts,person_id,kind,units) VALUES(?,?,?,?)", (now, person_id, kind, do_plano)).lastrowid if do_plano else None
+        return Hold(rid, parts)
 
 
-def undo(store, row_id: int | None) -> None:
-    if row_id:
-        with store.tx() as c:
-            c.execute("DELETE FROM media_usage WHERE id=?", (row_id,))
+def undo(store, hold: Hold | None) -> None:
+    if hold is None:
+        return
+    with store.tx() as c:
+        if hold.row_id:
+            c.execute("DELETE FROM media_usage WHERE id=?", (hold.row_id,))
+        if hold.parts:
+            credits.give_back(c, hold.parts)

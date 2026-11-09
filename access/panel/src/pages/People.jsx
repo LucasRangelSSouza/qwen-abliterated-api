@@ -43,6 +43,7 @@ function PersonDrawer({ open, person, onClose, onSaved }) {
       sOn: l ? l.session_limit_tokens != null : true, sTok: l?.session_limit_tokens != null ? String(l.session_limit_tokens) : '',
       wOn: l ? l.week_limit_tokens != null : false, wTok: l?.week_limit_tokens != null ? String(l.week_limit_tokens) : '',
       sSec: editing ? String(l.session_seconds) : '', wSec: editing ? String(l.week_seconds) : '',
+      mImg: person?.media?.image?.custom ? String(person.media.image.limit) : '', mVid: person?.media?.video?.custom ? String(person.media.video.limit) : '', mAud: person?.media?.audio?.custom ? String(person.media.audio.limit) : '',
     })
     setErrs({})
   }, [open, person, editing])
@@ -64,6 +65,7 @@ function PersonDrawer({ open, person, onClose, onSaved }) {
       session_limit_tokens: f.sOn ? +f.sTok : null,
       week_limit_tokens: f.wOn ? +f.wTok : null,
     }
+    if (editing) { body.image_quota_month = f.mImg === '' ? null : +f.mImg; body.video_quota_month = f.mVid === '' ? null : +f.mVid; body.audio_quota_month = f.mAud === '' ? null : +f.mAud }  // vazio = segue o plano
     if (f.sSec) body.session_seconds = +f.sSec
     if (f.wSec) body.week_seconds = +f.wSec
     setBusy(true)
@@ -117,6 +119,25 @@ function PersonDrawer({ open, person, onClose, onSaved }) {
             </Field>
           )}
         </div>
+
+        {editing && (
+          <div className="rounded-[12px] border border-border-subtle bg-bg p-4 flex flex-col gap-4">
+            <div>
+              <h3 className="text-sm font-semibold text-text-main">Créditos de mídia por mês</h3>
+              <p className="text-xs text-text-muted">Já vêm do plano da pessoa e mudam sozinhos se o plano mudar. Preencha só para dar um valor diferente a esta pessoa; vazio volta a seguir o plano. O cliente não vê isso. Vídeo conta clipes de 5 s em 480p (720p conta 3).</p>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[['mImg', 'image', 'Imagens'], ['mVid', 'video', 'Vídeos'], ['mAud', 'audio', 'Áudios']].map(([k, m, label]) => {
+                const x = person?.media?.[m]
+                return (
+                  <Field key={k} label={label} htmlFor={`p-${k}`} hint={x ? `Plano: ${x.custom ? '—' : (x.limit ?? 'sem cota')} · usado ${x.used}` : null}>
+                    <Input id={`p-${k}`} inputMode="numeric" value={f[k]} onChange={(e) => set(k, digits(e.target.value))} placeholder={x && !x.custom && x.limit != null ? String(x.limit) : 'segue o plano'} />
+                  </Field>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         <details className="group rounded-[12px] border border-border-subtle">
           <summary className="flex items-center justify-between px-4 h-11 cursor-pointer text-sm font-medium text-text-muted hover:text-text-main list-none rounded-[12px]">

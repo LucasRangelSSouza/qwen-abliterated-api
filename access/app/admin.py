@@ -11,6 +11,7 @@ import httpx
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
+from app import mediaquota
 from app.dberr import DB_ERRORS
 from app.auth import COOKIE, new_api_key, sha256
 from app.ctx import Ctx, fail
@@ -114,11 +115,16 @@ _PERSON_SQL = (
 
 def _person_view(ctx: Ctx, r, windows: dict) -> dict:
     now = ctx.clock()
+    try:
+        media = mediaquota.view(ctx.store, r["id"], now)
+    except Exception:  # noqa: BLE001  a lista de pessoas nao depende da cota
+        media = None
     ef = ctx.ledger.limits(r["id"])  # limite efetivo AO VIVO (o do plano para quem tem conta)
     return {
         "id": r["id"], "name": r["name"], "note": r["note"], "status": r["status"], "safety_level": r["safety_level"], "key_last4": r["key_last4"],
         "limits": {"session_limit_tokens": ef["session_limit_tokens"], "week_limit_tokens": ef["week_limit_tokens"], "session_seconds": r["ss"], "week_seconds": r["ws"]},
         **{k: {kk: vv for kk, vv in view(windows.get(k), ef[k + "_limit_tokens"], now).items() if kk != "remaining"} for k in KINDS},
+        "media": media,
         "last_used_at": iso(r["last_used"]),
     }
 
@@ -212,6 +218,14 @@ async def people_patch(pid: int, request: Request):
                 c.execute("UPDATE limits SET custom=1 WHERE person_id=?", (pid,))  # editado a mao: passa a valer no lugar do plano
         if b.get("follow_plan") is True:
             c.execute("UPDATE limits SET custom=0 WHERE person_id=?", (pid,))  # volta a seguir o limite do plano
+            c.execute("DELETE FROM media_overrides WHERE person_id=?", (pid,))  # e a cota de midia do plano
+        for kind, col in mediaquota.COLUMN.items():  # cota de midia da pessoa: inteiro >= 0 vale no lugar do plano; null volta a seguir o plano
+            if col in b:
+                v = b[col]
+                if v is not None and (isinstance(v, bool) or not isinstance(v, int) or v < 0):
+                    raise fail(422, f"{col} deve ser inteiro >= 0 ou null", "invalid_request_error", "invalid_limit")
+                c.execute("INSERT INTO media_overrides(person_id) VALUES(?) ON CONFLICT(person_id) DO NOTHING", (pid,))
+                c.execute(f"UPDATE media_overrides SET {col}=? WHERE person_id=?", (v, pid))
         for f in ("session_seconds", "week_seconds"):
             if f in b:
                 c.execute(f"UPDATE limits SET {f}=? WHERE person_id=?", (_seconds(ctx, b[f], f), pid))

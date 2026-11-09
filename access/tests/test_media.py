@@ -97,8 +97,10 @@ async def test_cota_de_video_do_plano_bloqueia_e_conta_720p_triplo(rig: Rig):
     assert r.status_code == 429 and r.json()["error"]["code"] == "media_quota_exceeded" and "4 de 5" in r.json()["error"]["message"]
     assert (await rig.client.post("/v1/videos/generations", json=v, headers=h)).status_code == 200  # a 5a unidade ainda cabe
     assert (await rig.client.post("/v1/videos/generations", json=v, headers=h)).status_code == 429
-    m = (await rig.usage(key))["media"]
-    assert m["video"] == {"limit": 5, "used": 5, "remaining": 0, "resets_at": m["video"]["resets_at"]} and m["image"]["limit"] == 100 and m["audio"]["limit"] == 20
+    assert "media" not in await rig.usage(key)  # o cliente nao ve a cota
+    pid = (await rig.client.get("/admin/api/people")).json()[0]["id"]
+    m = (await rig.client.get("/admin/api/people")).json()[0]["media"]
+    assert (m["video"]["limit"], m["video"]["used"], m["video"]["custom"]) == (5, 5, False) and m["image"]["limit"] == 100 and m["audio"]["limit"] == 20
 
 
 async def test_cota_renova_no_mes_seguinte_e_falha_nao_gasta(rig: Rig):
@@ -113,10 +115,11 @@ async def test_cota_renova_no_mes_seguinte_e_falha_nao_gasta(rig: Rig):
 
     async def recusa(request, body):
         return httpx.Response(500, json={"error": "x"})
+    await rig.login()  # a sessao do painel venceu com o relogio avancado
     rig.up.handler = recusa  # upstream recusa: a reserva e desfeita
-    before = (await rig.usage(key))["media"]["video"]["used"]
+    before = (await rig.client.get("/admin/api/people")).json()[0]["media"]["video"]["used"]
     assert (await rig.client.post("/v1/videos/generations", json={"prompt": "x", "quality": "padrao"}, headers=h)).status_code == 500
-    assert (await rig.usage(key))["media"]["video"]["used"] == before
+    assert (await rig.client.get("/admin/api/people")).json()[0]["media"]["video"]["used"] == before
 
 
 async def test_dono_sem_cota_e_plano_sem_cota_configurada_nao_bloqueia(rig: Rig):
@@ -138,3 +141,19 @@ def test_unidades_por_pedido():
     assert u("video", "/v1/videos/generations", {"seconds": 10}) == 2          # auto + 2 clipes = 480p encadeado
     assert u("video", "/v1/videos/generations", {"quality": "alta", "seconds": 10}) == 6
     assert u("video", "/v1/videos/generations", {"recipe": "openjutsu-swap", "seconds": 5}) == 1
+
+
+async def test_ajuste_manual_da_pessoa_vale_no_lugar_do_plano_e_volta_a_seguir(rig: Rig):
+    key = await _assinante(rig, "light")  # plano: 5 videos
+    pid = (await rig.client.get("/admin/api/people")).json()[0]["id"]
+    h = {"Authorization": f"Bearer {key}"}
+    v = {"prompt": "x", "quality": "padrao"}
+    r = await rig.client.patch(f"/admin/api/people/{pid}", json={"video_quota_month": 2})
+    assert r.status_code == 200 and r.json()["media"]["video"]["limit"] == 2 and r.json()["media"]["video"]["custom"] is True and r.json()["media"]["image"]["custom"] is False
+    assert [(await rig.client.post("/v1/videos/generations", json=v, headers=h)).status_code for _ in range(3)] == [200, 200, 429]
+    assert (await rig.client.patch(f"/admin/api/people/{pid}", json={"video_quota_month": 0})).json()["media"]["video"]["limit"] == 0
+    assert (await rig.client.patch(f"/admin/api/people/{pid}", json={"video_quota_month": -1})).status_code == 422
+    r = await rig.client.patch(f"/admin/api/people/{pid}", json={"follow_plan": True})
+    assert r.json()["media"]["video"]["limit"] == 5 and r.json()["media"]["video"]["custom"] is False  # volta ao plano
+    assert (await rig.client.patch(f"/admin/api/people/{pid}", json={"image_quota_month": 7})).json()["media"]["image"]["limit"] == 7
+    assert (await rig.client.patch(f"/admin/api/people/{pid}", json={"image_quota_month": None})).json()["media"]["image"]["limit"] == 100

@@ -209,10 +209,9 @@ async def usage(request: Request):
         return {"person": p.name, "session": free, "week": dict(free)}
     try:
         w = ctx.ledger.windows(p.person_id)
-        media = mediaquota.view(ctx.store, p.person_id, ctx.clock())
     except DB_ERRORS:
         raise fail(503, "banco de chaves indisponivel", "service_unavailable", "database_unavailable")
-    return {"person": p.name, "session": w["session"], "week": w["week"], "media": media}
+    return {"person": p.name, "session": w["session"], "week": w["week"]}
 
 
 # ---- imagem: fila propria (uma por vez) no llm-queue; nao gasta tokens da janela, so autentica, mostra quem pediu e registra o uso

@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS plans(
   id TEXT PRIMARY KEY, name TEXT NOT NULL, session_limit_tokens INTEGER, week_limit_tokens INTEGER, image_quota_month INTEGER NOT NULL DEFAULT 0,
   video_quota_month INTEGER, audio_quota_month INTEGER,
   safety_level INTEGER NOT NULL DEFAULT 1 CHECK(safety_level IN (1,2,3)), max_devices INTEGER NOT NULL DEFAULT 3, price_cents INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS media_overrides(
+  person_id INTEGER PRIMARY KEY, image_quota_month INTEGER, video_quota_month INTEGER, audio_quota_month INTEGER);
 CREATE TABLE IF NOT EXISTS media_usage(
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, person_id INTEGER NOT NULL, kind TEXT NOT NULL, units INTEGER NOT NULL);
 CREATE INDEX IF NOT EXISTS media_usage_person ON media_usage(person_id, kind, ts);

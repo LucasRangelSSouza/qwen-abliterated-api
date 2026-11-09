@@ -42,9 +42,15 @@ def units_for(route: str, path: str, body: dict) -> int:
     return clips * (ALTA_UNITS if alta else 1)
 
 
-def _quota_sql(kind: str) -> str:
-    return (f"SELECT p.{COLUMN[kind]} q FROM accounts a JOIN subscriptions s ON s.account_id=a.id JOIN plans p ON p.id=s.plan "
-            "WHERE a.person_id=? ORDER BY s.updated_at DESC, s.id DESC LIMIT 1")
+def quota(c, person_id: int, kind: str) -> tuple[int | None, bool]:
+    """(cota do mes, veio_do_ajuste_manual). O ajuste da pessoa (painel) vale no lugar do plano; sem ajuste vale o plano da assinatura mais recente (lido a cada chamada)."""
+    col = COLUMN[kind]
+    o = c.execute(f"SELECT {col} q FROM media_overrides WHERE person_id=?", (person_id,)).fetchone()
+    if o is not None and o["q"] is not None:
+        return int(o["q"]), True
+    r = c.execute(f"SELECT p.{col} q FROM accounts a JOIN subscriptions s ON s.account_id=a.id JOIN plans p ON p.id=s.plan "
+                  "WHERE a.person_id=? ORDER BY s.updated_at DESC, s.id DESC LIMIT 1", (person_id,)).fetchone()
+    return (None if r is None or r["q"] is None else int(r["q"])), False
 
 
 def _used(c, person_id: int, kind: str, since: float) -> int:
@@ -55,11 +61,11 @@ def view(store, person_id: int, now: float) -> dict:
     ini, fim = month_bounds(now)
     resets = datetime.fromtimestamp(fim, timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     out = {}
-    for k in KINDS:
-        r = store.one(_quota_sql(k), (person_id,))
-        q = None if r is None or r["q"] is None else int(r["q"])
-        u = int(store.one("SELECT COALESCE(SUM(units),0) u FROM media_usage WHERE person_id=? AND kind=? AND ts>=?", (person_id, k, ini))["u"])
-        out[k] = {"limit": q, "used": u, "remaining": None if q is None else max(0, q - u), "resets_at": resets}
+    with store.tx() as c:
+        for k in KINDS:
+            q, manual = quota(c, person_id, k)
+            u = _used(c, person_id, k, ini)
+            out[k] = {"limit": q, "used": u, "remaining": None if q is None else max(0, q - u), "custom": manual, "resets_at": resets}
     return out
 
 
@@ -73,12 +79,12 @@ def reserve(store, person_id: int, kind: str, units: int, now: float) -> int | N
     """Confere e grava o consumo numa transacao so. Devolve o id da linha (para desfazer) ou None se o plano nao tem cota."""
     ini, fim = month_bounds(now)
     with store.tx() as c:
-        r = c.execute(_quota_sql(kind), (person_id,)).fetchone()
-        if r is None or r["q"] is None:
+        q, _ = quota(c, person_id, kind)
+        if q is None:
             return None
         gasto = _used(c, person_id, kind, ini)
-        if gasto + units > int(r["q"]):
-            raise QuotaExceeded(kind, int(r["q"]), gasto, fim)
+        if gasto + units > q:
+            raise QuotaExceeded(kind, q, gasto, fim)
         return c.execute("INSERT INTO media_usage(ts,person_id,kind,units) VALUES(?,?,?,?)", (now, person_id, kind, units)).lastrowid
 
 

@@ -369,3 +369,17 @@ async def test_pessoa_sem_conta_mantem_o_proprio_limite(rig: Rig):
     pid, _key = await rig.person("manual", session_limit_tokens=1000)
     await rig.client.put("/admin/api/plans/max", json={"session_limit_tokens": 9_000_000})
     assert rig.app.state.ctx.ledger.limits(pid)["session_limit_tokens"] == 1000
+
+async def test_depois_de_definir_a_senha_manda_e_mail_ensinando_onde_e_como_entrar(make_rig, monkeypatch):
+    from app import mailer
+    enviados = []
+    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html_body=None: enviados.append((to, subject, text)) or True)
+    r = await make_rig(cakto_webhook_secret=SEG)
+    await webhook(r, compra())
+    await r.login()
+    sid = (await lista(r))["rows"][0]["id"]
+    enviados.clear()
+    await definir_senha(r, sid)
+    assert len(enviados) == 1
+    para, assunto, texto = enviados[0]
+    assert para == "ana@exemplo.com" and "como entrar" in assunto.lower() and "remoto.rangeltech.net" in texto and "ana@exemplo.com" in texto

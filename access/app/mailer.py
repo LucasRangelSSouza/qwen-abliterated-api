@@ -78,6 +78,19 @@ def send_welcome(ctx, to: str, name: str, token: str, liberada: bool = True) -> 
     return send(to, "Defina a sua senha do Segundo Cérebro", texto, corpo)
 
 
+def send_password_done(ctx, to: str, name: str = "") -> bool:
+    """Depois de criar ou recuperar a senha: ensina onde entrar e como (web remoto e aplicativo)."""
+    remoto = "https://remoto.rangeltech.net"
+    ola = f"Olá, {name}!" if name else "Olá!"
+    paras = [ola + " Sua senha foi definida.",
+             f"Para entrar agora, abra remoto.rangeltech.net no navegador do computador ou do celular, digite o e-mail {to} e a senha que você acabou de criar, e toque em Entrar.",
+             f"Se preferir o aplicativo no computador, baixe em {site_url().removeprefix('https://')}, abra, toque em Entrar e use o mesmo e-mail e a mesma senha.",
+             "Se esquecer a senha, use Esqueci a senha na tela de entrada do aplicativo, ou fale com a gente. Se não foi você que definiu essa senha, avise na hora."]
+    texto = "\n\n".join(paras) + f"\n\nEntrar: {remoto}\n"
+    corpo = render_html("Como entrar no Segundo Cérebro", paras, "Entrar agora", remoto, "Se a sua conta ainda não foi liberada, avisaremos assim que estiver pronta.")
+    return send(to, "Como entrar no Segundo Cérebro", texto, corpo)
+
+
 def send_reset(ctx, to: str, token: str) -> bool:
     link = setup_link(token)
     texto = f"Use este link para definir uma nova senha (vale por 7 dias):\n{link}\n"

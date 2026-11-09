@@ -151,6 +151,10 @@ async def auth_set_password(request: Request):
         raise fail(400, "link invalido ou vencido; peca um novo", "invalid_request_error", "invalid_token")
     with ctx.store.tx() as c:
         c.execute("UPDATE accounts SET pw_hash=?, setup_hash=NULL, setup_expires=NULL WHERE id=?", (A.hash_password(str(b["password"])), acc["id"]))
+    try:
+        mailer.send_password_done(ctx, acc["email"], acc["name"] or "")  # criacao ou recuperacao: ensina onde e como entrar
+    except Exception:  # noqa: BLE001  e-mail nunca derruba a troca de senha
+        pass
     return {"ok": True}
 
 

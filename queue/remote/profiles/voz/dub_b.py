@@ -52,6 +52,8 @@ def main():
     t0 = agora()
     trad = json.load(open(os.path.join(a.work, "translated.json"), encoding="utf-8"))
     segs = [s for s in trad if s.get("text", "").strip()]
+    if not segs:
+        raise RuntimeError("a traducao nao trouxe nenhuma fala")
     entrada = glob.glob(os.path.join(a.work, "in.*"))[0]
     video = has_video(entrada)
     total = duration(entrada)

@@ -17,6 +17,16 @@ def montar(segmentos: list[dict], src: str, tgt: str) -> tuple[str, str]:
     return SISTEMA.format(src=LANG_NAMES.get(src, src), tgt=LANG_NAMES.get(tgt, tgt)), json.dumps(linhas, ensure_ascii=False)
 
 
+def _texto(x) -> str:
+    """Um item da resposta: string, ou objeto com a traducao em qualquer chave razoavel (o modelo as vezes devolve {"i":0,"translation":"..."})."""
+    if isinstance(x, dict):
+        for k in ("text", "translation", "translated", "traducao", "tradução", "t", "output", "result"):
+            if isinstance(x.get(k), str):
+                return x[k].strip()
+        return next((v.strip() for k, v in x.items() if k not in ("i", "index", "id", "max_chars") and isinstance(v, str)), "")
+    return str(x or "").strip()
+
+
 def ler(texto: str, n: int) -> list[str] | None:
     t = re.sub(r"^```(?:json)?\s*|\s*```$", "", (texto or "").strip())
     for cand in (t, t[t.find("["): t.rfind("]") + 1] if "[" in t and "]" in t else ""):
@@ -27,7 +37,7 @@ def ler(texto: str, n: int) -> list[str] | None:
         if isinstance(v, dict):
             v = next((x for x in v.values() if isinstance(x, list)), None)
         if isinstance(v, list) and len(v) == n:
-            return [str((x.get("text") if isinstance(x, dict) else x) or "").strip() for x in v]
+            return [_texto(x) for x in v]
     return None
 
 
@@ -39,9 +49,10 @@ async def traduzir(llm, segmentos: list[dict], src: str, tgt: str) -> list[dict]
         sistema, usuario = montar(lote, src, tgt)
         traduzido = None
         for tentativa in range(2):
-            traduzido = ler(await llm(sistema, usuario if not tentativa else usuario + "\n(Your previous answer had the wrong number of items: return exactly %d.)" % len(lote)), len(lote))
-            if traduzido is not None:
+            traduzido = ler(await llm(sistema, usuario if not tentativa else usuario + "\n(Your previous answer was invalid: return ONLY a JSON array of exactly %d non-empty strings, nothing else.)" % len(lote)), len(lote))
+            if traduzido is not None and all(t for t in traduzido):  # traducao vazia de uma fala que tinha texto e falha: tenta de novo
                 break
+            traduzido = None
         if traduzido is None:
             raise ValueError("a traducao das falas nao veio no formato esperado")
         for s, t in zip(lote, traduzido):

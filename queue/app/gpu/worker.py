@@ -171,7 +171,7 @@ class EphemeralWorker:
                 await self._attempt()
                 self.state, self.stage, self.ready_at, self.runs = "ready", "pronto", self.now(), self.runs + 1
                 self.last_activity = self.now()
-                log.info("worker pronto: instancia %s a US$ %.3f/h em %.0f s", self.inst_id, self.dph, self.now() - self.start_t)
+                log.warning("worker %s pronto: instancia %s a US$ %.3f/h em %.0f s", self.spec.name, self.inst_id, self.dph, self.now() - self.start_t)
                 return
             except _Fatal as e:
                 self.last_error = str(e)
@@ -208,7 +208,7 @@ class EphemeralWorker:
                 res = await self.vast.create_instance(int(o["id"]), self.spec.image, self.spec.disk_gb, self.spec.label, "touch /root/.no_auto_tmux", {})
                 if res.ok and res.instance_id:
                     self.inst_id, self.dph, self.created_at = int(res.instance_id), float(o["allin_dph"]), self.now()
-                    log.info("worker: alugada a oferta %s (%s, %s) -> instancia %s a US$ %.3f/h", o["id"], o.get("gpu_name"), o.get("geolocation"), self.inst_id, self.dph)
+                    log.warning("worker %s: alugada a oferta %s (%s, %s) -> instancia %s a US$ %.3f/h", self.spec.name, o["id"], o.get("gpu_name"), o.get("geolocation"), self.inst_id, self.dph)
                     break
                 log.warning("worker: oferta %s recusada: %s %s", o.get("id"), res.error, res.msg)
             if not self.inst_id:
@@ -226,7 +226,7 @@ class EphemeralWorker:
             if (i.raw or {}).get("label") == self.spec.label and i.actual_status in ("running", "loading", "created"):
                 self.inst_id, self.dph = i.id, float(i.dph_total or 0)
                 self.created_at = self.created_at or self.now()
-                log.info("worker: adotando instancia %s ja existente", i.id)
+                log.warning("worker %s: adotando instancia %s ja existente", self.spec.name, i.id)
                 return i
         return None
 
@@ -390,11 +390,14 @@ class EphemeralWorker:
                 if self.state == "ready" and self.busy == 0 and (idle >= self.spec.idle_s or (age >= self.spec.max_age_h * 3600 and idle >= 60)):
                     self.state = "stopping"
                     await self._destroy(f"ocioso ha {int(idle)} s")
-        if self.state == "off" and self.now() - self._last_reconcile >= RECONCILE_EVERY_S and self.now() - self.boot_t >= ADOPT_GRACE_S:
+        if self.state in ("off", "ready") and self.now() - self._last_reconcile >= RECONCILE_EVERY_S and self.now() - self.boot_t >= ADOPT_GRACE_S:
             self._last_reconcile = self.now()
+            agora = self.now()
             for i in await self.vast.list_instances():
-                if (i.raw or {}).get("label") == self.spec.label and i.id != self.inst_id:
-                    log.warning("worker: destruindo sobra %s", i.id)
+                criada = float((i.raw or {}).get("start_date") or 0)
+                velha = (agora - criada) > 180 if criada else True  # uma maquina recem-alugada ainda pode estar sendo registrada
+                if (i.raw or {}).get("label") == self.spec.label and i.id != self.inst_id and velha:
+                    log.warning("worker: destruindo sobra %s (a atual e %s)", i.id, self.inst_id)
                     ok = await self.vast.destroy(i.id)
                     await self._record(i.id, "sobra sem dono", ok)
 

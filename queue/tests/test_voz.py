@@ -336,3 +336,32 @@ async def test_bloqueio_de_paises_por_licenca_e_opcional():
         w = EphemeralWorker(s, vast, VozTunnel(), None, clock=clock, sleep=clock.sleep, script="x", spec=WorkerSpec.small(s))
         await w.ensure("imagem")
         assert ("create", esperado, "ok") in vast.calls
+
+
+@pytest.mark.asyncio
+async def test_traducao_aceita_objetos_com_outras_chaves_e_rejeita_vazios():
+    segs = [{"start": 0, "end": 1, "text": "hello"}, {"start": 1, "end": 2, "text": "world"}]
+    assert dubbing.ler('[{"i":0,"translation":"ola"},{"i":1,"translated":"mundo"}]', 2) == ["ola", "mundo"]
+    assert dubbing.ler('[{"i":0,"foo":"ola"},{"i":1,"foo":"mundo"}]', 2) == ["ola", "mundo"]  # qualquer chave de texto
+    n = {"c": 0}
+
+    async def llm(s, u):
+        n["c"] += 1
+        return '["", ""]' if n["c"] == 1 else '["ola", "mundo"]'  # 1a resposta vazia: tenta de novo
+    out = await dubbing.traduzir(llm, segs, "en", "pt")
+    assert n["c"] == 2 and [x["text"] for x in out] == ["ola", "mundo"]
+
+
+@pytest.mark.asyncio
+async def test_vigia_destroi_sobra_mesmo_com_a_maquina_atual_de_pe():
+    s = settings(worker_small_enabled=True)
+    clock = Clock()
+    vast = FakeVast(offers=[offer(1, 0.25, name="RTX 3090", sc=0.1)], boot_polls=1)
+    w = EphemeralWorker(s, vast, VozTunnel(), None, clock=clock, sleep=clock.sleep, script="x", spec=WorkerSpec.small(s))
+    await w.ensure("imagem")
+    atual = w.inst_id
+    r = await vast.create_instance(1, "img", 170, w.spec.label, "", {})  # sobra do mesmo rotulo (ex.: restante de um reinicio)
+    vast.instances[r.instance_id]["start_date"] = clock.t - 3600
+    clock.t += 400
+    await w.tick()
+    assert r.instance_id not in vast.instances and atual in vast.instances and w.state == "ready"

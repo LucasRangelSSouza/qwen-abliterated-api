@@ -353,3 +353,22 @@ async def test_assinatura_anual_combinada_fica_ativa_o_ano_todo_e_so_atrasa_depo
     assert (await cakto(r, "subscription_late", email="anual@x.com", produto="Segundo Cérebro Max anual + Máquina virtual", sub="anual-1", ev="a2", proximo="2020-01-01T00:00:00Z")).status_code == 200
     vm = ctx.store.one("SELECT * FROM vms")
     assert vm["billing_status"] == "late" and V.deve_ficar_desligada(ctx, V._cobranca(vm, ctx.store.one("SELECT * FROM subscriptions"))) is True  # 2020 esta alem da carencia
+
+async def test_pagamento_do_combo_adota_a_vm_que_ja_existe_sem_comprar_outra(rig2):
+    """Cliente que ja tem conta e VM rodando (criadas antes do pagamento, sem vinculo de cobranca) paga o combo: a VM atual e adotada."""
+    r, ctx, fake = rig2
+    aid, pid = conta(ctx, email="juca@x.com")
+    with ctx.store.tx() as c:
+        c.execute("INSERT INTO vms(account_id,name,contabo_id,status,product_id,region,ip,cost_cents,price_cents,created_at,updated_at,external_id,billing_status)"
+                  " VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL,'active')", (aid, "sc-vm-existente", "203728244", "running", "V153", "EU", "13.140.216.191", 3300, 39900, ctx.clock(), ctx.clock()))
+    antes = ctx.store.one("SELECT id FROM vms")["id"]
+    assert (await cakto(r, "purchase_approved", email="juca@x.com", produto="Segundo Cérebro Lite + Máquina virtual", sub="combo-juca", ev="j1")).status_code == 200
+    vms = ctx.store.query("SELECT * FROM vms")
+    assert len(vms) == 1 and vms[0]["id"] == antes  # nenhuma VM nova
+    assert vms[0]["external_id"] == "combo-juca" and vms[0]["billing_status"] == "active" and vms[0]["status"] == "running" and vms[0]["contabo_id"] == "203728244"
+    assert fake.mutacoes() == []  # nada foi comprado nem alterado na Contabo
+    assert ctx.store.one("SELECT plan,status FROM subscriptions WHERE external_id='combo-juca'")["plan"] == "light"
+    assert len(ctx.store.query("SELECT id FROM accounts")) == 1  # a conta existente foi reaproveitada
+    # renovacao do mes seguinte: mesmo id de assinatura, continua a mesma VM
+    assert (await cakto(r, "purchase_approved", email="juca@x.com", produto="Segundo Cérebro Lite + Máquina virtual", sub="combo-juca", ev="j2", proximo="2027-01-04T10:00:00Z")).status_code == 200
+    assert len(ctx.store.query("SELECT id FROM vms")) == 1 and fake.mutacoes() == []

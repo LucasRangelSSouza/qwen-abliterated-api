@@ -7,7 +7,8 @@ import json
 
 KINDS = ("tokens", "image", "video", "audio")
 LABEL = {"tokens": "uso", "image": "imagens", "video": "vídeos", "audio": "áudio"}
-PRICE_BRL = 100
+BASE_BRL = 100                      # o pacote vale o equivalente a R$ 100 (preco original); a cobranca e em dolar
+DEFAULT_USD_BRL = 5.5               # cotacao de referencia (ajuste do painel: usd_brl_rate)
 DEFAULT_UNITS = {"image": 500, "video": 30, "audio": 150}
 TOKENS_MULT = 2                     # pacote de uso = 2 x o limite da sessao de 5 h do plano
 DEFAULT_EXPIRY_DAYS = 30
@@ -25,6 +26,23 @@ def _json_setting(store, key: str) -> dict:
     except ValueError:
         return {}
     return v if isinstance(v, dict) else {}
+
+
+def usd_brl_rate(store) -> float:
+    try:
+        v = float(store.get_setting("usd_brl_rate") or DEFAULT_USD_BRL)
+    except ValueError:
+        return DEFAULT_USD_BRL
+    return v if v > 0 else DEFAULT_USD_BRL
+
+
+def price_usd(store) -> int:
+    """Preco do pacote em dolar inteiro: o ajuste credit_price_usd, ou R$ 100 convertido pela cotacao (US$ 18 a 5,5)."""
+    try:
+        fixo = float(store.get_setting("credit_price_usd") or 0)
+    except ValueError:
+        fixo = 0
+    return int(round(fixo)) if fixo > 0 else max(1, int(round(BASE_BRL / usd_brl_rate(store))))
 
 
 def offers(store) -> dict:

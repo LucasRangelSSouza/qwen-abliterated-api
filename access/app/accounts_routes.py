@@ -161,7 +161,7 @@ async def client_credits(request: Request):
         if not units:
             continue  # plano sem limite de uso nao compra credito de uso
         url = f"https://pay.cakto.com.br/{ofertas[kind]}?email={quote(acc['email'])}" if kind in ofertas else None
-        packs.append({"kind": kind, "label": credits.LABEL[kind], "price_brl": credits.PRICE_BRL, "units": units, "expires_days": int(credits.expiry_days(ctx.store)), "checkout_url": url})
+        packs.append({"kind": kind, "label": credits.LABEL[kind], "price_usd": credits.price_usd(ctx.store), "currency": "USD", "units": units, "expires_days": int(credits.expiry_days(ctx.store)), "checkout_url": url})
     url_prox = "https://wa.me/5562985613482" if nxt == "enterprise" else f"{site}/#planos"  # Enterprise e venda consultiva
     return {"plan": plan_id, "next_plan": ({"id": nxt_row["id"], "name": nxt_row["name"], "url": url_prox} if nxt_row else None),
             "balances": credits.balances(ctx.store, p.person_id, now), "packs": packs}
@@ -388,7 +388,8 @@ def billing_settings(request: Request):
     return {"grace_days": A.grace_days(ctx), "auto_enable": A.auto_enable(ctx), "plan_map": json.loads(raw) if raw else {}, "webhook_configured": bool(ctx.s.cakto_webhook_secret),
             "smtp_configured": mailer.configured(), "site_url": mailer.site_url(),
             "credit_offers": credits.offers(ctx.store), "credit_products": credits._json_setting(ctx.store, "credit_products"),
-            "credit_pack_units": credits._json_setting(ctx.store, "credit_pack_units"), "credit_expiry_days": credits.expiry_days(ctx.store)}
+            "credit_pack_units": credits._json_setting(ctx.store, "credit_pack_units"), "credit_expiry_days": credits.expiry_days(ctx.store),
+            "usd_brl_rate": credits.usd_brl_rate(ctx.store), "credit_price_usd": credits.price_usd(ctx.store)}
 
 
 @api.put("/billing/settings")
@@ -419,6 +420,15 @@ async def billing_settings_put(request: Request):
         if not isinstance(v, dict) or any(k not in (*credits.KINDS, "tokens_mult") or isinstance(x, bool) or not isinstance(x, (int, float)) or x <= 0 for k, x in v.items()):
             raise fail(422, "credit_pack_units deve ser {image|video|audio|tokens_mult: numero > 0}", "invalid_request_error", "invalid_billing_settings")
         ctx.store.set_setting("credit_pack_units", json.dumps(v))
+    for key in ("usd_brl_rate", "credit_price_usd"):  # moeda: cotacao de referencia e preco do pacote em dolar (vazio = calcula pela cotacao)
+        if key in b:
+            v = b[key]
+            if v is None and key == "credit_price_usd":
+                ctx.store.set_setting(key, "")
+                continue
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 < v <= (20 if key == "usd_brl_rate" else 100000):
+                raise fail(422, f"{key} invalido", "invalid_request_error", "invalid_billing_settings")
+            ctx.store.set_setting(key, str(v))
     if "credit_expiry_days" in b:
         v = b["credit_expiry_days"]
         if isinstance(v, bool) or not isinstance(v, (int, float)) or not 1 <= v <= 365:

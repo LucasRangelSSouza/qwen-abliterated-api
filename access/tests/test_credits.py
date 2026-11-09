@@ -193,7 +193,7 @@ async def test_rota_de_creditos_do_cliente_traz_pacotes_checkout_com_email_e_pro
     h = {"Authorization": f"Bearer {key}"}
     j = (await rig.client.get("/v1/credits", headers=h)).json()
     assert j["plan"] == "light" and j["next_plan"]["id"] == "max" and j["next_plan"]["url"].endswith("/#planos")
-    assert [p["kind"] for p in j["packs"]] == ["tokens", "image", "video", "audio"] and all(p["checkout_url"] is None and p["price_brl"] == 100 for p in j["packs"])
+    assert [p["kind"] for p in j["packs"]] == ["tokens", "image", "video", "audio"] and all(p["checkout_url"] is None and p["price_usd"] == 18 and p["currency"] == "USD" for p in j["packs"])
     assert j["packs"][0]["units"] == 2_000_000  # 2 x a sessao do Lite
     await rig.login()
     await rig.client.put("/admin/api/billing/settings", json={"credit_offers": {"image": "xyz789"}})
@@ -203,6 +203,12 @@ async def test_rota_de_creditos_do_cliente_traz_pacotes_checkout_com_email_e_pro
     ultra = await assinante(rig, "ultra")
     assert (await rig.client.get("/v1/credits", headers={"Authorization": f"Bearer {ultra[1]}"})).json()["next_plan"]["url"].startswith("https://wa.me/")
     assert (await rig.client.get("/v1/credits")).status_code == 401
+    # cotacao mudou no painel: o preco em dolar acompanha (R$ 100 / 4 = US$ 25); preco fixo vence a cotacao
+    await rig.client.put("/admin/api/billing/settings", json={"usd_brl_rate": 4})
+    assert (await rig.client.get("/v1/credits", headers=h)).json()["packs"][0]["price_usd"] == 25
+    await rig.client.put("/admin/api/billing/settings", json={"credit_price_usd": 20})
+    assert (await rig.client.get("/v1/credits", headers=h)).json()["packs"][0]["price_usd"] == 20
+    assert (await rig.client.put("/admin/api/billing/settings", json={"usd_brl_rate": 0})).status_code == 422
 
 
 async def test_painel_valida_ajustes_e_revoga_pacote(rig2):

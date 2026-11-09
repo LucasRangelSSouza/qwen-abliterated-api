@@ -17,7 +17,10 @@ Premissa do Lucas: **econômica ao máximo**. Nada fica ligado 24 h: toda GPU de
 | Vídeo Wan 14B 480p, 5 s | 236 a 482 s (média usada: 350) | medido em 3 máquinas |
 | Vídeo Wan 14B 720p, 5 s | 852 a 1145 s (usado: 1000) | medido em 2 máquinas |
 | Troca de rosto 480p, 4,5 s (3090) | 319 s | medido |
-| Clonar voz, trocar voz, dublar | ver §5 | estimado até a medição do QA de voz |
+| Clonar voz, 10 s de fala (modelo já carregado) | ~30 s (carregar 14 a 25 s + gerar) | medido (QA 08-09/11) |
+| Trocar voz de um vídeo de 4 s | 32 a 56 s | medido |
+| Dublar um vídeo de 4 s (EN para PT) | 23 a 45 s | medido |
+| Os mesmos para arquivos de 30 s | extrapolação linear | estimado |
 
 ## 2. Custo por sessão (a parte que derruba a margem com pouco volume)
 
@@ -69,7 +72,7 @@ Como ler a margem: é margem **sobre o custo de GPU**. Para o lucro real, descon
 
 ## 5. O que ainda é estimativa
 
-Clonar voz, trocar voz e dublar usam tempos **estimados** (RTF dos modelos conhecidos). O QA de voz de 08/11 mede os tempos reais; esta tabela deve ser refeita com `GET /v1/jobs/{id}` (`metrics`) e `seconds` de cada pedido. Os tempos do Wan variam 2x entre máquinas (a Vast entrega GPUs diferentes sob o mesmo nome): por isso a tabela usa a média e o teto de preço da máquina (`WORKER_MAX_DPH_USD`, `WORKER_SMALL_MAX_DPH_USD`).
+Clonar voz, trocar voz e dublar foram **medidos só com arquivos curtos** (4 a 10 s); a tabela do §3 extrapola linearmente para 30 s. Refazer com `GET /v1/jobs/{id}` (`metrics`) e `seconds` quando houver pedidos reais maiores. Os tempos do Wan variam 2x entre máquinas (a Vast entrega GPUs diferentes sob o mesmo nome): por isso a tabela usa a média e o teto de preço da máquina (`WORKER_MAX_DPH_USD`, `WORKER_SMALL_MAX_DPH_USD`).
 
 ## 6. Decisões que mexem na conta
 

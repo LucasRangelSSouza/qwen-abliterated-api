@@ -85,7 +85,7 @@ Vídeo de qualidade máxima (**Wan 2.2 A14B**, receita `wan22-a14b`) roda numa *
 
 | Classe | GPU | Teto de preço (todo-incluído) | Espera ociosa | Perfis | Ligar com |
 |---|---|---|---|---|---|
-| **pequena** | RTX 3090 / 4090, RAM do host ≥ 64 GB | US$ 0,65/h (`WORKER_SMALL_MAX_DPH_USD`) | 900 s (`WORKER_SMALL_IDLE_S`) | `imagem`, `rosto`, `voz` | `WORKER_SMALL_ENABLED=true` |
+| **pequena** | RTX 3090 / 4090, RAM do host ≥ 64 GB | US$ 0,65/h (`WORKER_SMALL_MAX_DPH_USD`) | 600 s (`WORKER_SMALL_IDLE_S`) | `imagem`, `rosto`, `voz` | `WORKER_SMALL_ENABLED=true` |
 | **grande** | RTX PRO 6000 (S ou WS) | US$ 1,80/h (`WORKER_MAX_DPH_USD`) | 600 s (`WORKER_IDLE_S`) | `video` | `WORKER_ENABLED=true` |
 
 - **Perfil** = o que se instala na máquina (`queue/remote/profiles/<perfil>.sh` + `_lib.sh`; o perfil `voz` leva também os scripts de `profiles/voz/`). A máquina nasce com o perfil do primeiro pedido e **instala os outros sob demanda na mesma máquina**, sem alugar outra. Marcador: `/workspace/profile-<perfil>.done`; tempos de cada etapa em `/workspace/provision.log`.

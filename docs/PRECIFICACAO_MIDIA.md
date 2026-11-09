@@ -12,7 +12,7 @@ Premissa do Lucas: **econômica ao máximo**. Nada fica ligado 24 h: toda GPU de
 | Instalar perfil rosto numa máquina pequena de pé | 154 s | medido |
 | Instalar perfil voz numa máquina pequena | ~340 s | medido (QA 08/11) |
 | Partida a frio da grande (alugar + perfil vídeo) | 400 a 600 s | medido |
-| Espera antes de destruir | pequena 900 s, grande 600 s | configuração |
+| Espera antes de destruir | pequena 600 s, grande 600 s | configuração |
 | Imagem Flux 1024 (máquina quente) | ~20 s | medido |
 | Vídeo Wan 14B 480p, 5 s | 236 a 482 s (média usada: 350) | medido em 3 máquinas |
 | Vídeo Wan 14B 720p, 5 s | 852 a 1145 s (usado: 1000) | medido em 2 máquinas |

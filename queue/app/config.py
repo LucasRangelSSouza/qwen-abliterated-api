@@ -173,7 +173,7 @@ class Settings:
     worker_small_disk_gb: int = 170                       # Flux 17 + troca de rosto ~55 + voz ~25 + ComfyUI e ambientes
     worker_small_min_down_mbps: int = 800
     worker_small_min_ram_gb: float = 64.0                 # o H3 le os pesos da RAM do host
-    worker_small_idle_s: float = 900.0                    # tem custo baixo: segura a maquina mais tempo para pedidos seguidos
+    worker_small_idle_s: float = 600.0                    # sem pedido por 10 min a maquina e destruida (serverless: nada ligado sem trabalho)
     worker_small_local_port: int = 18190
     worker_small_cold_start_s: int = 360
     extra: dict = field(default_factory=dict)

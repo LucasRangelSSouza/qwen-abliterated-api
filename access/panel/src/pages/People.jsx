@@ -3,6 +3,7 @@ import { Plus, Search, Pencil, Pause, Play, KeyRound, RotateCcw, ChevronDown, Us
 import { api } from '../lib/api.js'
 import { fmtInt, fmtIn, fmtAgo, cn } from '../lib/format.js'
 import PageHeader from '../components/PageHeader.jsx'
+import { CreditosDaPessoa } from '../components/Creditos.jsx'
 import {
   Button, IconButton, Card, Badge, Field, Input, Textarea, Select, Toggle, Progress, Drawer, ConfirmModal, KeyReveal,
   Skeleton, EmptyState, ErrorState, useToast, useLoad,
@@ -138,6 +139,8 @@ function PersonDrawer({ open, person, onClose, onSaved }) {
             </div>
           </div>
         )}
+
+        {editing && <CreditosDaPessoa pid={person.id} />}
 
         <details className="group rounded-[12px] border border-border-subtle">
           <summary className="flex items-center justify-between px-4 h-11 cursor-pointer text-sm font-medium text-text-muted hover:text-text-main list-none rounded-[12px]">

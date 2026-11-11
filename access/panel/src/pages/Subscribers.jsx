@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Users, UserPlus, KeyRound, Link2, Save, RefreshCw, CreditCard, ListChecks, Check, Copy, Trash2 } from 'lucide-react'
 import { api } from '../lib/api.js'
 import { fmtUsd, fmtFull, fmtInt, cn } from '../lib/format.js'
+import { CreditosAjustes } from '../components/Creditos.jsx'
 import PageHeader from '../components/PageHeader.jsx'
 import { Card, CardHeader, Badge, Button, Field, Input, Select, Toggle, Notice, Skeleton, EmptyState, ErrorState, Drawer, ConfirmModal, useToast, useLoad } from '../components/ui.jsx'
 
@@ -248,6 +249,7 @@ export default function SubscribersPage() {
         <Subscribers />
         <PlansCard />
         <BillingCard />
+        <CreditosAjustes />
       </div>
     </>
   )

@@ -26,7 +26,7 @@ async def liberar(rig: Rig, sid: int):
 
 async def definir_senha(rig: Rig, sid: int, senha="senha-forte-123"):
     link = (await rig.client.post(f"/admin/api/subscribers/{sid}/password-link")).json()["setup_link"]
-    r = await rig.client.post("/v1/auth/set-password", json={"token": link.split("token=")[1], "password": senha})
+    r = await rig.client.post("/v1/auth/set-password", json={"token": link.split("token=")[1], "password": senha, "aceite_termos": True})
     assert r.status_code == 200, r.text
 
 
@@ -153,7 +153,7 @@ async def test_senha_fraca_e_link_de_uso_unico(make_rig):
     sid = (await lista(r))["rows"][0]["id"]
     tok = (await r.client.post(f"/admin/api/subscribers/{sid}/password-link")).json()["setup_link"].split("token=")[1]
     assert (await r.client.post("/v1/auth/set-password", json={"token": tok, "password": "curta"})).status_code == 422
-    assert (await r.client.post("/v1/auth/set-password", json={"token": tok, "password": "senha-forte-123"})).status_code == 200
+    assert (await r.client.post("/v1/auth/set-password", json={"token": tok, "password": "senha-forte-123", "aceite_termos": True})).status_code == 200
     assert (await r.client.post("/v1/auth/set-password", json={"token": tok, "password": "outra-senha-123"})).status_code == 400  # ja usado
 
 
@@ -373,7 +373,7 @@ async def test_pessoa_sem_conta_mantem_o_proprio_limite(rig: Rig):
 async def test_depois_de_definir_a_senha_manda_e_mail_ensinando_onde_e_como_entrar(make_rig, monkeypatch):
     from app import mailer
     enviados = []
-    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html_body=None: enviados.append((to, subject, text)) or True)
+    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html_body=None: (enviados.append((to, subject, text)) if not subject.startswith("Comprovante") else None) or True)
     r = await make_rig(cakto_webhook_secret=SEG)
     await webhook(r, compra())
     await r.login()
@@ -391,7 +391,7 @@ async def test_depois_de_definir_a_senha_manda_e_mail_ensinando_onde_e_como_entr
 async def test_quem_ja_usava_e_so_redefiniu_a_senha_recebe_a_versao_curta(make_rig, monkeypatch):
     from app import mailer
     enviados = []
-    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html_body=None: enviados.append((to, subject, text)) or True)
+    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html_body=None: (enviados.append((to, subject, text)) if not subject.startswith("Comprovante") else None) or True)
     r = await make_rig(cakto_webhook_secret=SEG)
     await webhook(r, compra())
     await r.login()

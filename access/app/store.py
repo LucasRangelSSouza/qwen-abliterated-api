@@ -66,6 +66,38 @@ CREATE TABLE IF NOT EXISTS free_trials(
 CREATE TABLE IF NOT EXISTS billing_events(
   id INTEGER PRIMARY KEY AUTOINCREMENT, provider TEXT NOT NULL, event_id TEXT NOT NULL, kind TEXT NOT NULL, received_at REAL NOT NULL,
   processed INTEGER NOT NULL DEFAULT 0, error TEXT, payload TEXT NOT NULL, UNIQUE(provider, event_id));
+CREATE TABLE IF NOT EXISTS terms_versions(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, versao TEXT NOT NULL UNIQUE, texto TEXT NOT NULL, sha256 TEXT NOT NULL, publicado_em REAL NOT NULL, vigente INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS terms_acceptances(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, account_id INTEGER, email TEXT NOT NULL, versao TEXT NOT NULL, texto_sha256 TEXT NOT NULL, aceito_em REAL NOT NULL,
+  aceito_iso TEXT NOT NULL, ip TEXT NOT NULL DEFAULT '', user_agent TEXT NOT NULL DEFAULT '', canal TEXT NOT NULL DEFAULT '',
+  hash_anterior TEXT NOT NULL DEFAULT '', hash TEXT NOT NULL UNIQUE, assinatura TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS terms_acc_email ON terms_acceptances(email);
+CREATE TABLE IF NOT EXISTS affiliates(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, cupom TEXT NOT NULL UNIQUE, ativo INTEGER NOT NULL DEFAULT 1, observacoes TEXT NOT NULL DEFAULT '',
+  criado_em REAL NOT NULL, atualizado_em REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS affiliate_links(
+  affiliate_id INTEGER NOT NULL REFERENCES affiliates(id), produto TEXT NOT NULL, url TEXT NOT NULL, preco_cents INTEGER NOT NULL,
+  cakto_offer_id TEXT NOT NULL DEFAULT '', cakto_affiliate_id TEXT NOT NULL DEFAULT '', PRIMARY KEY(affiliate_id, produto));
+CREATE TABLE IF NOT EXISTS affiliate_sales(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, affiliate_id INTEGER NOT NULL, email TEXT NOT NULL DEFAULT '', produto TEXT NOT NULL DEFAULT '', amount_cents INTEGER,
+  event_id TEXT NOT NULL UNIQUE, origem TEXT NOT NULL DEFAULT '', at REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS checkouts(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, token TEXT NOT NULL UNIQUE, email TEXT NOT NULL, nome TEXT NOT NULL DEFAULT '', produto TEXT NOT NULL, cupom TEXT NOT NULL DEFAULT '',
+  affiliate_id INTEGER, estado TEXT NOT NULL DEFAULT 'aberto', criado_em REAL NOT NULL, pago_em REAL, ip TEXT NOT NULL DEFAULT '');
+CREATE INDEX IF NOT EXISTS checkouts_email ON checkouts(email, criado_em);
+"""
+
+
+APPEND_ONLY_SQLITE = """
+CREATE TRIGGER IF NOT EXISTS terms_acc_no_upd BEFORE UPDATE ON terms_acceptances BEGIN SELECT RAISE(ABORT, 'terms_acceptances e so de inclusao'); END;
+CREATE TRIGGER IF NOT EXISTS terms_acc_no_del BEFORE DELETE ON terms_acceptances BEGIN SELECT RAISE(ABORT, 'terms_acceptances e so de inclusao'); END;
+"""
+
+APPEND_ONLY_PG = """
+CREATE OR REPLACE FUNCTION terms_acc_so_inclusao() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'terms_acceptances e so de inclusao'; END; $$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS terms_acc_no_change ON terms_acceptances;
+CREATE TRIGGER terms_acc_no_change BEFORE UPDATE OR DELETE ON terms_acceptances FOR EACH ROW EXECUTE FUNCTION terms_acc_so_inclusao();
 """
 
 
@@ -85,6 +117,7 @@ class Store:
             c.execute("PRAGMA synchronous=NORMAL")
             c.execute("PRAGMA foreign_keys=ON")
             c.executescript(SCHEMA)
+            c.executescript(APPEND_ONLY_SQLITE)
             # migracao: nivel de seguranca por pessoa. DEFAULT 1 = sem trava: quem ja existe nao muda de comportamento
             if "label" not in {r["name"] for r in c.execute("PRAGMA table_info(keys)").fetchall()}:
                 c.execute("ALTER TABLE keys ADD COLUMN label TEXT")  # "app:<computador>" nas chaves emitidas no login

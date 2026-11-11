@@ -151,10 +151,14 @@ async def signup(request: Request):
     ident = identidade(email)
     if A.find_account(ctx, email) is not None or ctx.store.one("SELECT 1 FROM free_trials WHERE ident=?", (ident,)):
         raise fail(409, "Este e-mail já tem cadastro. Entre com a sua senha.", "invalid_request_error", "exists")
+    from app import terms
+    if not b.get("aceite_termos"):  # sem a caixa marcada nada e criado (Spec 25 §18.1)
+        raise fail(400, "Para continuar, leia e aceite os Termos de uso.", "invalid_request_error", "terms_required")
     acc, _tok = A.create_account(ctx, email, nome, "light", safety_level=1)
     with ctx.store.tx() as c:
         c.execute("UPDATE accounts SET pw_hash=?, setup_hash=NULL, setup_expires=NULL WHERE id=?", (A.hash_password(senha), acc["id"]))
         c.execute("INSERT INTO free_trials(account_id,ident,used,verified,created_at,ip) VALUES(?,?,0,0,?,?)", (acc["id"], ident, agora, _ip(request)))
+    terms.exigir_aceite(ctx, b, request, email, "site", account_id=acc["id"])
     _enviar_codigo(ctx, email, acc["id"])
     return {"ok": True, "need_code": True}
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Users, UserCheck, Activity, Cpu, Server, Image as ImageIcon, ShieldAlert, Settings as Cog, LogOut, Sun, Moon, ShieldCheck, Loader2 } from 'lucide-react'
+import { Users, UserCheck, Activity, Cpu, Server, Image as ImageIcon, ShieldAlert, Settings as Cog, LogOut, Sun, Moon, ShieldCheck, Loader2, BadgePercent, ScrollText } from 'lucide-react'
 import { api, setUnauthorizedHandler } from './lib/api.js'
 import { cn } from './lib/format.js'
 import { ToastProvider, Button, Card, Field, Input, IconButton } from './components/ui.jsx'
@@ -10,6 +10,8 @@ import MachineImage from './pages/MachineImage.jsx'
 import Subscribers from './pages/Subscribers.jsx'
 import Settings from './pages/Settings.jsx'
 import VMs from './pages/VMs.jsx'
+import Affiliates from './pages/Affiliates.jsx'
+import Terms from './pages/Terms.jsx'
 
 const NAV = [
   { id: 'pessoas', label: 'Pessoas', icon: Users, el: People },
@@ -18,6 +20,8 @@ const NAV = [
   { id: 'llm', label: 'Máquina LLM', icon: Cpu, el: MachineLlm },
   { id: 'imagem', label: 'Máquina de imagem', icon: ImageIcon, el: MachineImage },
   { id: 'vms', label: 'Máquinas virtuais', icon: Server, el: VMs },
+  { id: 'afiliados', label: 'Afiliados', icon: BadgePercent, el: Affiliates },
+  { id: 'termos', label: 'Termos de uso', icon: ScrollText, el: Terms },
   { id: 'config', label: 'Configurações', icon: Cog, el: Settings },
 ]
 

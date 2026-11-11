@@ -85,6 +85,10 @@ def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = No
     app.include_router(accounts_routes.router)
     app.include_router(free.router)
     app.include_router(diag.router)
+    from app import affiliates, checkout, terms
+    app.include_router(terms.router)
+    app.include_router(affiliates.router)
+    app.include_router(checkout.router)
     from app import versao
     app.include_router(versao.router)
     app.include_router(enroll.router)

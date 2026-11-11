@@ -8,7 +8,7 @@ from tests.test_accounts import compra, webhook
 
 
 async def cadastrar(rig: Rig, email="gabi@exemplo.com", senha="senha-boa-123", **kw):
-    return await rig.client.post("/v1/free/signup", json={"email": email, "password": senha, "name": "Gabi", **kw})
+    return await rig.client.post("/v1/free/signup", json={"email": email, "password": senha, "name": "Gabi", "aceite_termos": True, **kw})
 
 
 def codigo_de(rig: Rig, email="gabi@exemplo.com") -> str:

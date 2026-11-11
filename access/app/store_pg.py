@@ -12,7 +12,7 @@ from contextlib import contextmanager
 import psycopg
 from psycopg.rows import dict_row
 
-from app.store import SCHEMA
+from app.store import APPEND_ONLY_PG, SCHEMA
 
 # tabelas com coluna `id` autoincremento: derivadas do proprio SCHEMA (uma tabela nova com id nao pode ficar de fora e devolver lastrowid None)
 TABLES_WITH_ID = tuple(re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)\(\s*id INTEGER PRIMARY KEY AUTOINCREMENT", SCHEMA))
@@ -94,6 +94,10 @@ class PgStore:
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS external_id TEXT")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS billing_status TEXT")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS next_payment_at DOUBLE PRECISION")
+            try:  # aceites dos termos so de inclusao (trigger); se falhar o servico sobe igual (o codigo tambem nunca altera nem apaga)
+                c.execute(APPEND_ONLY_PG)
+            except Exception:  # noqa: BLE001
+                pass
             self._c = c
         return self._c
 

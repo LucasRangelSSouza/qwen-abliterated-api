@@ -210,6 +210,8 @@ def parse_cakto(payload: dict) -> dict:
         "event_id": str(_dig(payload, "event_id", "data.event_id", "data.transaction_id", "data.id", "id") or ""),
         "next_payment_at": _ts(_dig(payload, "data.next_charge_date", "data.next_payment_date", "data.subscription.next_payment_date", "next_payment_date")),
         "amount_cents": cents,
+        "callback": str(_dig(payload, "data.callback", "callback", "data.order.callback", "data.checkout.callback") or "")[:60],  # token da sessao do checkout embutido (Spec 25 §19.4.0)
+        "offer_id": str(_dig(payload, "data.offer.id", "data.offer_id", "offer.id", "data.checkout.offer_id") or "")[:60],
     }
 
 
@@ -266,6 +268,12 @@ def _apply(ctx: Ctx, ev: dict, now: float) -> None:
     if kind:  # credito avulso (Spec 24): nunca cria conta, nunca mexe em plano, assinatura ou VM
         _apply_credit(ctx, acc, kind, ev, now)
         return
+    if ev["status"] == "active":  # compra de plano aprovada: fecha a sessao do checkout embutido e atribui o afiliado (so planos; credito ja saiu acima)
+        try:
+            from app import checkout
+            checkout.ao_aprovar(ctx, ev, plan_id, now)
+        except Exception:  # noqa: BLE001  nunca derruba a cobranca
+            pass
     if acc is None:
         acc, token = create_account(ctx, ev["email"], ev["name"], plan_id)
         _notify_new_account(ctx, acc, token)

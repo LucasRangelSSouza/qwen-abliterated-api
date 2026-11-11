@@ -133,7 +133,8 @@ async def auth_whoami(request: Request):
         raise fail(403, "sua assinatura nao esta ativa", "invalid_request_error", "subscription_inactive")
     lvl = ctx.store.one("SELECT safety_level FROM people WHERE id=?", (p.person_id,))
     return {"account_id": acc["id"], "email": acc["email"], "name": acc["name"], "safety_level": int(lvl["safety_level"]) if lvl else 1,
-            "plan": {"id": sub["plan"], "skill_pack": A.skill_pack(sub["plan"])}}
+            "plan": {"id": sub["plan"], "skill_pack": A.skill_pack(sub["plan"])},
+            "termos_aceitos": __import__("app.terms", fromlist=["aceitou"]).aceitou(ctx, acc["email"], acc["id"])}
 
 
 @router.get("/v1/credits")
@@ -181,6 +182,11 @@ async def auth_set_password(request: Request):
     acc = ctx.store.one("SELECT * FROM accounts WHERE setup_hash=?", (sha256(str(b.get("token") or "")),))
     if acc is None or (acc["setup_expires"] or 0) < now:
         raise fail(400, "link invalido ou vencido; peca um novo", "invalid_request_error", "invalid_token")
+    from app import terms
+    if acc["last_login"] is None and terms.aceitou(ctx, acc["email"], acc["id"]) is None:  # conta nova: o aceite dos termos e obrigatorio (recuperar senha de conta antiga nao pede)
+        terms.exigir_aceite(ctx, b, request, acc["email"], "site", account_id=acc["id"])
+    elif b.get("aceite_termos"):
+        terms.exigir_aceite(ctx, b, request, acc["email"], "site", account_id=acc["id"])
     with ctx.store.tx() as c:
         c.execute("UPDATE accounts SET pw_hash=?, setup_hash=NULL, setup_expires=NULL WHERE id=?", (A.hash_password(str(b["password"])), acc["id"]))
     try:

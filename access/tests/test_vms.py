@@ -386,7 +386,7 @@ async def test_evento_de_assinatura_criada_logo_apos_a_aprovacao_nao_bloqueia_o_
 async def test_vm_ainda_nao_pronta_manda_email_do_espaco_exclusivo_e_pronta_manda_os_dados_de_login(rig2, monkeypatch):
     from app import mailer
     enviados = []
-    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html_body=None: enviados.append((to, subject, text)) or True)
+    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html_body=None: (enviados.append((to, subject, text)) if not subject.startswith("Comprovante") else None) or True)  # o comprovante dos termos tem teste proprio
     r, ctx, fake = rig2
     aid, _pid = conta(ctx, email="cliente@x.com")
     vm_id = V.solicitar(ctx, aid)

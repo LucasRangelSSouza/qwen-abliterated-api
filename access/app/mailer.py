@@ -142,3 +142,15 @@ def send_reset(ctx, to: str, token: str) -> bool:
     corpo = render_html("Redefinir a senha", ["Recebemos um pedido para definir uma nova senha no Segundo Cérebro.", "Se não foi você, pode ignorar este e-mail: a sua senha atual continua valendo."],
                         "Definir nova senha", link, "Este link vale por 7 dias e só pode ser usado por você.")
     return send(to, "Redefinir a senha do Segundo Cérebro", texto, corpo)
+
+
+def send_terms_receipt(ctx, to: str, versao: str, aceito_iso: str, codigo: str) -> bool:
+    """Comprovante do aceite dos termos (Spec 25 §18): versao, data e hora, codigo de verificacao e links."""
+    site = site_url()
+    link = f"{site}/termos-de-uso/verificar/?codigo={codigo}"
+    paras = [f"Você aceitou os Termos de uso do Segundo Cérebro (versão {versao}).",
+             f"Data e hora do aceite (UTC): {aceito_iso}.",
+             f"Código de verificação: {codigo}. Guarde este e-mail: com esse código qualquer pessoa pode conferir no nosso site que o aceite foi registrado.",
+             f"Você pode ler a versão que aceitou em {site}/termos-de-uso/?versao={versao}."]
+    texto = "\n\n".join(paras) + f"\n\nConferir o aceite: {link}\n"
+    return send(to, "Comprovante: você aceitou os Termos de uso", texto, render_html("Comprovante do aceite", paras, "Conferir o aceite", link, "Rangel Tech - Segundo Cérebro"))

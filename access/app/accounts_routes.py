@@ -184,11 +184,17 @@ async def auth_set_password(request: Request):
     with ctx.store.tx() as c:
         c.execute("UPDATE accounts SET pw_hash=?, setup_hash=NULL, setup_expires=NULL WHERE id=?", (A.hash_password(str(b["password"])), acc["id"]))
     try:
+        # o e-mail depois da senha muda conforme o plano e a maquina (Spec 25 §11.1)
         vm = ctx.store.one("SELECT status FROM vms WHERE account_id=? AND status NOT IN ('canceled','error') ORDER BY id DESC LIMIT 1", (acc["id"],))
-        if vm is not None and vm["status"] != "running":  # comprou maquina virtual que ainda nao ficou pronta: explica o espaco exclusivo em vez de mandar entrar
+        sub = ctx.store.one("SELECT plan FROM subscriptions WHERE account_id=? ORDER BY id DESC LIMIT 1", (acc["id"],))
+        plano = A.get_plan(ctx, sub["plan"]) if sub else None
+        recuperacao = acc["last_login"] is not None  # ja usou a conta: so redefiniu a senha
+        if vm is not None and vm["status"] != "running":  # comprou maquina virtual que ainda nao ficou pronta: explica o espaco exclusivo
             mailer.send_vm_preparing(ctx, acc["email"], acc["name"] or "")
-        else:
-            mailer.send_password_done(ctx, acc["email"], acc["name"] or "")  # criacao ou recuperacao: ensina onde e como entrar
+        elif vm is not None and not recuperacao:  # maquina pronta: entra direto nela pelo remoto
+            mailer.send_vm_ready(ctx, acc["email"], acc["name"] or "")
+        else:  # sem maquina: baixar o aplicativo e entrar (ou a versao curta de quem so redefiniu a senha)
+            mailer.send_password_done(ctx, acc["email"], acc["name"] or "", plano=(plano["name"] if plano else None), recuperacao=recuperacao)
     except Exception:  # noqa: BLE001  e-mail nunca derruba a troca de senha
         pass
     return {"ok": True}

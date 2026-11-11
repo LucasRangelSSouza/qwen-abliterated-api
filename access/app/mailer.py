@@ -78,17 +78,36 @@ def send_welcome(ctx, to: str, name: str, token: str, liberada: bool = True) -> 
     return send(to, "Defina a sua senha do Segundo Cérebro", texto, corpo)
 
 
-def send_password_done(ctx, to: str, name: str = "") -> bool:
-    """Depois de criar ou recuperar a senha: ensina onde entrar e como (web remoto e aplicativo)."""
+DOWNLOADS = {  # sempre a última versão publicada
+    "Windows": "https://github.com/RangelTech/second-brain/releases/latest/download/Segundo-Cerebro-Windows.exe",
+    "Mac (Apple Silicon)": "https://github.com/RangelTech/second-brain/releases/latest/download/Segundo-Cerebro-macOS-arm64.dmg",
+    "Mac (Intel)": "https://github.com/RangelTech/second-brain/releases/latest/download/Segundo-Cerebro-macOS-x64.dmg",
+    "Linux": "https://github.com/RangelTech/second-brain/releases/latest/download/Segundo-Cerebro-Linux.AppImage",
+}
+
+
+def send_password_done(ctx, to: str, name: str = "", plano: str | None = None, recuperacao: bool = False) -> bool:
+    """Depois de criar ou recuperar a senha (Spec 25 §11.1): ensina a BAIXAR o aplicativo e a entrar, citando o plano pelo nome
+    (sem números fixos no código). Quem só redefiniu a senha e já usa o app recebe a versão curta."""
     remoto = "https://remoto.rangeltech.net"
     ola = f"Olá, {name}!" if name else "Olá!"
-    paras = [ola + " Sua senha foi definida.",
-             f"Para entrar agora, abra remoto.rangeltech.net no navegador do computador ou do celular, digite o e-mail {to} e a senha que você acabou de criar, e toque em Entrar.",
-             f"Se preferir o aplicativo no computador, baixe em {site_url().removeprefix('https://')}, abra, toque em Entrar e use o mesmo e-mail e a mesma senha.",
-             "Se esquecer a senha, use Esqueci a senha na tela de entrada do aplicativo, ou fale com a gente. Se não foi você que definiu essa senha, avise na hora."]
-    texto = "\n\n".join(paras) + f"\n\nEntrar: {remoto}\n"
-    corpo = render_html("Como entrar no Segundo Cérebro", paras, "Entrar agora", remoto, "Se a sua conta ainda não foi liberada, avisaremos assim que estiver pronta.")
-    return send(to, "Como entrar no Segundo Cérebro", texto, corpo)
+    if recuperacao:
+        paras = [ola + " Sua senha foi redefinida.",
+                 f"Entre normalmente no aplicativo ou em remoto.rangeltech.net com o e-mail {to} e a senha nova.",
+                 "Se não foi você que pediu essa troca, responda este e-mail na hora."]
+        texto = "\n\n".join(paras) + f"\n\nEntrar: {remoto}\n"
+        return send(to, "Sua senha do Segundo Cérebro foi redefinida", texto, render_html("Senha redefinida", paras, "Entrar agora", remoto, "Qualquer dúvida, responda este e-mail."))
+    plano_txt = f"Seu plano: {plano}. " if plano else ""
+    links = " | ".join(f"{k}: {v}" for k, v in DOWNLOADS.items())
+    paras = [ola + " Sua senha foi definida e a sua conta está pronta.",
+             plano_txt + "Para usar no computador, baixe o aplicativo Segundo Cérebro, instale e abra:",
+             links,
+             f"Na primeira abertura toque em Entrar e use o e-mail {to} e a senha que você acabou de criar. O assistente se prepara sozinho na primeira vez (alguns minutos) e depois é só conversar.",
+             f"Também dá para usar pelo navegador do computador ou do celular, sem instalar nada: abra remoto.rangeltech.net e entre com o mesmo e-mail e senha.",
+             "Se esquecer a senha, use Esqueci a senha na tela de entrada, ou fale com a gente. Se não foi você que definiu essa senha, avise na hora."]
+    texto = "\n\n".join(paras) + f"\n\nBaixar: {site_url()}/#baixar\nEntrar pelo navegador: {remoto}\n"
+    corpo = render_html("Baixe o Segundo Cérebro e entre", paras, "Baixar o aplicativo", f"{site_url()}/#baixar", "Pelo navegador: remoto.rangeltech.net")
+    return send(to, "Baixe o Segundo Cérebro e entre na sua conta", texto, corpo)
 
 
 def send_vm_preparing(ctx, to: str, name: str = "") -> bool:

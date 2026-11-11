@@ -382,4 +382,24 @@ async def test_depois_de_definir_a_senha_manda_e_mail_ensinando_onde_e_como_entr
     await definir_senha(r, sid)
     assert len(enviados) == 1
     para, assunto, texto = enviados[0]
-    assert para == "ana@exemplo.com" and "como entrar" in assunto.lower() and "remoto.rangeltech.net" in texto and "ana@exemplo.com" in texto
+    # sem maquina virtual: ensina a BAIXAR o aplicativo (links da ultima versao), cita o plano e o acesso pelo navegador (Spec 25 §11.1)
+    assert para == "ana@exemplo.com" and "baixe" in assunto.lower()
+    assert "releases/latest/download/Segundo-Cerebro-Windows.exe" in texto and "remoto.rangeltech.net" in texto and "ana@exemplo.com" in texto
+    assert "Seu plano:" in texto
+
+
+async def test_quem_ja_usava_e_so_redefiniu_a_senha_recebe_a_versao_curta(make_rig, monkeypatch):
+    from app import mailer
+    enviados = []
+    monkeypatch.setattr(mailer, "send", lambda to, subject, text, html_body=None: enviados.append((to, subject, text)) or True)
+    r = await make_rig(cakto_webhook_secret=SEG)
+    await webhook(r, compra())
+    await r.login()
+    sid = (await lista(r))["rows"][0]["id"]
+    with r.app.state.ctx.store.tx() as c:
+        c.execute("UPDATE accounts SET last_login=? WHERE id=?", (r.app.state.ctx.clock(), sid))
+    enviados.clear()
+    await definir_senha(r, sid)
+    assert len(enviados) == 1
+    _, assunto, texto = enviados[0]
+    assert "redefinida" in assunto.lower() and "releases/latest" not in texto

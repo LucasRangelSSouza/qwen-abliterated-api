@@ -55,7 +55,8 @@ def _prompt(body: dict) -> str:
     p = str(body.get("prompt") or "").strip()[:3800]
     est = ESTILO.get(str(body.get("style") or "").lower())
     neg = str(body.get("negative_prompt") or "").strip()
-    return p + (f"\nStyle: {est}." if est else "") + (f"\nAvoid: {neg[:400]}." if neg else "")
+    fmt = {"1024x1024": "Square 1:1 image.", "1536x1024": "Wide landscape 3:2 image.", "1024x1536": "Tall portrait 2:3 image."}.get(_tamanho(body.get("size")), "")
+    return p + (f"\nStyle: {est}." if est else "") + (f"\nAvoid: {neg[:400]}." if neg else "") + (f"\nFormat: {fmt}" if fmt else "")
 
 
 async def _gerar(ctx, job: dict, body: dict) -> None:

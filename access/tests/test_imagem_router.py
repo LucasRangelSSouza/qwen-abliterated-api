@@ -47,7 +47,7 @@ async def test_async_igual_ao_app(rig_img: Rig):
     s = await _esperar(rig_img, jid)
     assert s["status"] == "done" and s["mime"] == "image/png" and s["progress"] == 100
     corpo = rig_img.up.router_calls[0]
-    assert corpo["model"] == "cx/gpt-image-2" and corpo["size"] == "1536x1024" and "photorealistic" in corpo["prompt"]
+    assert corpo["model"] == "cx/gpt-image-2" and corpo["size"] == "1536x1024" and "photorealistic" in corpo["prompt"] and "landscape 3:2" in corpo["prompt"]
     f = await rig_img.client.get(f"/v1/jobs/{jid}/file", headers=H)
     assert f.status_code == 200 and f.content == PNG and f.headers["content-type"] == "image/png"
     assert (await rig_img.client.get(f"/v1/jobs/{jid}", headers=H)).json()["state"] == "done"

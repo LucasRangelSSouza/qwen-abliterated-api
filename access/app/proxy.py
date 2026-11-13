@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from app.dberr import DB_ERRORS
 from app.auth import Principal, bearer, sha256
 from app.ctx import Ctx, err, fail
-from app import credits, mediaquota
+from app import credits, imagem, mediaquota
 from app.ledger import Blocked, iso
 from app.tokens import Meter, estimate_in, max_out
 
@@ -272,6 +272,15 @@ async def _media_generate(request: Request, path: str, route: str):
                        kind=q.kind, credits_available=q.kind in credits.offers(ctx.store))
         except DB_ERRORS:
             raise fail(503, "banco de chaves indisponivel", "service_unavailable", "database_unavailable")
+    if route == "image" and imagem.ligado(ctx.s):  # imagem pelo ChatGPT no 9Router global (a GPU de midia saiu)
+        if not str(body.get("prompt") or "").strip():
+            mediaquota.undo(ctx.store, cota)
+            raise fail(422, "Descreva a imagem no campo prompt.", "invalid_request_error", "invalid_prompt")
+        out = await imagem.criar(ctx, p.person_id if p.kind == "person" else None, cota, body)
+        _log(ctx, p, route, 0, 0, 0, "ok" if out.get("status") != "failed" else "upstream_error", None)
+        if out.get("status") == "failed":
+            return JSONResponse(err("Não consegui gerar a imagem agora. Nada foi cobrado.", "server_error", "media_failed"), status_code=502)
+        return JSONResponse(out, status_code=202 if body.get("async") else 200)
     try:
         r = await ctx.http.post(ctx.s.upstream_base + path, json=body, headers=headers, timeout=240)
     except httpx.HTTPError:
@@ -314,6 +323,8 @@ async def audio_transcriptions(request: Request):
 async def job_status(job_id: str, request: Request):
     ctx = _ctx(request)
     p = authenticate(ctx, request)
+    if (j := imagem.achar(job_id, p.person_id if p.kind == "person" else None)) is not None:
+        return imagem.estado(j)
     r = await ctx.http.get(ctx.s.upstream_base + f"/v1/jobs/{job_id}", headers=_media_headers(ctx, p), timeout=15)
     return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
 
@@ -323,6 +334,8 @@ async def media_job_progress(job_id: str, request: Request):
     """Progresso de imagem/video para o app: status, posicao, eta, progress e mensagem neutra (contrato no README do queue)."""
     ctx = _ctx(request)
     p = authenticate(ctx, request)
+    if (j := imagem.achar(job_id, p.person_id if p.kind == "person" else None)) is not None:
+        return imagem.progresso(j)
     try:
         r = await ctx.http.get(ctx.s.upstream_base + f"/v1/media/jobs/{job_id}", headers=_media_headers(ctx, p), timeout=15)
     except httpx.HTTPError:
@@ -335,6 +348,10 @@ async def media_job_progress(job_id: str, request: Request):
 async def job_image(job_id: str, request: Request):
     ctx = _ctx(request)
     p = authenticate(ctx, request)
+    if (j := imagem.achar(job_id, p.person_id if p.kind == "person" else None)) is not None:
+        if j["status"] != "done":
+            raise fail(409, "a imagem ainda nao ficou pronta", "invalid_request_error", "not_ready")
+        return Response(j["bytes"], media_type=j["mime"], headers={"Content-Disposition": f'inline; filename="{job_id}.png"'})
     idx = request.query_params.get("i", "0")
     r = await ctx.http.get(ctx.s.upstream_base + f"/v1/jobs/{job_id}/image", params={"i": idx if idx.isdigit() else "0"}, headers=_media_headers(ctx, p), timeout=120)
     extra = {"Content-Disposition": r.headers["content-disposition"]} if "content-disposition" in r.headers else {}

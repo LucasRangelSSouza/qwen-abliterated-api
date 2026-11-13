@@ -5,7 +5,7 @@ import asyncio
 
 from fastapi import Request
 
-from app import estudio, fornecedores as F
+from app import estudio, fornecedores as F, imagem
 from app.admin import _db, _json, api, require
 from app.ctx import fail
 
@@ -29,8 +29,8 @@ async def _visao(ctx) -> dict:
             {"id": "runware", "nome": "Runware", "uso": F.PROVEDORES["runware"]["uso"], "site": F.PROVEDORES["runware"]["site"],
              "chave": F.mascara(k), "origem": origem, "saldo": rw},
             {"id": "vast", "nome": "Vast.ai", "uso": "GPU do LLM (2×3090)", "site": "https://cloud.vast.ai/billing/", "chave": "no llm-queue", "origem": "ambiente", "saldo": vast},
-            {"id": "chatgpt", "nome": "ChatGPT (9Router)", "uso": "Geração de imagem pelo combo do 9Router", "site": None, "chave": "conta logada no 9Router", "origem": "9router",
-             "saldo": {"ok": True, "assinatura": True}},
+            {"id": "chatgpt", "nome": "ChatGPT (9Router)", "uso": "Geração de imagem pelo combo do 9Router", "site": None, "chave": ("modelo " + ctx.s.image_router_model) if imagem.ligado(ctx.s) else None, "origem": "9router",
+             "saldo": {"ok": True, "assinatura": True} if imagem.ligado(ctx.s) else {"ok": False, "erro": "IMAGE_ROUTER_KEY ausente: imagem vai para a GPU"}},
         ],
         "precos": p, "tabela": tabela, "tabela_de": estudio.TABELA_LIDA_EM,
     }

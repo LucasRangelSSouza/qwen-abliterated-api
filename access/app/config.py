@@ -45,6 +45,9 @@ class Settings:
     secrets_key: str = ""           # SECRETS_KEY: chave mestra que cifra credenciais guardadas no banco (Contabo); sem ela nao guarda
     runware_api_key: str = ""       # RUNWARE_API_KEY: Estudio (modelos de ponta na Runware, spec 36). Vazia = Estudio responde "em breve"; a chave nunca sai do servidor
     runware_url: str = "https://api.runware.ai/v1"
+    image_router_url: str = ""      # IMAGE_ROUTER_URL: 9Router global (llm-gateway). Com URL e chave, imagem sai pelo ChatGPT em vez da GPU de midia
+    image_router_key: str = ""
+    image_router_model: str = "cx/gpt-image-2"
     runware_mock: bool = False      # RUNWARE_MOCK=1: responde sem chamar a Runware (QA e desenvolvimento, custo zero)
 
     @property
@@ -77,5 +80,8 @@ class Settings:
             site_origins=e("SITE_ORIGINS", cls.site_origins),
             runware_api_key=_secret("RUNWARE_API_KEY"),
             runware_url=e("RUNWARE_URL", cls.runware_url),
+            image_router_url=e("IMAGE_ROUTER_URL", ""),
+            image_router_key=_secret("IMAGE_ROUTER_KEY"),
+            image_router_model=e("IMAGE_ROUTER_MODEL", cls.image_router_model),
             runware_mock=e("RUNWARE_MOCK", "0").strip().lower() in ("1", "true", "yes", "on"),
         )

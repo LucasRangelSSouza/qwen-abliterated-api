@@ -135,6 +135,10 @@ def _tarefa(nome: str, body: dict, q: str) -> dict:
             t["settings"] = {"quality": q}
     if body.get("texto_fala") and nome in ("sincronia-labial", "avatar-foto"):
         t["speech"] = {"text": str(body["texto_fala"])}
+    if body.get("largura") and body.get("altura") and e["task"] == "videoInference":
+        t["width"], t["height"] = int(body["largura"]), int(body["altura"])
+    if body.get("seed") is not None:
+        t["seed"] = int(body["seed"])
     if inputs:
         t["inputs"] = inputs
     return t
@@ -251,11 +255,16 @@ async def rota_orcar(request: Request):
 @router.post("/v1/estudio/gerar")
 async def rota_gerar(request: Request):
     """Reserva a cota (ou credito avulso), manda a tarefa a Runware e devolve o job. O resultado vem por GET /v1/estudio/jobs/{id}."""
-    from app.proxy import authenticate, _log
+    from app.proxy import authenticate
     ctx: Ctx = request.app.state.ctx
     p = authenticate(ctx, request)
     body = _json(await request.json())
-    nome = str(body.get("efeito") or "")
+    return _visao(await iniciar(request, ctx, p, str(body.get("efeito") or ""), body))
+
+
+async def iniciar(request: Request, ctx: Ctx, p, nome: str, body: dict) -> dict:
+    """Orca, reserva, sobe arquivos, manda a tarefa e registra o job (usado pelo Estudio e pelas rotas antigas de midia)."""
+    from app.proxy import _log
     o = orcar(nome, body, ctx.store)
     rw = _cliente(ctx)
     if not rw.ligado:
@@ -296,7 +305,7 @@ async def rota_gerar(request: Request):
         job.update(status="failed", erro=str(r.get("error") or "falhou"), hold=None)
     jobs[job["id"]] = job
     _log(ctx, p, kind, 0, 0, 0, "ok", None)
-    return _visao(job)
+    return job
 
 
 def _e_bruto(v) -> bool:
@@ -331,6 +340,13 @@ async def rota_job(job_id: str, request: Request):
     job = _jobs(request).get(job_id)
     if job is None or (p.kind == "person" and job["person_id"] != p.person_id):
         raise fail(404, "pedido nao encontrado", "invalid_request_error", "not_found")
+    await atualizar(ctx, job)
+    return _visao(job)
+
+
+async def atualizar(ctx: Ctx, job: dict) -> dict:
+    """Consulta a Runware se o job ainda corre; falha ou 15 min sem resposta devolve a reserva."""
+    job_id = job["id"]
     if job["status"] == "running":
         try:
             r = await _cliente(ctx).consultar(job_id)
@@ -345,7 +361,7 @@ async def rota_job(job_id: str, request: Request):
         elif ctx.clock() - job["criado"] > MAX_WAIT_S:
             mediaquota.undo(ctx.store, job.get("hold"))
             job.update(status="failed", erro="tempo esgotado", hold=None)
-    return _visao(job)
+    return job
 
 
 async def atualizar_tabela(http: httpx.AsyncClient) -> dict:

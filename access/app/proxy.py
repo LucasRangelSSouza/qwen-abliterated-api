@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from app.dberr import DB_ERRORS
 from app.auth import Principal, bearer, sha256
 from app.ctx import Ctx, err, fail
-from app import credits, imagem, mediaquota
+from app import credits, estudio, imagem, mediaquota, midia_runware
 from app.ledger import Blocked, iso
 from app.tokens import Meter, estimate_in, max_out
 
@@ -257,6 +257,14 @@ async def _media_generate(request: Request, path: str, route: str):
         assert isinstance(body, dict)
     except Exception:  # noqa: BLE001
         raise fail(400, "JSON invalido", "invalid_request_error", "invalid_json")
+    if route != "image" and midia_runware.ligado(ctx.s):  # video e voz pela Runware (a GPU de midia saiu)
+        t = midia_runware.traduzir(path, body)
+        if t is None:
+            raise fail(503, midia_runware.EM_BREVE.get(path, "Este recurso está chegando ao Estúdio."), "service_unavailable", "estudio_em_breve")
+        job = await estudio.iniciar(request, ctx, p, t[0], t[1])
+        st = midia_runware.progresso(job, ctx.clock())
+        return JSONResponse({"id": job["id"], "status": "queued" if st["status"] == "running" else st["status"], "eta_s": st["eta_s"],
+                             "preco_usd": job["preco_usd"], "preco_brl": job.get("preco_brl")}, status_code=202)
     headers = {**_media_headers(ctx, p), "Content-Type": "application/json"}
     for h in ("x-queue-class", "prefer"):
         if h in request.headers:
@@ -325,6 +333,8 @@ async def job_status(job_id: str, request: Request):
     p = authenticate(ctx, request)
     if (j := imagem.achar(job_id, p.person_id if p.kind == "person" else None)) is not None:
         return imagem.estado(j)
+    if (j := midia_runware.achar(request, job_id, p.person_id if p.kind == "person" else None)) is not None:
+        return midia_runware.estado(await estudio.atualizar(ctx, j))
     r = await ctx.http.get(ctx.s.upstream_base + f"/v1/jobs/{job_id}", headers=_media_headers(ctx, p), timeout=15)
     return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
 
@@ -336,6 +346,8 @@ async def media_job_progress(job_id: str, request: Request):
     p = authenticate(ctx, request)
     if (j := imagem.achar(job_id, p.person_id if p.kind == "person" else None)) is not None:
         return imagem.progresso(j)
+    if (j := midia_runware.achar(request, job_id, p.person_id if p.kind == "person" else None)) is not None:
+        return midia_runware.progresso(await estudio.atualizar(ctx, j), ctx.clock())
     try:
         r = await ctx.http.get(ctx.s.upstream_base + f"/v1/media/jobs/{job_id}", headers=_media_headers(ctx, p), timeout=15)
     except httpx.HTTPError:
@@ -352,6 +364,13 @@ async def job_image(job_id: str, request: Request):
         if j["status"] != "done":
             raise fail(409, "a imagem ainda nao ficou pronta", "invalid_request_error", "not_ready")
         return Response(j["bytes"], media_type=j["mime"], headers={"Content-Disposition": f'inline; filename="{job_id}.png"'})
+    if (j := midia_runware.achar(request, job_id, p.person_id if p.kind == "person" else None)) is not None:
+        await estudio.atualizar(ctx, j)
+        got = await midia_runware.baixar(ctx, j) if j["status"] == "done" else None
+        if got is None:
+            raise fail(409, "o resultado ainda nao ficou pronto", "invalid_request_error", "not_ready")
+        ext = {"video/mp4": "mp4", "video/webm": "webm", "audio/mpeg": "mp3", "audio/wav": "wav", "image/png": "png", "image/jpeg": "jpg"}.get(got[1], "bin")
+        return Response(got[0], media_type=got[1], headers={"Content-Disposition": f'inline; filename="{job_id}.{ext}"'})
     idx = request.query_params.get("i", "0")
     r = await ctx.http.get(ctx.s.upstream_base + f"/v1/jobs/{job_id}/image", params={"i": idx if idx.isdigit() else "0"}, headers=_media_headers(ctx, p), timeout=120)
     extra = {"Content-Disposition": r.headers["content-disposition"]} if "content-disposition" in r.headers else {}

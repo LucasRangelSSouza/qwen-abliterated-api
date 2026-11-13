@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from app import admin, enroll, proxy
 from app import vms_routes  # noqa: F401  (registra as rotas do painel de VMs em admin.api ANTES do include_router)
+from app import fornecedores_routes  # noqa: F401  (Fornecedores e precos, spec 36)
 from app.auth import AdminAuth
 from app.config import Settings
 from app.ctx import Ctx

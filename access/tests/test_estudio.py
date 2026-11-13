@@ -49,15 +49,15 @@ async def test_catalogo_publico_e_marca_em_breve_sem_chave(rig_sem_chave: Rig):
     nomes = {e["efeito"] for e in j["efeitos"]}
     assert {"trocar-personagem", "sincronia-labial", "voz", "video-ponta", "imagem-ponta"} <= nomes
     troca = next(e for e in j["efeitos"] if e["efeito"] == "trocar-personagem")
-    assert troca["preco_por_unidade_usd"]["480p"] == round(0.05 * 1.25, 5) and troca["disponivel"] is False
+    assert troca["preco_por_unidade_usd"]["480p"] == 0.25 and troca["disponivel"] is False and j["teto_brl"] == 20.0
 
 
 async def test_orcar_calcula_preco_com_margem_e_creditos(rig_rw: Rig):
     r = await rig_rw.client.post("/v1/estudio/orcar", json={"efeito": "trocar-personagem", "segundos": 10}, headers=H)
     assert r.status_code == 200
     o = r.json()
-    assert o["custo_usd"] == 0.5 and o["preco_usd"] == 0.625 and o["creditos"] == 32 and o["qualidade"] == "480p"
-    assert o["unidades_cota"] == 2 and o["modelo"] == "prunaai:p-video@2-pro-replace" and o["disponivel"] is True
+    assert o["custo_usd"] == 0.5 and o["preco_usd"] == 2.5 and o["preco_brl"] == 13.75 and o["qualidade"] == "480p" and o["acima_do_teto"] is False
+    assert o["unidades"] == 5 and o["valor_unidade_usd"] == 0.6 and o["modelo"] == "prunaai:p-video@2-pro-replace" and o["disponivel"] is True
     r = await rig_rw.client.post("/v1/estudio/orcar", json={"efeito": "voz", "texto": "a" * 1000}, headers=H)
     assert r.json()["custo_usd"] == 0.03 and r.json()["unidade"] == "caractere"
     r = await rig_rw.client.post("/v1/estudio/orcar", json={"efeito": "nao-existe"}, headers=H)
@@ -86,7 +86,7 @@ async def test_gerar_manda_tarefa_certa_e_acompanha_ate_pronto(rig_rw: Rig):
                                                             "inputs": {"video": "https://ex/v.mp4", "referenceImages": ["https://ex/eu.jpg"]}}, headers=H)
     assert r.status_code == 200, r.text
     j = r.json()
-    assert j["status"] == "running" and j["preco_usd"] == 1.25 and j["message"] == "Criando no Estúdio..."
+    assert j["status"] == "running" and j["preco_usd"] == 3.6364 and j["preco_brl"] == 20.0 and j["message"] == "Criando no Estúdio..."
     tarefa = rig_rw.up.rw_calls[0][0]
     assert tarefa["taskType"] == "videoInference" and tarefa["model"] == "prunaai:p-video@2-pro-replace" and tarefa["resolution"] == "768p"
     assert tarefa["includeCost"] is True and tarefa["deliveryMethod"] == "async" and tarefa["inputs"]["video"] == "https://ex/v.mp4"
@@ -146,3 +146,34 @@ def test_tarefa_veo_com_audio_e_imagem():
     t = estudio._tarefa("imagem-ponta", {"prompt": "p"}, "2K")
     assert t["taskType"] == "imageInference" and t["resolution"] == "2K" and t["outputFormat"] == "PNG"
     assert json.dumps(t)  # serializavel
+
+
+async def test_teto_de_20_reais_e_piso_de_margem(rig_rw: Rig):
+    # 10 s em 768p custa US$ 1: 5x passaria do teto -> fica no teto (R$ 20); 3 min em 480p custa US$ 9: piso 1,5x passa do teto e a tela avisa
+    o = (await rig_rw.client.post("/v1/estudio/orcar", json={"efeito": "trocar-personagem", "segundos": 10, "qualidade": "768p"}, headers=H)).json()
+    assert o["preco_brl"] == 20.0 and o["acima_do_teto"] is False and o["markup_aplicado"] == 3.64
+    o = (await rig_rw.client.post("/v1/estudio/orcar", json={"efeito": "trocar-personagem", "segundos": 180}, headers=H)).json()
+    assert o["custo_usd"] == 9.0 and o["preco_usd"] == 13.5 and o["acima_do_teto"] is True and o["preco_brl"] == 74.25
+    o = (await rig_rw.client.post("/v1/estudio/orcar", json={"efeito": "editar-video", "segundos": 40}, headers=H)).json()
+    assert o["partes"] == 3 and o["qualidade"] == "720p"
+
+
+async def test_gerar_video_curto_e_cortado_em_4_a_15_s(rig_rw: Rig):
+    o = (await rig_rw.client.post("/v1/estudio/orcar", json={"efeito": "video-ponta", "segundos": 60}, headers=H)).json()
+    assert o["quantidade"] == 15
+    o = (await rig_rw.client.post("/v1/estudio/orcar", json={"efeito": "video-ponta", "segundos": 1}, headers=H)).json()
+    assert o["quantidade"] == 4
+
+
+async def test_arquivo_do_cliente_sobe_antes_da_tarefa(rig_rw: Rig):
+    runware_falsa(rig_rw.up, [
+        {"data": [{"taskType": "mediaStorage", "mediaUUID": "m-video"}]},
+        {"data": [{"taskType": "mediaStorage", "mediaUUID": "m-foto"}]},
+        {"data": [{"taskType": "videoInference", "taskUUID": "x", "status": "processing"}]},
+    ])
+    r = await rig_rw.client.post("/v1/estudio/gerar", json={"efeito": "editar-video", "segundos": 10, "prompt": "troque o carro por um Mustang preto",
+                                                            "inputs": {"video": "data:video/mp4;base64,AAAA", "referenceImages": ["data:image/png;base64,BBBB"]}}, headers=H)
+    assert r.status_code == 200, r.text
+    up1, up2, tarefa = (c[0] for c in rig_rw.up.rw_calls)
+    assert up1["taskType"] == "mediaStorage" and up1["operation"] == "upload" and up1["media"].startswith("data:video/mp4")
+    assert tarefa["inputs"] == {"referenceVideos": ["m-video"], "referenceImages": ["m-foto"]} and "duration" not in tarefa

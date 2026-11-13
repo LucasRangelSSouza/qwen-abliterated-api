@@ -17,14 +17,14 @@ import httpx
 from fastapi import APIRouter, Request
 
 from app.ctx import Ctx, fail
-from app import credits, mediaquota
+from app import credits, fornecedores, mediaquota
 from app.dberr import DB_ERRORS
 
 log = logging.getLogger("llm-access.estudio")
 router = APIRouter()
 
-MARGEM = 1.25                 # preco ao cliente = custo Runware x 1,25 (spec 29 §3)
-CREDITO_USD = 0.02            # 1 credito = US$ 0,02 (spec 29 §3); mostrado ao cliente junto do dolar
+MARGEM = 5.0                  # so para o catalogo publico (preco por unidade); o preco real vem de fornecedores.preco_final (painel)
+DURACAO = {"min": 4, "max": 15}  # modelos que GERAM video aceitam 4-15 s por pedido; video maior e cortado em partes pelo app
 JOB_TTL_S = 48 * 3600
 POLL_S = 3.0
 MAX_WAIT_S = 900.0
@@ -56,6 +56,9 @@ CATALOGO: dict[str, dict] = {
     "sincronia-labial-pro": {"rotulo": "Sincronia labial profissional (lipsync-2)", "kind": "video", "task": "videoInference", "modelo": "sync:lipsync-2@1",
                              "unidade": "segundo", "taxas": {"padrao": 0.044}, "padrao": "padrao", "entrada": ["video", "audio"],
                              "tempo_s": {"padrao": 120}},
+    "editar-video": {"rotulo": "Trocar objeto, roupa ou cenário no seu vídeo", "kind": "video", "task": "videoInference", "modelo": "alibaba:wan@3.0",
+                     "unidade": "segundo", "taxas": {"480p": 0.05, "720p": 0.10, "1080p": 0.20}, "padrao": "720p", "entrada": ["video", "positivePrompt", "referenceImages?"],
+                     "tempo_s": {"480p": 120, "720p": 160, "1080p": 220}, "partes_s": 15},
     "voz": {"rotulo": "Narração com voz natural (e clone de voz)", "kind": "audio", "task": "audioInference", "modelo": "heygen:voice@1.0",
             "unidade": "caractere", "taxas": {"padrao": 0.00003}, "padrao": "padrao", "entrada": ["speech.text", "audio?"],
             "tempo_s": {"padrao": 15}},
@@ -71,14 +74,17 @@ TABELA_LIDA_EM = "2026-11-12"
 
 def _quantidade(efeito: dict, body: dict) -> float:
     if efeito["unidade"] == "segundo":
-        return max(1.0, float(body.get("segundos") or body.get("seconds") or 5))
+        n = max(1.0, float(body.get("segundos") or body.get("seconds") or 5))
+        if efeito["entrada"][0] not in ("video", "referenceImages") and "partes_s" not in efeito:  # gera do zero: 4 a 15 s por pedido
+            n = min(max(n, DURACAO["min"]), DURACAO["max"])
+        return n
     if efeito["unidade"] == "caractere":
         return max(1.0, float(len(str(body.get("texto") or body.get("text") or ""))))
     return max(1.0, min(4.0, float(body.get("n") or 1)))
 
 
-def orcar(nome: str, body: dict) -> dict:
-    """Preco ANTES de rodar: custo Runware (tabela), preco ao cliente com margem, creditos e unidades da cota, tempo estimado. Nao chama a rede."""
+def orcar(nome: str, body: dict, store=None) -> dict:
+    """Preco ANTES de rodar: custo Runware (tabela), preco ao cliente (painel: markup, piso, teto em R$), unidades de credito de midia, tempo. Sem rede."""
     e = CATALOGO.get(nome)
     if e is None:
         raise fail(422, f"efeito desconhecido: {nome}", "invalid_request_error", "invalid_effect", efeitos=sorted(CATALOGO))
@@ -87,12 +93,17 @@ def orcar(nome: str, body: dict) -> dict:
         raise fail(422, f"qualidade {q} nao existe para {nome}", "invalid_request_error", "invalid_quality", qualidades=sorted(e["taxas"]))
     n = _quantidade(e, body)
     custo = round(e["taxas"][q] * n, 4)
-    preco = round(custo * MARGEM, 4)
-    cota = {"segundos": n if e["unidade"] == "segundo" else None, "quality": "alta" if q not in (e["padrao"], "padrao") else "baixa", "n": int(n) if e["unidade"] == "imagem" else 1}
-    unidades = mediaquota.units_for(e["kind"], "/v1/estudio/gerar", cota if e["kind"] != "audio" else {})
+    if store is not None:
+        pf = fornecedores.preco_final(store, nome, custo)
+        vu = fornecedores.valor_unidade_usd(store, e["kind"])
+    else:
+        pf = {"preco_usd": round(custo * MARGEM, 4), "preco_brl": None, "markup_aplicado": MARGEM, "acima_do_teto": False, "teto_brl": None, "cotacao": None}
+        vu = 0.6
+    partes = int(math.ceil(n / e["partes_s"])) if e.get("partes_s") else 1
+    tempo = e["tempo_s"].get(q, 60) * (1 if partes == 1 else max(1, math.ceil(partes / 3)))  # ate 3 partes em paralelo
     return {"efeito": nome, "rotulo": e["rotulo"], "kind": e["kind"], "modelo": e["modelo"], "qualidade": q, "unidade": e["unidade"], "quantidade": n,
-            "custo_usd": custo, "preco_usd": preco, "creditos": int(math.ceil(preco / CREDITO_USD)), "unidades_cota": unidades,
-            "tempo_estimado_s": e["tempo_s"].get(q, 60), "tabela_de": TABELA_LIDA_EM}
+            "custo_usd": custo, **pf, "unidades": max(1, int(math.ceil(pf["preco_usd"] / vu - 1e-9))), "valor_unidade_usd": round(vu, 4),
+            "partes": partes, "tempo_estimado_s": tempo, "tabela_de": TABELA_LIDA_EM}
 
 
 def _tarefa(nome: str, body: dict, q: str) -> dict:
@@ -103,7 +114,9 @@ def _tarefa(nome: str, body: dict, q: str) -> dict:
     inputs = {k: body["inputs"][k] for k in (body.get("inputs") or {}) if isinstance(body.get("inputs"), dict)}
     if body.get("prompt"):
         t["positivePrompt"] = str(body["prompt"])[:4000]
-    if e["unidade"] == "segundo" and e["task"] == "videoInference" and nome not in ("trocar-personagem", "sincronia-labial", "sincronia-labial-pro", "avatar-foto"):
+    if nome == "editar-video" and "video" in inputs:  # Wan 3.0 edita a partir de referenceVideos; o app manda partes de ate 15 s
+        inputs["referenceVideos"] = [inputs.pop("video")]
+    if e["unidade"] == "segundo" and e["task"] == "videoInference" and nome not in ("trocar-personagem", "sincronia-labial", "sincronia-labial-pro", "avatar-foto", "editar-video"):
         t["duration"] = int(_quantidade(e, body))
     if nome == "video-google":
         t["resolution"] = "720p"
@@ -156,6 +169,16 @@ class Runware:
             raise RunwareError(502 if r.status_code >= 500 else 422, "O fornecedor não aceitou o pedido." + (f" ({msg[:160]})" if msg else ""), "estudio_rejected")
         return j.get("data", []) if isinstance(j, dict) else j
 
+    async def subir(self, midia: str) -> str:
+        """Guarda video/audio/imagem do cliente na Runware (`mediaStorage/upload`, aceita dataURI ou base64) e devolve o UUID para usar como entrada."""
+        if self.mock:
+            return str(uuid.uuid4())
+        d = await self._post([{"taskType": "mediaStorage", "taskUUID": str(uuid.uuid4()), "operation": "upload", "media": midia}])
+        u = (d[0] if d else {}).get("mediaUUID")
+        if not u:
+            raise RunwareError(502, "Não consegui enviar o seu arquivo ao Estúdio.", "estudio_upload_failed")
+        return u
+
     async def submeter(self, task: dict) -> dict:
         d = await self._post([task])
         return d[0] if d else {"taskUUID": task["taskUUID"], "status": "processing"}
@@ -178,14 +201,8 @@ def _url(d: dict) -> str | None:
 
 
 def _cliente(ctx: Ctx) -> Runware:
-    c = getattr(ctx, "_runware", None)
-    if c is None:
-        c = Runware(ctx.http, ctx.s.runware_url, ctx.s.runware_api_key, ctx.s.runware_mock)
-        try:
-            ctx._runware = c  # type: ignore[attr-defined]
-        except Exception:  # noqa: BLE001  (dataclass sem slots aceita; so por seguranca)
-            pass
-    return c
+    """Chave lida a cada pedido (o painel pode trocar sem reiniciar): banco cifrado -> RUNWARE_API_KEY."""
+    return Runware(ctx.http, ctx.s.runware_url, fornecedores.chave(ctx, "runware")[0], ctx.s.runware_mock)
 
 
 def _jobs(request: Request) -> dict:
@@ -211,11 +228,13 @@ async def catalogo(request: Request):
     """Lista de efeitos com preco por unidade ao cliente (ja com margem). Sem login: o site e o app mostram antes da compra."""
     ctx: Ctx = request.app.state.ctx
     ligado = _cliente(ctx).ligado
+    mk = fornecedores.precos(ctx.store)
     out = []
     for nome, e in CATALOGO.items():
+        MARGEM_EF = float(mk["por_efeito"].get(nome, mk["markup"]))
         out.append({"efeito": nome, "rotulo": e["rotulo"], "kind": e["kind"], "unidade": e["unidade"], "qualidades": sorted(e["taxas"]), "padrao": e["padrao"],
-                    "preco_por_unidade_usd": {q: round(v * MARGEM, 5) for q, v in e["taxas"].items()}, "entrada": e["entrada"], "disponivel": ligado})
-    return {"disponivel": ligado, "aviso": None if ligado else "em breve", "credito_usd": CREDITO_USD, "tabela_de": TABELA_LIDA_EM, "efeitos": out}
+                    "preco_por_unidade_usd": {q: round(v * MARGEM_EF, 5) for q, v in e["taxas"].items()}, "teto_brl": mk["cap_brl"], "entrada": e["entrada"], "disponivel": ligado})
+    return {"disponivel": ligado, "aviso": None if ligado else "em breve", "teto_brl": mk["cap_brl"], "tabela_de": TABELA_LIDA_EM, "efeitos": out}
 
 
 @router.post("/v1/estudio/orcar")
@@ -224,7 +243,7 @@ async def rota_orcar(request: Request):
     ctx: Ctx = request.app.state.ctx
     authenticate(ctx, request)
     body = _json(await request.json())
-    o = orcar(str(body.get("efeito") or ""), body)
+    o = orcar(str(body.get("efeito") or ""), body, ctx.store)
     o["disponivel"] = _cliente(ctx).ligado
     return o
 
@@ -237,7 +256,7 @@ async def rota_gerar(request: Request):
     p = authenticate(ctx, request)
     body = _json(await request.json())
     nome = str(body.get("efeito") or "")
-    o = orcar(nome, body)
+    o = orcar(nome, body, ctx.store)
     rw = _cliente(ctx)
     if not rw.ligado:
         raise fail(503, "O Estúdio ainda não está disponível. Em breve.", "service_unavailable", "estudio_em_breve")
@@ -245,7 +264,7 @@ async def rota_gerar(request: Request):
     hold = None
     if p.kind == "person":
         try:
-            hold = mediaquota.reserve(ctx.store, p.person_id, kind, o["unidades_cota"], ctx.clock())
+            hold = mediaquota.reserve(ctx.store, p.person_id, kind, o["unidades"], ctx.clock())
         except mediaquota.QuotaExceeded as q:
             quando = mediaquota.datetime.fromtimestamp(q.resets_at, mediaquota.timezone.utc).strftime("%d/%m")
             _log(ctx, p, kind, 0, 0, 0, "quota", None)
@@ -253,8 +272,9 @@ async def rota_gerar(request: Request):
                        "rate_limit_error", "media_quota_exceeded", kind=q.kind, credits_available=q.kind in credits.offers(ctx.store))
         except DB_ERRORS:
             raise fail(503, "banco de chaves indisponivel", "service_unavailable", "database_unavailable")
-    task = _tarefa(nome, body, o["qualidade"])
     try:
+        body = await _subir_entradas(rw, body)
+        task = _tarefa(nome, body, o["qualidade"])
         r = await rw.submeter(task)
     except RunwareError as e:
         mediaquota.undo(ctx.store, hold)
@@ -269,7 +289,7 @@ async def rota_gerar(request: Request):
     jobs = _jobs(request)
     _limpar(jobs, now)
     job = {"id": task["taskUUID"], "person_id": p.person_id, "kind": kind, "efeito": nome, "modelo": o["modelo"], "qualidade": o["qualidade"],
-           "preco_usd": o["preco_usd"], "custo_previsto_usd": o["custo_usd"], "custo_usd": r.get("cost"), "status": "done" if _url(r) else "running",
+           "preco_usd": o["preco_usd"], "preco_brl": o.get("preco_brl"), "custo_previsto_usd": o["custo_usd"], "custo_usd": r.get("cost"), "status": "done" if _url(r) else "running",
            "url": _url(r), "hold": hold, "criado": now, "tempo_estimado_s": o["tempo_estimado_s"], "erro": None}
     if r.get("status") == "error" or r.get("error"):
         mediaquota.undo(ctx.store, hold)
@@ -279,9 +299,27 @@ async def rota_gerar(request: Request):
     return _visao(job)
 
 
+def _e_bruto(v) -> bool:
+    return isinstance(v, str) and (v.startswith("data:") or (len(v) > 512 and not v.startswith("http")))
+
+
+async def _subir_entradas(rw: Runware, body: dict) -> dict:
+    """Arquivos do cliente chegam como dataURI/base64: sobem para a Runware (video e audio so aceitam UUID ou URL)."""
+    inp = body.get("inputs")
+    if not isinstance(inp, dict):
+        return body
+    novo = {}
+    for k, v in inp.items():
+        if isinstance(v, list):
+            novo[k] = [await rw.subir(x) if _e_bruto(x) else x for x in v]
+        else:
+            novo[k] = await rw.subir(v) if _e_bruto(v) else v
+    return {**body, "inputs": novo}
+
+
 def _visao(job: dict) -> dict:
     return {"id": job["id"], "kind": job["kind"], "efeito": job["efeito"], "modelo": job["modelo"], "qualidade": job["qualidade"], "status": job["status"],
-            "url": job["url"], "preco_usd": job["preco_usd"], "custo_usd": job["custo_usd"], "tempo_estimado_s": job["tempo_estimado_s"], "erro": job["erro"],
+            "url": job["url"], "preco_usd": job["preco_usd"], "preco_brl": job.get("preco_brl"), "custo_usd": job["custo_usd"], "tempo_estimado_s": job["tempo_estimado_s"], "erro": job["erro"],
             "message": {"running": "Criando no Estúdio...", "done": "Pronto.", "failed": "Não deu certo. Nada foi cobrado."}[job["status"]]}
 
 

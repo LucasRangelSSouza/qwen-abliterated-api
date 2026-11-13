@@ -65,6 +65,8 @@ CATALOGO: dict[str, dict] = {
     "voz-hd": {"rotulo": "Narração HD (MiniMax Speech)", "kind": "audio", "task": "audioInference", "modelo": "minimax:speech@2.8",
                "unidade": "caractere", "taxas": {"turbo": 0.00006, "hd": 0.0001}, "padrao": "turbo", "entrada": ["speech.text"],
                "tempo_s": {"turbo": 8, "hd": 10}},
+    "imagem-livre": {"rotulo": "Imagem sem restrição de conteúdo", "kind": "image", "task": "imageInference", "modelo": "runware:100@1",
+                     "unidade": "imagem", "taxas": {"1024": 0.0013}, "padrao": "1024", "entrada": ["positivePrompt"], "tempo_s": {"1024": 8}},
     "imagem-ponta": {"rotulo": "Imagem de ponta (Seedream 5.5)", "kind": "image", "task": "imageInference", "modelo": "bytedance:seedream@5.5",
                      "unidade": "imagem", "taxas": {"1.5K": 0.02, "2K": 0.035}, "padrao": "1.5K", "entrada": ["positivePrompt", "referenceImages?"],
                      "tempo_s": {"1.5K": 25, "2K": 35}},
@@ -106,6 +108,21 @@ def orcar(nome: str, body: dict, store=None) -> dict:
             "partes": partes, "tempo_estimado_s": tempo, "tabela_de": TABELA_LIDA_EM}
 
 
+def _dim_imagem(v) -> tuple[int, int]:
+    """quadrado 1024x1024 por padrao; aceita 'WxH' ou paisagem/retrato; sempre multiplos de 64 e ate 1536."""
+    t = str(v or "1024x1024").lower().replace(" ", "")
+    if t in ("paisagem", "banner"):
+        return 1344, 768
+    if t in ("retrato", "story"):
+        return 768, 1344
+    try:
+        w, h = (int(x) for x in t.split("x"))
+    except ValueError:
+        return 1024, 1024
+    snap = lambda n: max(256, min(1536, round(n / 64) * 64))
+    return snap(w), snap(h)
+
+
 def _tarefa(nome: str, body: dict, q: str) -> dict:
     """Monta a tarefa no formato da Runware (campos do schema.json de cada modelo)."""
     e = CATALOGO[nome]
@@ -123,7 +140,13 @@ def _tarefa(nome: str, body: dict, q: str) -> dict:
         t["settings"] = {"audio": q.endswith("-audio")}
     elif q not in ("padrao", "turbo", "hd", "1.5K", "2K"):
         t["resolution"] = q
-    if e["task"] == "imageInference":
+    if nome == "imagem-livre":  # FLUX schnell: 4 passos, sem filtro de conteudo; tamanho em multiplos de 64
+        w, h = _dim_imagem(body.get("tamanho"))
+        t.update(width=w, height=h, steps=4, outputFormat="JPG", safety={"checkContent": False})
+        t.pop("resolution", None)
+        if body.get("negative_prompt"):
+            t["negativePrompt"] = str(body["negative_prompt"])[:600]
+    elif e["task"] == "imageInference":
         t["resolution"] = q
         t["outputFormat"] = "PNG"
     if e["task"] == "audioInference":

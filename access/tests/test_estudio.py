@@ -177,3 +177,14 @@ async def test_arquivo_do_cliente_sobe_antes_da_tarefa(rig_rw: Rig):
     up1, up2, tarefa = (c[0] for c in rig_rw.up.rw_calls)
     assert up1["taskType"] == "mediaStorage" and up1["operation"] == "upload" and up1["media"].startswith("data:video/mp4")
     assert tarefa["inputs"] == {"referenceVideos": ["m-video"], "referenceImages": ["m-foto"]} and "duration" not in tarefa
+
+
+async def test_imagem_livre_manda_flux_sem_filtro_e_custa_cinco_creditos(rig_rw: Rig):
+    runware_falsa(rig_rw.up, [{"data": [{"taskType": "imageInference", "taskUUID": "i", "imageURL": "https://im.runware.ai/i.jpg", "cost": 0.0013}]}])
+    o = (await rig_rw.client.post("/v1/estudio/orcar", json={"efeito": "imagem-livre"}, headers=H)).json()
+    assert o["creditos"] == 5 and o["modelo"] == "runware:100@1"
+    r = await rig_rw.client.post("/v1/estudio/gerar", json={"efeito": "imagem-livre", "prompt": "retrato artistico adulto", "tamanho": "retrato"}, headers=H)
+    assert r.status_code == 200 and r.json()["status"] == "done"
+    t = rig_rw.up.rw_calls[0][0]
+    assert t["model"] == "runware:100@1" and t["steps"] == 4 and (t["width"], t["height"]) == (768, 1344)
+    assert t["safety"] == {"checkContent": False} and "resolution" not in t

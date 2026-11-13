@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import logging
+import re
 import time
 import uuid
 
@@ -21,12 +22,17 @@ from app import mediaquota
 
 log = logging.getLogger("llm-access.imagem")
 
+RECUSA = re.compile(r"content.?policy|safety|moderat|violat|refus|not allowed|disallowed|policy", re.I)
 TTL_S = 3600
 ETA_S = 25            # medido em 13/11/2026: 20 s por imagem 1024x1024
 TIMEOUT_S = 300
 TAMANHOS = {"1024x1024", "1536x1024", "1024x1536", "auto"}
 ESTILO = {"foto": "photorealistic photo", "realista": "photorealistic photo", "ilustracao": "digital illustration", "anime": "anime style",
           "3d": "3D render", "aquarela": "watercolor painting", "minimalista": "minimalist flat design"}
+
+class Recusada(Exception):
+    """O gerador padrao (ChatGPT) recusou o pedido por conteudo: o app oferece a imagem sem restricao do Estudio, por creditos."""
+
 
 _jobs: dict[str, dict] = {}
 
@@ -82,13 +88,16 @@ async def _gerar(ctx, job: dict, body: dict) -> None:
         elif d.get("url"):
             img = (await ctx.http.get(d["url"], timeout=60)).content
         else:
-            raise RuntimeError(f"router {r.status_code}: {str(j.get('error') or '')[:200]}")
+            motivo = str(j.get("error") or "") or (r.text[:300] if r.content else "")
+            if RECUSA.search(motivo):
+                raise Recusada(motivo[:200])
+            raise RuntimeError(f"router {r.status_code}: {motivo[:200]}")
         job.update(status="done", bytes=img, mime="image/png" if img[:4] == b"\x89PNG" else "image/jpeg" if img[:2] == b"\xff\xd8" else "image/webp",
                    seconds=round(time.time() - t0, 1), size=_tamanho(body.get("size")))
     except Exception as e:  # noqa: BLE001  (qualquer falha devolve a cota; a mensagem ao cliente e generica)
         log.warning("imagem %s falhou: %s", job["id"], str(e)[:300])
         mediaquota.undo(ctx.store, job.get("hold"))
-        job.update(status="failed", error="falhou", hold=None, seconds=round(time.time() - t0, 1))
+        job.update(status="failed", error="recusada" if isinstance(e, Recusada) else "falhou", hold=None, seconds=round(time.time() - t0, 1))
 
 
 async def criar(ctx, person_id: int | None, hold, body: dict) -> dict:
@@ -118,6 +127,8 @@ def progresso(j: dict) -> dict:
     gasto = time.time() - j["criado"]
     prog = 100 if j["status"] == "done" else min(95, int(gasto / ETA_S * 100)) if j["status"] == "running" else 0
     msg = {"queued": "Sua imagem está na fila para ser gerada.", "running": "Gerando a sua imagem...", "done": "Pronto.", "failed": "Não deu certo. Nada foi cobrado."}
+    if j["status"] == "failed" and j.get("error") == "recusada":
+        msg["failed"] = "O gerador padrão não aceita este tipo de imagem. Dá para criar no Estúdio, sem restrição de conteúdo, por créditos. Nada foi cobrado."
     return {"id": j["id"], "kind": "image", "status": j["status"], "position": None, "eta_s": max(0, int(ETA_S - gasto)) if j["status"] != "done" else 0,
             "progress": prog, "message": msg[j["status"]], "mime": j["mime"], "seconds": j["seconds"], "size": j["size"], "error": j["error"]}
 

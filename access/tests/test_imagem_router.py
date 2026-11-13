@@ -83,3 +83,14 @@ async def test_foto_do_cliente_vai_como_referencia_para_editar(rig_img: Rig):
     r = await rig_img.client.post("/v1/images/generations", json={"prompt": "gato", "async": True}, headers=H)
     await _esperar(rig_img, r.json()["id"])
     assert "images" not in rig_img.up.router_calls[-1]
+
+
+async def test_recusa_de_conteudo_avisa_que_o_estudio_faz(rig_img: Rig):
+    async def recusa(request, body):
+        if request.url.path == "/router/v1/images/generations":
+            return httpx.Response(400, json={"error": {"message": "Your request was rejected by the safety system (content_policy_violation)"}})
+        return httpx.Response(404, json={})
+    rig_img.up.handler = recusa
+    r = await rig_img.client.post("/v1/images/generations", json={"prompt": "algo que o gerador padrao recusa", "async": True}, headers=H)
+    s = await _esperar(rig_img, r.json()["id"])
+    assert s["status"] == "failed" and s["error"] == "recusada" and "Estúdio" in s["message"]

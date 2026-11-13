@@ -22,14 +22,14 @@ function Saldo({ f }) {
   const s = f.saldo || {}
   if (f.id === 'chatgpt') return <div className="text-sm text-text-muted">Assinatura (sem saldo por uso)</div>
   if (!s.ok) return <Badge variant="warning" dot>{s.erro || 'sem leitura'}</Badge>
-  const baixo = s.saldo_usd < 5
+  const baixo = s.saldo_usd < 5 || (s.dias != null && Number(s.dias) < 3) // Vast: poucos dias de saldo tambem e alerta
   return (
     <div>
       <div className={cn('num text-2xl font-semibold tracking-tight', baixo ? 'text-red-600 dark:text-red-400' : 'text-text-main')}>{usd(s.saldo_usd)}</div>
       <div className="text-xs text-text-muted">
         {s.simulado ? 'simulado (modo de teste)' : f.id === 'runware'
           ? `hoje ${usd(s.gasto_hoje_usd)} · 30 dias ${usd(s.gasto_30d_usd)} · ${s.pedidos_30d ?? 0} pedidos`
-          : s.dias != null ? `gasto ${usd(s.gasto_dia_usd)}/dia · dura ${Number(s.dias).toFixed(1)} dias` : ''}
+          : s.dias != null ? `gasto ${usd(s.gasto_dia_usd)}/dia · dura ${Number(s.dias).toFixed(1)} dias${Number(s.dias) < 3 ? ' · recarregue' : ''}` : ''}
       </div>
     </div>
   )

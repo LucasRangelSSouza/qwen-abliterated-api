@@ -43,6 +43,9 @@ class Settings:
     cakto_webhook_secret: str = ""  # CAKTO_WEBHOOK_SECRET: sem ele o webhook responde 503 (nunca fica aberto)
     site_origins: str = "https://brain.rangeltech.net,https://remoto.rangeltech.net"  # SITE_ORIGINS: origens que podem chamar /v1/free pelo navegador
     secrets_key: str = ""           # SECRETS_KEY: chave mestra que cifra credenciais guardadas no banco (Contabo); sem ela nao guarda
+    runware_api_key: str = ""       # RUNWARE_API_KEY: Estudio (modelos de ponta na Runware, spec 36). Vazia = Estudio responde "em breve"; a chave nunca sai do servidor
+    runware_url: str = "https://api.runware.ai/v1"
+    runware_mock: bool = False      # RUNWARE_MOCK=1: responde sem chamar a Runware (QA e desenvolvimento, custo zero)
 
     @property
     def upstream_base(self) -> str:
@@ -72,4 +75,7 @@ class Settings:
             cakto_webhook_secret=_secret("CAKTO_WEBHOOK_SECRET"),
             secrets_key=_secret("SECRETS_KEY"),
             site_origins=e("SITE_ORIGINS", cls.site_origins),
+            runware_api_key=_secret("RUNWARE_API_KEY"),
+            runware_url=e("RUNWARE_URL", cls.runware_url),
+            runware_mock=e("RUNWARE_MOCK", "0").strip().lower() in ("1", "true", "yes", "on"),
         )

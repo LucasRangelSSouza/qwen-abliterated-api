@@ -46,3 +46,9 @@ Servico unico exposto ao publico (`https://qwen.rangeltech.net`). Fica na frente
 - `GET /admin/api/settings` (somente leitura: tetos e ociosidade do queue, modo QA) e `POST /admin/api/password {current,new}`
 - `GET /admin/api/gpu-config` e `PUT /admin/api/gpu-config {auto_shutdown?,idle_min?,reserved?}` -> `{auto_shutdown,idle_min,reserved,static,static_instance_id}`: so repassa a `GET`/`POST /admin/gpu/config` do queue com `UPSTREAM_ADMIN_KEY` (o estado vive no Redis do queue, nada no SQLite). Valida `auto_shutdown`/`reserved` booleanos e `idle_min` de 1 a 1440 (`422 invalid_gpu_config`); queue fora do ar ou recusando vira `502`.
 - Painel estatico: `GET /admin` e `/admin/*` (SPA, fallback `index.html`), assets em `/admin/assets/*`.
+
+## Estudio (spec 36): modelos de ponta pela Runware
+- `RUNWARE_API_KEY` so no servidor (`/opt/platform/secrets/llm-access.env`); vazia = `GET /v1/estudio/catalogo` com `disponivel:false` e `POST /v1/estudio/gerar` 503 `estudio_em_breve`. `RUNWARE_MOCK=1` simula (QA).
+- Rotas: `GET /v1/estudio/catalogo` (publica; efeitos, qualidades, preco por unidade ja com margem 1,25x), `POST /v1/estudio/orcar` (chave; preco antes, creditos a US$ 0,02, unidades da cota), `POST /v1/estudio/gerar` (reserva cota/credito avulso -> tarefa Runware `deliveryMethod: async` + `includeCost` -> job), `GET /v1/estudio/jobs/{id}` (getResponse; falha ou 15 min devolve a reserva).
+- Jobs em memoria por 48 h (reinicio do container perde o acompanhamento; a cota ja reservada fica: aceitavel ate a tabela `estudio_jobs`).
+- Tabela de precos em `app/estudio.py` (`CATALOGO`, lida dos schema.json em 12/11/2026); `atualizar_tabela()` compara com a Runware sem gastar.

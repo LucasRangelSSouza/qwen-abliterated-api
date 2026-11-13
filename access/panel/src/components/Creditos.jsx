@@ -6,7 +6,7 @@ import { api } from '../lib/api.js'
 import { fmtInt, fmtFull } from '../lib/format.js'
 import { Button, Badge, Field, Input, Select, Skeleton, ErrorState, Card, CardHeader, Notice, useToast, useLoad } from './ui.jsx'
 
-const TIPOS = { tokens: 'Uso (tokens)', image: 'Imagens', video: 'Vídeos', audio: 'Áudios' }
+const TIPOS = { tokens: 'Uso (tokens)', image: 'Imagens', video: 'Vídeos', audio: 'Áudios', studio: 'Créditos do Estúdio' }
 
 export function CreditosDaPessoa({ pid }) {
   const toast = useToast()
@@ -88,13 +88,13 @@ export function CreditosAjustes() {
     const d = st.data
     setF({
       usd_brl_rate: String(d.usd_brl_rate ?? ''), credit_price_usd: d.credit_price_usd == null ? '' : String(d.credit_price_usd), credit_expiry_days: String(d.credit_expiry_days ?? 30),
-      units: JSON.stringify(d.credit_pack_units || {}, null, 0), offers: JSON.stringify(d.credit_offers || {}, null, 0), products: JSON.stringify(d.credit_products || {}, null, 0),
+      units: JSON.stringify(d.credit_pack_units || {}, null, 0), planos: JSON.stringify(d.studio_plan_credits || {}, null, 0), offers: JSON.stringify(d.credit_offers || {}, null, 0), products: JSON.stringify(d.credit_products || {}, null, 0),
     })
   }, [st.data])
   const save = async () => {
-    let units, offers, products
-    try { units = JSON.parse(f.units || '{}'); offers = JSON.parse(f.offers || '{}'); products = JSON.parse(f.products || '{}') } catch { return toast.error('Os campos de pacote, ofertas e produtos precisam ser JSON válido.') }
-    const body = { usd_brl_rate: +f.usd_brl_rate, credit_expiry_days: +f.credit_expiry_days, credit_pack_units: units, credit_offers: offers, credit_products: products, credit_price_usd: f.credit_price_usd === '' ? null : +f.credit_price_usd }
+    let units, offers, products, planos
+    try { planos = JSON.parse(f.planos || '{}'); units = JSON.parse(f.units || '{}'); offers = JSON.parse(f.offers || '{}'); products = JSON.parse(f.products || '{}') } catch { return toast.error('Os campos de pacote, ofertas e produtos precisam ser JSON válido.') }
+    const body = { usd_brl_rate: +f.usd_brl_rate, credit_expiry_days: +f.credit_expiry_days, credit_pack_units: units, credit_offers: offers, credit_products: products, studio_plan_credits: planos, credit_price_usd: f.credit_price_usd === '' ? null : +f.credit_price_usd }
     try { await api.putBillingSettings(body); toast.success('Créditos salvos.'); st.refresh() } catch (e) { toast.error(e.message) }
   }
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
@@ -110,7 +110,8 @@ export function CreditosAjustes() {
               <Field label="Validade (dias)" htmlFor="cr-exp"><Input id="cr-exp" inputMode="numeric" value={f.credit_expiry_days} onChange={set('credit_expiry_days')} /></Field>
             </div>
             <Field label="Tamanho dos pacotes" htmlFor="cr-units" hint='Ex.: {"tokens_mult": 2, "image": 500, "video": 30, "audio": 150} (uso = vezes a sessão do plano)'><Input id="cr-units" value={f.units} onChange={set('units')} /></Field>
-            <Field label="Ofertas da Cakto (checkout)" htmlFor="cr-off" hint='{"tokens": "id da oferta", "image": "...", ...}'><Input id="cr-off" value={f.offers} onChange={set('offers')} /></Field>
+            <Field label="Créditos grátis do Estúdio por mês e por plano" htmlFor="cr-planos" hint='Ex.: {"light": 100, "max": 300, "ultra": 1000}. 1 crédito = US$ 0,02; o pacote de US$ 18 = 900.'><Input id="cr-planos" value={f.planos} onChange={set('planos')} /></Field>
+            <Field label="Ofertas da Cakto (checkout)" htmlFor="cr-off" hint='{"tokens": "id da oferta", "image": "...", "studio": "...", ...}'><Input id="cr-off" value={f.offers} onChange={set('offers')} /></Field>
             <Field label="Produtos da Cakto (webhook)" htmlFor="cr-prod" hint='{"tokens": "id do produto", ...}'><Input id="cr-prod" value={f.products} onChange={set('products')} /></Field>
             <div className="flex justify-end"><Button icon={Save} onClick={save}>Salvar créditos</Button></div>
             <Notice variant="info">Os produtos são criados com o script <code>access/scripts/criar_produtos_credito.py --criar</code>; depois cole aqui os ids das ofertas e dos produtos.</Notice>

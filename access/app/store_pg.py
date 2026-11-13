@@ -88,6 +88,11 @@ class PgStore:
                         THEN ALTER TABLE {tb} DROP CONSTRAINT IF EXISTS {tb}_safety_level_check; ALTER TABLE {tb} ADD CONSTRAINT {tb}_safety_level_check CHECK(safety_level IN (1,2,3)); END IF; END $$""")
                 except Exception:  # noqa: BLE001
                     pass
+            try:  # credito unico do Estudio (kind 'studio'): troca o CHECK antigo uma vez; se falhar o servico sobe igual (so o Estudio fica sem cobrar em credito)
+                c.execute("""DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='credits'::regclass AND conname='credits_kind_check' AND pg_get_constraintdef(oid) LIKE '%studio%')
+                    THEN ALTER TABLE credits DROP CONSTRAINT IF EXISTS credits_kind_check; ALTER TABLE credits ADD CONSTRAINT credits_kind_check CHECK(kind IN ('tokens','image','video','audio','studio')); END IF; END $$""")
+            except Exception:  # noqa: BLE001
+                pass
             c.execute("ALTER TABLE limits ADD COLUMN IF NOT EXISTS custom BIGINT NOT NULL DEFAULT 0")
             c.execute("ALTER TABLE plans ADD COLUMN IF NOT EXISTS video_quota_month BIGINT")
             c.execute("ALTER TABLE plans ADD COLUMN IF NOT EXISTS audio_quota_month BIGINT")

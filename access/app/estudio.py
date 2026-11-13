@@ -102,7 +102,7 @@ def orcar(nome: str, body: dict, store=None) -> dict:
     partes = int(math.ceil(n / e["partes_s"])) if e.get("partes_s") else 1
     tempo = e["tempo_s"].get(q, 60) * (1 if partes == 1 else max(1, math.ceil(partes / 3)))  # ate 3 partes em paralelo
     return {"efeito": nome, "rotulo": e["rotulo"], "kind": e["kind"], "modelo": e["modelo"], "qualidade": q, "unidade": e["unidade"], "quantidade": n,
-            "custo_usd": custo, **pf, "unidades": max(1, int(math.ceil(pf["preco_usd"] / vu - 1e-9))), "valor_unidade_usd": round(vu, 4),
+            "custo_usd": custo, **pf, "creditos": credits.studio_creditos(pf["preco_usd"]), "unidades": max(1, int(math.ceil(pf["preco_usd"] / vu - 1e-9))), "valor_unidade_usd": round(vu, 4),
             "partes": partes, "tempo_estimado_s": tempo, "tabela_de": TABELA_LIDA_EM}
 
 
@@ -245,10 +245,15 @@ async def catalogo(request: Request):
 async def rota_orcar(request: Request):
     from app.proxy import authenticate
     ctx: Ctx = request.app.state.ctx
-    authenticate(ctx, request)
     body = _json(await request.json())
     o = orcar(str(body.get("efeito") or ""), body, ctx.store)
     o["disponivel"] = _cliente(ctx).ligado
+    pr = authenticate(ctx, request)
+    if pr.kind == "person":
+        try:
+            o["saldo"] = credits.studio_balance(ctx.store, pr.person_id, ctx.clock())
+        except DB_ERRORS:
+            o["saldo"] = None
     return o
 
 
@@ -273,14 +278,14 @@ async def iniciar(request: Request, ctx: Ctx, p, nome: str, body: dict) -> dict:
     hold = None
     if p.kind == "person":
         try:
-            hold = mediaquota.reserve(ctx.store, p.person_id, kind, o["unidades"], ctx.clock())
-        except mediaquota.QuotaExceeded as q:
-            quando = mediaquota.datetime.fromtimestamp(q.resets_at, mediaquota.timezone.utc).strftime("%d/%m")
-            _log(ctx, p, kind, 0, 0, 0, "quota", None)
-            raise fail(429, f"Você já usou a cota de {mediaquota.LABEL[q.kind]} do seu plano neste mês ({q.used} de {q.limit}). Ela renova em {quando}.",
-                       "rate_limit_error", "media_quota_exceeded", kind=q.kind, credits_available=q.kind in credits.offers(ctx.store))
+            parts, saldo = credits.studio_reserve(ctx.store, p.person_id, o["creditos"], ctx.clock())
         except DB_ERRORS:
             raise fail(503, "banco de chaves indisponivel", "service_unavailable", "database_unavailable")
+        if parts is None:
+            _log(ctx, p, kind, 0, 0, 0, "quota", None)
+            raise fail(402, f"Você precisa de {o['creditos']} créditos para este pedido e tem {saldo}. Compre mais créditos para continuar.",
+                       "rate_limit_error", "media_quota_exceeded", kind="studio", needed=o["creditos"], balance=saldo, credits_available="studio" in credits.offers(ctx.store))
+        hold = mediaquota.Hold(None, parts)
     try:
         body = await _subir_entradas(rw, body)
         task = _tarefa(nome, body, o["qualidade"])
@@ -298,7 +303,7 @@ async def iniciar(request: Request, ctx: Ctx, p, nome: str, body: dict) -> dict:
     jobs = _jobs(request)
     _limpar(jobs, now)
     job = {"id": task["taskUUID"], "person_id": p.person_id, "kind": kind, "efeito": nome, "modelo": o["modelo"], "qualidade": o["qualidade"],
-           "preco_usd": o["preco_usd"], "preco_brl": o.get("preco_brl"), "custo_previsto_usd": o["custo_usd"], "custo_usd": r.get("cost"), "status": "done" if _url(r) else "running",
+           "preco_usd": o["preco_usd"], "preco_brl": o.get("preco_brl"), "creditos": o["creditos"], "custo_previsto_usd": o["custo_usd"], "custo_usd": r.get("cost"), "status": "done" if _url(r) else "running",
            "url": _url(r), "hold": hold, "criado": now, "tempo_estimado_s": o["tempo_estimado_s"], "erro": None}
     if r.get("status") == "error" or r.get("error"):
         mediaquota.undo(ctx.store, hold)
@@ -328,7 +333,7 @@ async def _subir_entradas(rw: Runware, body: dict) -> dict:
 
 def _visao(job: dict) -> dict:
     return {"id": job["id"], "kind": job["kind"], "efeito": job["efeito"], "modelo": job["modelo"], "qualidade": job["qualidade"], "status": job["status"],
-            "url": job["url"], "preco_usd": job["preco_usd"], "preco_brl": job.get("preco_brl"), "custo_usd": job["custo_usd"], "tempo_estimado_s": job["tempo_estimado_s"], "erro": job["erro"],
+            "url": job["url"], "preco_usd": job["preco_usd"], "preco_brl": job.get("preco_brl"), "creditos": job.get("creditos"), "custo_usd": job["custo_usd"], "tempo_estimado_s": job["tempo_estimado_s"], "erro": job["erro"],
             "message": {"running": "Criando no Estúdio...", "done": "Pronto.", "failed": "Não deu certo. Nada foi cobrado."}[job["status"]]}
 
 

@@ -193,7 +193,7 @@ async def test_rota_de_creditos_do_cliente_traz_pacotes_checkout_com_email_e_pro
     h = {"Authorization": f"Bearer {key}"}
     j = (await rig.client.get("/v1/credits", headers=h)).json()
     assert j["plan"] == "light" and j["next_plan"]["id"] == "max" and j["next_plan"]["url"].endswith("/#planos")
-    assert [p["kind"] for p in j["packs"]] == ["tokens", "image", "video", "audio"] and all(p["checkout_url"] is None and p["price_usd"] == 18 and p["currency"] == "USD" for p in j["packs"])
+    assert [p["kind"] for p in j["packs"]] == ["tokens", "image", "video", "audio", "studio"] and all(p["checkout_url"] is None and p["price_usd"] == 18 and p["currency"] == "USD" for p in j["packs"])
     assert j["packs"][0]["units"] == 2_000_000  # 2 x a sessao do Lite
     await rig.login()
     await rig.client.put("/admin/api/billing/settings", json={"credit_offers": {"image": "xyz789"}})

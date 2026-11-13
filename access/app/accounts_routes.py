@@ -173,6 +173,13 @@ async def client_credits(request: Request):
         c = cota.get(kind) or {}
         if c.get("limit") and (c.get("remaining") or 0) <= 2 and saldos.get(kind, 0) <= 2:
             low[kind] = {"restante_plano": c.get("remaining"), "credito": saldos.get(kind, 0), "renova": c.get("resets_at")}
+    try:  # creditos do Estudio acabando (<= 25 = menos de um pedido pequeno)
+        est = credits.studio_balance(ctx.store, p.person_id, now)
+        saldos["studio"] = est
+        if est <= 25:
+            low["studio"] = {"restante_plano": est, "credito": est, "renova": None}
+    except Exception:  # noqa: BLE001
+        pass
     renews_at = iso(sub["next_payment_at"]) if sub and sub["next_payment_at"] else None
     dias = round((sub["next_payment_at"] - now) / 86400, 1) if sub and sub["next_payment_at"] else None
     return {"plan": plan_id, "next_plan": ({"id": nxt_row["id"], "name": nxt_row["name"], "url": url_prox} if nxt_row else None),
@@ -417,7 +424,8 @@ def billing_settings(request: Request):
             "smtp_configured": mailer.configured(), "site_url": mailer.site_url(),
             "credit_offers": credits.offers(ctx.store), "credit_products": credits._json_setting(ctx.store, "credit_products"),
             "credit_pack_units": credits._json_setting(ctx.store, "credit_pack_units"), "credit_expiry_days": credits.expiry_days(ctx.store),
-            "usd_brl_rate": credits.usd_brl_rate(ctx.store), "credit_price_usd": credits.price_usd(ctx.store)}
+            "usd_brl_rate": credits.usd_brl_rate(ctx.store), "credit_price_usd": credits.price_usd(ctx.store),
+            "studio_plan_credits": credits.studio_plan_credits(ctx.store)}
 
 
 @api.put("/billing/settings")
@@ -448,6 +456,11 @@ async def billing_settings_put(request: Request):
         if not isinstance(v, dict) or any(k not in (*credits.KINDS, "tokens_mult") or isinstance(x, bool) or not isinstance(x, (int, float)) or x <= 0 for k, x in v.items()):
             raise fail(422, "credit_pack_units deve ser {image|video|audio|tokens_mult: numero > 0}", "invalid_request_error", "invalid_billing_settings")
         ctx.store.set_setting("credit_pack_units", json.dumps(v))
+    if "studio_plan_credits" in b:  # creditos gratis do Estudio por mes e por plano
+        v = b["studio_plan_credits"]
+        if not isinstance(v, dict) or any(not isinstance(k, str) or isinstance(x, bool) or not isinstance(x, int) or x < 0 or x > 1_000_000 for k, x in v.items()):
+            raise fail(422, "studio_plan_credits deve ser {plano: creditos por mes (inteiro >= 0)}", "invalid_request_error", "invalid_billing_settings")
+        ctx.store.set_setting("studio_plan_credits", json.dumps(v))
     for key in ("usd_brl_rate", "credit_price_usd"):  # moeda: cotacao de referencia e preco do pacote em dolar (vazio = calcula pela cotacao)
         if key in b:
             v = b[key]

@@ -5,16 +5,19 @@ from __future__ import annotations
 
 import json
 
-KINDS = ("tokens", "image", "video", "audio")
-LABEL = {"tokens": "uso", "image": "imagens", "video": "vídeos", "audio": "áudio"}
+KINDS = ("tokens", "image", "video", "audio", "studio")
+LABEL = {"tokens": "uso", "image": "imagens", "video": "vídeos", "audio": "áudio", "studio": "créditos do Estúdio"}
 BASE_BRL = 100                      # o pacote vale o equivalente a R$ 100 (preco original); a cobranca e em dolar
 DEFAULT_USD_BRL = 5.5               # cotacao de referencia (ajuste do painel: usd_brl_rate)
-DEFAULT_UNITS = {"image": 500, "video": 30, "audio": 150}
+DEFAULT_UNITS = {"image": 500, "video": 30, "audio": 150, "studio": 900}  # studio: 1 credito = US$ 0,02; o pacote de US$ 18 = 900 creditos
+STUDIO_USD = 0.02
+STUDIO_ARREDONDA = 5            # o cliente ve sempre multiplos de 5 ("185 creditos")
+PLANO_STUDIO_PADRAO = {"light": 100, "max": 300, "ultra": 1000, "enterprise": 2000}  # creditos gratis por mes (o painel pode mudar: setting studio_plan_credits)
 TOKENS_MULT = 2                     # pacote de uso = 2 x o limite da sessao de 5 h do plano
 DEFAULT_EXPIRY_DAYS = 30
 DAY = 86400
 # nome do produto (minusculo) -> tipo, quando o id do produto nao estiver configurado
-NAME_HINTS = (("crédito de uso", "tokens"), ("credito de uso", "tokens"), ("crédito de imagens", "image"), ("credito de imagens", "image"),
+NAME_HINTS = (("créditos do estúdio", "studio"), ("creditos do estudio", "studio"), ("crédito do estúdio", "studio"), ("credito do estudio", "studio"), ("crédito de uso", "tokens"), ("credito de uso", "tokens"), ("crédito de imagens", "image"), ("credito de imagens", "image"),
               ("crédito de vídeos", "video"), ("credito de videos", "video"), ("crédito de áudio", "audio"), ("credito de audio", "audio"))
 NEXT_PLAN = {"light": "max", "max": "ultra", "ultra": "enterprise"}
 
@@ -150,3 +153,55 @@ def listing(store, person_id: int, now: float) -> list[dict]:
 def balances(store, person_id: int, now: float) -> dict:
     with store.tx() as c:
         return {k: balance(c, person_id, k, now) for k in KINDS}
+
+
+
+# ---- credito unico do Estudio
+def studio_creditos(preco_usd: float) -> int:
+    """Quantos creditos custa um pedido: preco ao cliente em dolar / US$ 0,02, arredondado PARA CIMA ao multiplo de 5 (minimo 5)."""
+    n = int(-(-round(float(preco_usd) / STUDIO_USD, 6) // 1))
+    return max(STUDIO_ARREDONDA, -(-n // STUDIO_ARREDONDA) * STUDIO_ARREDONDA)
+
+
+def studio_plan_credits(store) -> dict:
+    cfg = _json_setting(store, "studio_plan_credits")
+    return {**PLANO_STUDIO_PADRAO, **{k: int(v) for k, v in cfg.items() if isinstance(v, (int, float)) and v >= 0}}
+
+
+def _plan_of(c, person_id: int):
+    r = c.execute("SELECT s.plan p FROM accounts a JOIN subscriptions s ON s.account_id=a.id WHERE a.person_id=? ORDER BY s.updated_at DESC, s.id DESC LIMIT 1", (person_id,)).fetchone()
+    return r["p"] if r else None
+
+
+def ensure_monthly_studio(store, c, person_id: int, now: float) -> int:
+    """Concede (uma vez por mes) os creditos gratis do plano. O mesmo external_id nunca duplica; vencem no fim do mes (UTC). Devolve quantos creditou agora."""
+    from datetime import datetime, timezone
+    plan = _plan_of(c, person_id)
+    qtd = studio_plan_credits(store).get(plan or "", 0)
+    if qtd <= 0:
+        return 0
+    d = datetime.fromtimestamp(now, timezone.utc)
+    mes = d.strftime("%Y-%m")
+    ext = f"plano-studio:{person_id}:{mes}"
+    if c.execute("SELECT 1 FROM credits WHERE external_id=?", (ext,)).fetchone():
+        return 0
+    fim = d.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    fim = fim.replace(year=fim.year + (fim.month == 12), month=fim.month % 12 + 1).timestamp()
+    c.execute("INSERT INTO credits(person_id,kind,units,remaining,granted_at,expires_at,source,external_id) VALUES(?,?,?,?,?,?,?,?)",
+              (person_id, "studio", qtd, qtd, now, fim, "plan", ext))
+    return qtd
+
+
+def studio_balance(store, person_id: int, now: float) -> int:
+    with store.tx() as c:
+        ensure_monthly_studio(store, c, person_id, now)
+        return balance(c, person_id, "studio", now)
+
+
+def studio_reserve(store, person_id: int, creditos: int, now: float):
+    """Debita os creditos (os que vencem primeiro saem primeiro). Devolve (parts, saldo): parts=None quando falta saldo."""
+    with store.tx() as c:
+        ensure_monthly_studio(store, c, person_id, now)
+        saldo = balance(c, person_id, "studio", now)
+        parts = take(c, person_id, "studio", creditos, now)
+        return parts, saldo

@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS plans(
 CREATE TABLE IF NOT EXISTS media_overrides(
   person_id INTEGER PRIMARY KEY, image_quota_month INTEGER, video_quota_month INTEGER, audio_quota_month INTEGER);
 CREATE TABLE IF NOT EXISTS credits(
-  id INTEGER PRIMARY KEY AUTOINCREMENT, person_id INTEGER NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('tokens','image','video','audio')),
+  id INTEGER PRIMARY KEY AUTOINCREMENT, person_id INTEGER NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('tokens','image','video','audio','studio')),
   units INTEGER NOT NULL, remaining INTEGER NOT NULL, granted_at REAL NOT NULL, expires_at REAL NOT NULL,
   source TEXT NOT NULL DEFAULT 'purchase', external_id TEXT UNIQUE, revoked_at REAL);
 CREATE INDEX IF NOT EXISTS credits_person ON credits(person_id, kind, expires_at);

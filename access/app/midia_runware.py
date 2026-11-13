@@ -19,7 +19,7 @@ from app import estudio
 
 log = logging.getLogger("llm-access.midia_runware")
 
-RES_PERSONAGEM = {"480p": "480p", "576p": "768p", "736p": "768p"}
+RES_PERSONAGEM = {"480p": "480p", "576p": "768p", "736p": "768p", "768p": "768p", "1080p": "1080p"}
 TAMANHO = {  # (formato, resolucao) -> largura x altura aceitos pelo Wan 3.0 / P-Video
     ("paisagem", "480p"): (848, 480), ("retrato", "480p"): (480, 848), ("quadrado", "480p"): (640, 640),
     ("paisagem", "720p"): (1280, 720), ("retrato", "720p"): (720, 1280), ("quadrado", "720p"): (960, 960),

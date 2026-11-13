@@ -3,6 +3,7 @@ import { Wallet, KeyRound, RefreshCw, Save, ExternalLink, Sparkles, Clapperboard
 import { api } from '../lib/api.js'
 import { cn } from '../lib/format.js'
 import PageHeader from '../components/PageHeader.jsx'
+import { ProxyNavegador } from '../components/ProxyNavegador.jsx'
 import { Card, CardHeader, Badge, Button, Field, Input, Notice, Skeleton, ErrorState, useToast, useLoad } from '../components/ui.jsx'
 
 const usd = (v, exato = false) => {
@@ -199,6 +200,7 @@ export default function Providers() {
             {data.fornecedores.map((f) => <ProviderCard key={f.id} f={f} secretsOk={data.secrets_key_set} onSaved={setData} />)}
           </div>
           <PricingCard data={data} onSaved={setData} />
+          <ProxyNavegador chave="padrao" />
         </div>
       )}
     </>

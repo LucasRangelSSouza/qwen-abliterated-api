@@ -63,6 +63,8 @@ export const api = {
   putPlan: (id, b) => request('PUT', `/plans/${id}`, b),
   billingSettings: () => request('GET', '/billing/settings'),
   putBillingSettings: (b) => request('PUT', '/billing/settings', b),
+  proxyNav: () => request('GET', '/proxy-nav'),
+  putProxyNav: (chave, url) => request('PUT', `/proxy-nav/${chave}`, { url: url || null }),
   billingEvents: (limit = 30) => request('GET', '/billing/events' + qs({ limit })),
   personCredits: (pid) => request('GET', `/people/${pid}/credits`),
   grantCredit: (pid, b) => request('POST', `/people/${pid}/credits`, b),

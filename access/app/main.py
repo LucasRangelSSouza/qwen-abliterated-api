@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from app import admin, enroll, proxy
 from app import vms_routes  # noqa: F401  (registra as rotas do painel de VMs em admin.api ANTES do include_router)
 from app import fornecedores_routes  # noqa: F401  (Fornecedores e precos, spec 36)
+from app import proxy_nav  # noqa: F401  (proxy do navegador por cliente, spec 31: rotas do painel em admin.api)
 from app.auth import AdminAuth
 from app.config import Settings
 from app.ctx import Ctx
@@ -92,6 +93,7 @@ def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = No
     app.include_router(checkout.router)
     from app import versao
     app.include_router(versao.router)
+    app.include_router(proxy_nav.router)
     from app import estudio
     app.include_router(estudio.router)
     app.include_router(enroll.router)

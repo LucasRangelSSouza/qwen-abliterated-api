@@ -74,6 +74,7 @@ const status = () => ({ state: process_state, eta_s: process_state === 'starting
     { t: nowS() - 600, offer: 4, machine: 150100, geo: 'Bulgaria, BG', dph: 0.4236, down_mbps: 870, known: false, outcome: 'running', detail: 'em 818s' },
   ] })
 let safetyMock = null
+let provMock = null
 let subsMock = null
 let plansMock = null
 let billMock = null
@@ -160,6 +161,48 @@ function handle(method, url, body) {
         { id: 128, kind: 'chat', consumer: 'llm-access', end_user: 'Marina Duarte', cls: 'interactive', enq: n - 700, start: n - 699, end: n - 640, code: '200' },
         { id: 127, kind: 'embed', consumer: 'llm-access', end_user: 'platform', cls: 'batch', enq: n - 900, start: null, end: n - 850, code: '503' }],
       error: null })
+  }
+  if (path === '/fornecedores' || path.startsWith('/fornecedores/')) {
+    provMock = provMock || { key: null, precos: { markup: 5, markup_minimo: 1.5, cap_brl: 20, por_efeito: {} } }
+    if (method === 'POST' && path === '/fornecedores/chave') {
+      if (body.chave && body.chave.length < 8) return json({ error: { message: 'A chave não funcionou: chave recusada' } }, 422)
+      provMock.key = body.chave ? '••••' + body.chave.slice(-4) : null
+    }
+    if (method === 'POST' && path === '/fornecedores/precos') provMock.precos = { ...provMock.precos, ...body, por_efeito: Object.fromEntries(Object.entries(body.por_efeito || {}).filter(([, v]) => v !== '' && v != null).map(([k, v]) => [k, +v])) }
+    const P = provMock.precos
+    const CAT = [
+      ['video-rapido', 'Vídeo a partir de texto ou foto (rápido)', 'video', 'prunaai:p-video@2-pro', 'segundo', { '480p': 0.01, '768p': 0.025, '1080p': 0.05 }, '480p'],
+      ['video-ponta', 'Vídeo de ponta (Wan 3.0)', 'video', 'alibaba:wan@3.0', 'segundo', { '480p': 0.05, '720p': 0.1, '1080p': 0.2 }, '480p'],
+      ['video-premium', 'Vídeo premium (Seedance 2.0)', 'video', 'bytedance:seedance@2.0', 'segundo', { '480p': 0.07, '720p': 0.16, '1080p': 0.4 }, '480p'],
+      ['video-google', 'Vídeo com som (Veo 3.1)', 'video', 'google:veo@3.1', 'segundo', { '720p': 0.2, '720p-audio': 0.4 }, '720p'],
+      ['trocar-personagem', 'Me coloca nesse vídeo (troca de personagem)', 'video', 'prunaai:p-video@2-pro-replace', 'segundo', { '480p': 0.05, '768p': 0.1, '1080p': 0.12 }, '480p'],
+      ['avatar-foto', 'Foto que fala (avatar)', 'video', 'prunaai:p-video@avatar', 'segundo', { '720p': 0.025, '1080p': 0.045 }, '720p'],
+      ['sincronia-labial', 'Boca no ritmo do áudio (sincronia labial)', 'video', 'pixverse:lipsync@1', 'segundo', { padrao: 0.0136 }, 'padrao'],
+      ['sincronia-labial-pro', 'Sincronia labial profissional (lipsync-2)', 'video', 'sync:lipsync-2@1', 'segundo', { padrao: 0.044 }, 'padrao'],
+      ['editar-video', 'Trocar objeto, roupa ou cenário no seu vídeo', 'video', 'alibaba:wan@3.0', 'segundo', { '480p': 0.05, '720p': 0.1, '1080p': 0.2 }, '720p'],
+      ['voz', 'Narração com voz natural (e clone de voz)', 'audio', 'heygen:voice@1.0', 'caractere', { padrao: 0.00003 }, 'padrao'],
+      ['voz-hd', 'Narração HD (MiniMax Speech)', 'audio', 'minimax:speech@2.8', 'caractere', { turbo: 0.00006, hd: 0.0001 }, 'turbo'],
+      ['imagem-ponta', 'Imagem de ponta (Seedream 5.5)', 'image', 'bytedance:seedream@5.5', 'imagem', { '1.5K': 0.02, '2K': 0.035 }, '1.5K'],
+    ]
+    const cot = 5.5
+    const tabela = CAT.map(([efeito, rotulo, kind, modelo, unidade, taxas, q]) => {
+      const qtd = { segundo: 10, caractere: 1000, imagem: 1 }[unidade]
+      const custo = taxas[q] * qtd
+      const mk = P.por_efeito[efeito] ?? P.markup
+      const piso = custo * Math.min(P.markup_minimo, mk), teto = P.cap_brl / cot
+      const preco = Math.max(piso, Math.min(custo * mk, teto), 0.01)
+      return { efeito, rotulo, kind, modelo, unidade, qualidade: q, taxas_usd: taxas, markup: P.por_efeito[efeito] ?? null,
+        exemplo: { quantidade: qtd, custo_usd: +custo.toFixed(4), preco_usd: +preco.toFixed(4), preco_brl: +(preco * cot).toFixed(2), markup_aplicado: +(preco / custo).toFixed(2), acima_do_teto: piso > teto, teto_brl: P.cap_brl, cotacao: cot } }
+    })
+    return json({
+      secrets_key_set: true, mock: false,
+      fornecedores: [
+        { id: 'runware', nome: 'Runware', uso: 'Estúdio: vídeo, voz, sincronia labial e imagem de ponta', site: 'https://runware.ai/dashboard', chave: provMock.key || '••••Ik0', origem: provMock.key ? 'painel' : 'ambiente', saldo: { ok: true, saldo_usd: 0.05, organizacao: 'Rangel Tech', gasto_hoje_usd: 0, gasto_30d_usd: 0, pedidos_30d: 0 } },
+        { id: 'vast', nome: 'Vast.ai', uso: 'GPU do LLM (2×3090)', site: 'https://cloud.vast.ai/billing/', chave: 'no llm-queue', origem: 'ambiente', saldo: { ok: true, saldo_usd: 77, gasto_dia_usd: 6.2, dias: 12.4 } },
+        { id: 'chatgpt', nome: 'ChatGPT (9Router)', uso: 'Geração de imagem pelo combo do 9Router', site: null, chave: 'conta logada no 9Router', origem: '9router', saldo: { ok: true, assinatura: true } },
+      ],
+      precos: P, tabela, tabela_de: '2026-11-12',
+    })
   }
   if (path === '/safety' || path.startsWith('/safety/')) {
     safetyMock = safetyMock || { input: { enabled: true, backend: 'rules', categories: ['csam', 'cbrn', 'malware', 'fraud', 'violence', 'selfharm'], model_url: '', model_name: '', refusal: '', model_key_set: false, all_categories: ['csam', 'cbrn', 'malware', 'fraud', 'violence', 'selfharm'], blocked_24h: { cbrn: 2, fraud: 1 } },

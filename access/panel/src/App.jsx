@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Users, UserCheck, Activity, Cpu, Server, Image as ImageIcon, ShieldAlert, Settings as Cog, LogOut, Sun, Moon, ShieldCheck, Loader2, BadgePercent, ScrollText } from 'lucide-react'
+import { Users, UserCheck, Activity, Cpu, Server, Wallet, ShieldAlert, Settings as Cog, LogOut, Sun, Moon, ShieldCheck, Loader2, BadgePercent, ScrollText } from 'lucide-react'
 import { api, setUnauthorizedHandler } from './lib/api.js'
 import { cn } from './lib/format.js'
 import { ToastProvider, Button, Card, Field, Input, IconButton } from './components/ui.jsx'
 import People from './pages/People.jsx'
 import Usage from './pages/Usage.jsx'
 import MachineLlm from './pages/Machines.jsx'
-import MachineImage from './pages/MachineImage.jsx'
+import Providers from './pages/Providers.jsx'
 import Subscribers from './pages/Subscribers.jsx'
 import Settings from './pages/Settings.jsx'
 import VMs from './pages/VMs.jsx'
@@ -17,12 +17,12 @@ const NAV = [
   { id: 'pessoas', label: 'Pessoas', icon: Users, el: People },
   { id: 'assinantes', label: 'Assinantes', icon: UserCheck, el: Subscribers },
   { id: 'uso', label: 'Uso', icon: Activity, el: Usage },
-  { id: 'llm', label: 'Máquina LLM', icon: Cpu, el: MachineLlm },
-  { id: 'imagem', label: 'Máquina de imagem', icon: ImageIcon, el: MachineImage },
-  { id: 'vms', label: 'Máquinas virtuais', icon: Server, el: VMs },
+  { id: 'llm', label: 'Máquina LLM', short: 'LLM', icon: Cpu, el: MachineLlm },
+  { id: 'fornecedores', label: 'Fornecedores', icon: Wallet, el: Providers },
+  { id: 'vms', label: 'Máquinas virtuais', short: 'VMs', icon: Server, el: VMs },
   { id: 'afiliados', label: 'Afiliados', icon: BadgePercent, el: Affiliates },
-  { id: 'termos', label: 'Termos de uso', icon: ScrollText, el: Terms },
-  { id: 'config', label: 'Configurações', icon: Cog, el: Settings },
+  { id: 'termos', label: 'Termos de uso', short: 'Termos', icon: ScrollText, el: Terms },
+  { id: 'config', label: 'Configurações', short: 'Ajustes', icon: Cog, el: Settings },
 ]
 
 function useHashRoute() {
@@ -128,12 +128,12 @@ function Shell({ onLogout, dark, toggleTheme }) {
           <Page key={route} />
         </main>
         {/* Navegação inferior (celular/tablet) */}
-        <nav aria-label="Principal" className="lg:hidden fixed bottom-0 inset-x-0 z-30 grid grid-cols-4 border-t border-border-subtle bg-surface/90 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
+        <nav aria-label="Principal" className="lg:hidden fixed bottom-0 inset-x-0 z-30 flex overflow-x-auto snap-x border-t border-border-subtle bg-surface/90 backdrop-blur-xl pb-[env(safe-area-inset-bottom)] [scrollbar-width:none]">
           {NAV.map((n) => (
             <a key={n.id} href={'#/' + n.id} onClick={() => go(n.id)} aria-current={route === n.id ? 'page' : undefined}
-              className={cn('flex flex-col items-center justify-center gap-0.5 h-16 text-[11px] font-medium',
+              className={cn('flex flex-col items-center justify-center gap-0.5 h-16 min-w-[84px] flex-1 shrink-0 snap-start px-2 text-[11px] font-medium whitespace-nowrap',
                 route === n.id ? 'text-brand-text' : 'text-text-muted')}>
-              <n.icon className="size-5" />{n.label}
+              <n.icon className="size-5" />{n.short || n.label}
             </a>
           ))}
         </nav>

@@ -71,3 +71,15 @@ async def test_falha_do_router(rig_img: Rig):
 async def test_prompt_vazio_e_job_alheio(rig_img: Rig):
     assert (await rig_img.client.post("/v1/images/generations", json={"prompt": " "}, headers=H)).status_code == 422
     assert (await rig_img.client.get("/v1/media/jobs/img-nao-existe")).status_code == 401
+
+
+async def test_foto_do_cliente_vai_como_referencia_para_editar(rig_img: Rig):
+    foto = "data:image/jpeg;base64," + base64.b64encode(bytes([255, 216, 255]) + b"x" * 400).decode()
+    r = await rig_img.client.post("/v1/images/generations", json={"prompt": "coloque um terno azul nele, mesmo rosto", "images": [foto, "curto"], "async": True}, headers=H)
+    assert r.status_code == 202
+    await _esperar(rig_img, r.json()["id"])
+    corpo = rig_img.up.router_calls[-1]
+    assert corpo["images"] == [foto], "so referencia valida segue; texto curto e descartado"
+    r = await rig_img.client.post("/v1/images/generations", json={"prompt": "gato", "async": True}, headers=H)
+    await _esperar(rig_img, r.json()["id"])
+    assert "images" not in rig_img.up.router_calls[-1]

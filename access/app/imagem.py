@@ -59,12 +59,21 @@ def _prompt(body: dict) -> str:
     return p + (f"\nStyle: {est}." if est else "") + (f"\nAvoid: {neg[:400]}." if neg else "") + (f"\nFormat: {fmt}" if fmt else "")
 
 
+def _referencias(body: dict) -> dict:
+    """Fotos do cliente para EDITAR ou usar de base (vestir de terno, trocar fundo...): ate 4, dataURI ou base64; o 9Router passa ao ChatGPT como imagem de referencia."""
+    imgs = body.get("images") or ([body["image"]] if body.get("image") else [])
+    if not isinstance(imgs, list):
+        return {}
+    ok = [str(i) for i in imgs if isinstance(i, str) and len(i) > 200][:4]
+    return {"images": ok} if ok else {}
+
+
 async def _gerar(ctx, job: dict, body: dict) -> None:
     t0 = time.time()
     job["status"] = "running"
     try:
         r = await ctx.http.post(ctx.s.image_router_url.rstrip("/") + "/v1/images/generations",
-                                json={"model": ctx.s.image_router_model, "prompt": _prompt(body), "n": 1, "size": _tamanho(body.get("size"))},
+                                json={"model": ctx.s.image_router_model, "prompt": _prompt(body), "n": 1, "size": _tamanho(body.get("size")), **_referencias(body)},
                                 headers={"Authorization": f"Bearer {ctx.s.image_router_key}"}, timeout=TIMEOUT_S)
         j = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
         d = (j.get("data") or [{}])[0] if r.status_code == 200 else {}

@@ -180,10 +180,12 @@ async def client_credits(request: Request):
             low["studio"] = {"restante_plano": est, "credito": est, "renova": None}
     except Exception:  # noqa: BLE001
         pass
+    studio_faixas = [{**f, "checkout_url": f"https://pay.cakto.com.br/{f['oferta']}?email={quote(acc['email'])}" if f["oferta"] else None, "expires_days": int(credits.expiry_days(ctx.store))}
+                     for f in credits.studio_packs(ctx.store)]
     renews_at = iso(sub["next_payment_at"]) if sub and sub["next_payment_at"] else None
     dias = round((sub["next_payment_at"] - now) / 86400, 1) if sub and sub["next_payment_at"] else None
     return {"plan": plan_id, "next_plan": ({"id": nxt_row["id"], "name": nxt_row["name"], "url": url_prox} if nxt_row else None),
-            "balances": saldos, "packs": packs, "low": low, "renews_at": renews_at, "renews_in_days": dias,
+            "balances": saldos, "packs": packs, "studio_packs": studio_faixas, "low": low, "renews_at": renews_at, "renews_in_days": dias,
             "payment_failed": bool(sub and sub["status"] == "late"), "manage_url": f"{site}/conta"}
 
 
@@ -425,7 +427,8 @@ def billing_settings(request: Request):
             "credit_offers": credits.offers(ctx.store), "credit_products": credits._json_setting(ctx.store, "credit_products"),
             "credit_pack_units": credits._json_setting(ctx.store, "credit_pack_units"), "credit_expiry_days": credits.expiry_days(ctx.store),
             "usd_brl_rate": credits.usd_brl_rate(ctx.store), "credit_price_usd": credits.price_usd(ctx.store),
-            "studio_plan_credits": credits.studio_plan_credits(ctx.store)}
+            "studio_plan_credits": credits.studio_plan_credits(ctx.store), "studio_packs": credits.studio_packs(ctx.store),
+            "studio_pack_offers": credits._json_setting(ctx.store, "studio_pack_offers"), "studio_pack_products": credits._json_setting(ctx.store, "studio_pack_products")}
 
 
 @api.put("/billing/settings")
@@ -456,6 +459,20 @@ async def billing_settings_put(request: Request):
         if not isinstance(v, dict) or any(k not in (*credits.KINDS, "tokens_mult") or isinstance(x, bool) or not isinstance(x, (int, float)) or x <= 0 for k, x in v.items()):
             raise fail(422, "credit_pack_units deve ser {image|video|audio|tokens_mult: numero > 0}", "invalid_request_error", "invalid_billing_settings")
         ctx.store.set_setting("credit_pack_units", json.dumps(v))
+    if "studio_packs" in b:  # faixas de compra: [{id, preco_brl >= 97, bonus_pct, creditos?}] (null volta ao padrao)
+        v = b["studio_packs"]
+        if v is None:
+            ctx.store.set_setting("studio_packs", "")
+        elif not isinstance(v, list) or not v or any(not isinstance(x, dict) or not str(x.get("id") or "").strip() or isinstance(x.get("preco_brl"), bool) or not isinstance(x.get("preco_brl"), (int, float)) or x["preco_brl"] < 97 for x in v):
+            raise fail(422, "studio_packs deve ser [{id, preco_brl >= 97, bonus_pct}]", "invalid_request_error", "invalid_billing_settings")
+        else:
+            ctx.store.set_setting("studio_packs", json.dumps(v))
+    for key in ("studio_pack_offers", "studio_pack_products"):  # {id da faixa: id da oferta/produto na Cakto}
+        if key in b:
+            v = b[key]
+            if not isinstance(v, dict) or any(not isinstance(k, str) or not isinstance(x, str) for k, x in v.items()):
+                raise fail(422, f"{key} deve ser {{id da faixa: texto}}", "invalid_request_error", "invalid_billing_settings")
+            ctx.store.set_setting(key, json.dumps(v))
     if "studio_plan_credits" in b:  # creditos gratis do Estudio por mes e por plano
         v = b["studio_plan_credits"]
         if not isinstance(v, dict) or any(not isinstance(k, str) or isinstance(x, bool) or not isinstance(x, int) or x < 0 or x > 1_000_000 for k, x in v.items()):

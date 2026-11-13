@@ -104,3 +104,23 @@ async def test_pedido_antigo_de_troca_de_personagem_tambem_cobra_em_creditos(mak
                               headers={"Authorization": f"Bearer {key}"})
     assert r.status_code == 202, r.text
     assert C.studio_balance(ctx.store, pid, rig.clock()) < 300
+
+
+async def test_faixas_de_pacote_redondas_de_100_para_cima(rig3: Rig):
+    faixas = C.studio_packs(rig3.app.state.ctx.store)
+    assert [f["preco_brl"] for f in faixas] == [99, 149, 199, 499]
+    assert [f["creditos"] for f in faixas] == [900, 1400, 2000, 5450]  # cotacao 5,5 + bonus 0/5/10/20 %, multiplos de 50
+    assert all(f["creditos"] % 50 == 0 for f in faixas)
+
+
+async def test_webhook_reconhece_a_faixa_pelo_nome_e_pelo_valor(rig3: Rig):
+    ctx = rig3.app.state.ctx
+    pid, _, email = await assinante(rig3, "light")
+    antes = C.studio_balance(ctx.store, pid, ctx.clock())
+    r = await webhook(rig3, "Segundo Cérebro - Créditos do Estúdio 2.000", email, pedido="ord-faixa")
+    assert r.status_code == 200
+    assert C.studio_balance(ctx.store, pid, ctx.clock()) == antes + 2000
+    corpo = {"event": "purchase_approved", "data": {"id": "ord-499", "transaction_id": "t-499", "customer": {"name": "Ana", "email": email}, "product": {"name": "Segundo Cérebro - Créditos do Estúdio"}, "amount": 499.0}}
+    r = await rig3.client.post("/v1/billing/cakto", content=json.dumps(corpo), headers={"content-type": "application/json", "x-webhook-secret": SEG})
+    assert r.status_code == 200
+    assert C.studio_balance(ctx.store, pid, ctx.clock()) == antes + 2000 + 5450

@@ -89,12 +89,13 @@ export function CreditosAjustes() {
     setF({
       usd_brl_rate: String(d.usd_brl_rate ?? ''), credit_price_usd: d.credit_price_usd == null ? '' : String(d.credit_price_usd), credit_expiry_days: String(d.credit_expiry_days ?? 30),
       units: JSON.stringify(d.credit_pack_units || {}, null, 0), planos: JSON.stringify(d.studio_plan_credits || {}, null, 0), offers: JSON.stringify(d.credit_offers || {}, null, 0), products: JSON.stringify(d.credit_products || {}, null, 0),
+      faixas: JSON.stringify((d.studio_packs || []).map(({ id, preco_brl, bonus_pct }) => ({ id, preco_brl, bonus_pct }))), fOffers: JSON.stringify(d.studio_pack_offers || {}), fProducts: JSON.stringify(d.studio_pack_products || {}),
     })
   }, [st.data])
   const save = async () => {
-    let units, offers, products, planos
-    try { planos = JSON.parse(f.planos || '{}'); units = JSON.parse(f.units || '{}'); offers = JSON.parse(f.offers || '{}'); products = JSON.parse(f.products || '{}') } catch { return toast.error('Os campos de pacote, ofertas e produtos precisam ser JSON válido.') }
-    const body = { usd_brl_rate: +f.usd_brl_rate, credit_expiry_days: +f.credit_expiry_days, credit_pack_units: units, credit_offers: offers, credit_products: products, studio_plan_credits: planos, credit_price_usd: f.credit_price_usd === '' ? null : +f.credit_price_usd }
+    let units, offers, products, planos, faixas, fOffers, fProducts
+    try { faixas = JSON.parse(f.faixas || '[]'); fOffers = JSON.parse(f.fOffers || '{}'); fProducts = JSON.parse(f.fProducts || '{}'); planos = JSON.parse(f.planos || '{}'); units = JSON.parse(f.units || '{}'); offers = JSON.parse(f.offers || '{}'); products = JSON.parse(f.products || '{}') } catch { return toast.error('Os campos de pacote, ofertas e produtos precisam ser JSON válido.') }
+    const body = { usd_brl_rate: +f.usd_brl_rate, credit_expiry_days: +f.credit_expiry_days, credit_pack_units: units, credit_offers: offers, credit_products: products, studio_plan_credits: planos, studio_packs: faixas.length ? faixas : null, studio_pack_offers: fOffers, studio_pack_products: fProducts, credit_price_usd: f.credit_price_usd === '' ? null : +f.credit_price_usd }
     try { await api.putBillingSettings(body); toast.success('Créditos salvos.'); st.refresh() } catch (e) { toast.error(e.message) }
   }
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }))
@@ -111,6 +112,21 @@ export function CreditosAjustes() {
             </div>
             <Field label="Tamanho dos pacotes" htmlFor="cr-units" hint='Ex.: {"tokens_mult": 2, "image": 500, "video": 30, "audio": 150} (uso = vezes a sessão do plano)'><Input id="cr-units" value={f.units} onChange={set('units')} /></Field>
             <Field label="Créditos grátis do Estúdio por mês e por plano" htmlFor="cr-planos" hint='Ex.: {"light": 100, "max": 300, "ultra": 1000}. 1 crédito = US$ 0,02; o pacote de US$ 18 = 900.'><Input id="cr-planos" value={f.planos} onChange={set('planos')} /></Field>
+            <div className="rounded-lg border border-border p-3 flex flex-col gap-3">
+              <div className="text-sm font-medium">Pacotes de créditos do Estúdio (faixas)</div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {(st.data.studio_packs || []).map((p) => (
+                  <div key={p.id} className="rounded-md bg-muted/40 p-2 text-sm">
+                    <div className="font-semibold">R$ {p.preco_brl.toLocaleString('pt-BR')}</div>
+                    <div>{p.creditos.toLocaleString('pt-BR')} créditos</div>
+                    <div className="text-xs text-muted-foreground">US$ {p.preco_usd} · bônus {p.bonus_pct}% · {p.oferta ? 'com checkout' : 'sem oferta'}</div>
+                  </div>
+                ))}
+              </div>
+              <Field label="Faixas" htmlFor="cr-faixas" hint='[{"id":"p99","preco_brl":99,"bonus_pct":0}, ...]. Créditos = preço em US$ / 0,02 + bônus, arredondado a 50.'><Input id="cr-faixas" value={f.faixas} onChange={set('faixas')} /></Field>
+              <Field label="Ofertas da Cakto por faixa" htmlFor="cr-foff" hint='{"p99": "id da oferta", ...}'><Input id="cr-foff" value={f.fOffers} onChange={set('fOffers')} /></Field>
+              <Field label="Produtos da Cakto por faixa" htmlFor="cr-fprod" hint='{"p99": "id do produto", ...}'><Input id="cr-fprod" value={f.fProducts} onChange={set('fProducts')} /></Field>
+            </div>
             <Field label="Ofertas da Cakto (checkout)" htmlFor="cr-off" hint='{"tokens": "id da oferta", "image": "...", "studio": "...", ...}'><Input id="cr-off" value={f.offers} onChange={set('offers')} /></Field>
             <Field label="Produtos da Cakto (webhook)" htmlFor="cr-prod" hint='{"tokens": "id do produto", ...}'><Input id="cr-prod" value={f.products} onChange={set('products')} /></Field>
             <div className="flex justify-end"><Button icon={Save} onClick={save}>Salvar créditos</Button></div>

@@ -320,6 +320,11 @@ def _apply_credit(ctx: Ctx, acc, kind: str, ev: dict, now: float) -> None:
         return  # pix gerado, boleto, aguardando...: so a aprovacao concede
     if acc is None:
         raise ValueError("credito pago por e-mail sem conta; conceda na mao no painel")
+    if kind == "studio":  # faixas da spec 37: a faixa vem do produto, do nome ou do valor pago
+        pack = credits.studio_pack_of(ctx.store, ev["product_id"], ev["plan_hint"], ev.get("amount_cents"))
+        units = pack["creditos"] if pack else credits.units_for_pack(ctx.store, kind, None)
+        credits.grant(ctx.store, acc["person_id"], kind, units, now, "purchase", ref or None)
+        return
     session_limit = ctx.ledger.limits(acc["person_id"])["session_limit_tokens"]
     units = credits.units_for_pack(ctx.store, kind, session_limit)
     if not units:

@@ -3,6 +3,7 @@
 Uso (so na janela de deploy da madrugada; cria produto na conta da Cakto do Adriano):
     python criar_produtos_credito.py <arquivo .env com CAKTO_CLIENT_ID e CAKTO_CLIENT_SECRET>            # simulacao: so mostra o que faria
     python criar_produtos_credito.py <arquivo .env> --criar [--preco 18.00] [--moeda USD]               # cria o que faltar (idempotente: procura pelo nome)
+    python criar_produtos_credito.py <arquivo .env> --criar --faixas                                    # + as 4 faixas do Estudio (R$ 99/149/199/499)
 
 Preco: o mesmo do painel (GET /admin/api/billing/settings -> credit_price_usd). Se a Cakto recusar USD, rode com --moeda BRL --preco 100.00.
 
@@ -76,6 +77,35 @@ def main() -> None:
         if oferta:
             ofertas[tipo] = oferta["id"]
     print(json.dumps({"credit_offers": ofertas, "credit_products": produtos}, ensure_ascii=False, indent=2))
+    if "--faixas" in sys.argv:
+        faixas(token, criar)
+
+
+# spec 37: creditos do Estudio em 4 faixas de preco de marketing, cobradas em reais (os creditos sao dolarizados no servidor)
+FAIXAS = (("p99", "99.00", 900), ("p149", "149.00", 1400), ("p199", "199.00", 2000), ("p499", "499.00", 5450))
+
+
+def faixas(token: str, criar: bool) -> None:
+    ofertas, produtos = {}, {}
+    for fid, preco, cred in FAIXAS:
+        nome = f"Segundo Cérebro - Créditos do Estúdio {cred:,}".replace(",", ".")
+        desc = f"{cred:,} créditos para imagens, vídeos, voz e edição com IA no Segundo Cérebro. Liberados na hora, valem por 30 dias.".replace(",", ".")
+        achados = _chamar("GET", "/public_api/products/?search=" + urllib.parse.quote(nome) + "&limit=50", token)
+        existente = next((p for p in achados.get("results", []) if p["name"] == nome), None)
+        if existente is None:
+            if not criar:
+                print(f"[simulacao] criaria: {nome} (BRL {preco}, unico)")
+                continue
+            existente = _chamar("POST", "/public_api/products/", token, {"name": nome, "price": preco, "description": desc, "type": "unique", "currency": "BRL", "status": "active"})
+            print(f"criado: {nome}", file=sys.stderr)
+        else:
+            print(f"ja existe: {nome}", file=sys.stderr)
+        produtos[fid] = existente["id"]
+        detalhe = _chamar("GET", f"/public_api/offers/?product={existente['id']}", token)
+        oferta = next((o for o in detalhe.get("results", detalhe) if o.get("default")), None) or next(iter(detalhe.get("results", [])), None)
+        if oferta:
+            ofertas[fid] = oferta["id"]
+    print(json.dumps({"studio_pack_offers": ofertas, "studio_pack_products": produtos}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

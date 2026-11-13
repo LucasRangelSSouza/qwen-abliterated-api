@@ -17,7 +17,7 @@ TOKENS_MULT = 2                     # pacote de uso = 2 x o limite da sessao de 
 DEFAULT_EXPIRY_DAYS = 30
 DAY = 86400
 # nome do produto (minusculo) -> tipo, quando o id do produto nao estiver configurado
-NAME_HINTS = (("créditos do estúdio", "studio"), ("creditos do estudio", "studio"), ("crédito do estúdio", "studio"), ("credito do estudio", "studio"), ("crédito de uso", "tokens"), ("credito de uso", "tokens"), ("crédito de imagens", "image"), ("credito de imagens", "image"),
+NAME_HINTS = (("créditos do estúdio", "studio"), ("créditos do segundo cérebro", "studio"), ("creditos do segundo cerebro", "studio"), ("creditos do estudio", "studio"), ("crédito do estúdio", "studio"), ("credito do estudio", "studio"), ("crédito de uso", "tokens"), ("credito de uso", "tokens"), ("crédito de imagens", "image"), ("credito de imagens", "image"),
               ("crédito de vídeos", "video"), ("credito de videos", "video"), ("crédito de áudio", "audio"), ("credito de audio", "audio"))
 NEXT_PLAN = {"light": "max", "max": "ultra", "ultra": "enterprise"}
 
@@ -78,6 +78,8 @@ def kind_of_product(store, product_id: str, hint: str) -> str | None:
     for kind, pid in ids.items():
         if pid and product_id and pid == product_id and kind in KINDS:
             return kind
+    if product_id and product_id in _json_setting(store, "studio_pack_products").values():
+        return "studio"
     h = (hint or "").lower()
     return next((k for frag, k in NAME_HINTS if frag in h), None)
 
@@ -205,3 +207,62 @@ def studio_reserve(store, person_id: int, creditos: int, now: float):
         saldo = balance(c, person_id, "studio", now)
         parts = take(c, person_id, "studio", creditos, now)
         return parts, saldo
+
+
+# ---- pacotes de creditos do Estudio (spec 37): so de R$ 100 para cima, preco de marketing em reais, creditos dolarizados e redondos
+# (id, preco em reais, bonus %): o cliente paga em reais; os creditos saem do valor em dolar pela cotacao, + bonus, arredondados a 50
+STUDIO_PACKS_PADRAO = (("p99", 99, 0), ("p149", 149, 5), ("p199", 199, 10), ("p499", 499, 20))
+STUDIO_PACK_ARREDONDA = 50
+
+
+def _arredonda_pacote(n: float) -> int:
+    return max(STUDIO_PACK_ARREDONDA, int(round(n / STUDIO_PACK_ARREDONDA)) * STUDIO_PACK_ARREDONDA)
+
+
+def studio_packs(store) -> list[dict]:
+    """As faixas de compra. O painel pode trocar preco/bonus (setting studio_packs: [{id, preco_brl, bonus_pct}]) e fixar creditos (creditos)."""
+    try:
+        cfg = json.loads(store.get_setting("studio_packs") or "null")
+    except ValueError:
+        cfg = None
+    base = [{"id": i, "preco_brl": p, "bonus_pct": b} for i, p, b in STUDIO_PACKS_PADRAO]
+    if isinstance(cfg, list) and cfg:
+        base = [x for x in cfg if isinstance(x, dict) and x.get("id") and isinstance(x.get("preco_brl"), (int, float)) and x["preco_brl"] >= 100 - 3]
+    taxa = usd_brl_rate(store)
+    ofertas = _json_setting(store, "studio_pack_offers")
+    saida = []
+    for x in base:
+        preco = float(x["preco_brl"])
+        bonus = float(x.get("bonus_pct") or 0)
+        usd = preco / taxa
+        cred = int(x["creditos"]) if isinstance(x.get("creditos"), int) and x["creditos"] > 0 else _arredonda_pacote(usd / STUDIO_USD * (1 + bonus / 100))
+        saida.append({"id": str(x["id"]), "preco_brl": preco, "preco_usd": round(usd, 2), "bonus_pct": bonus, "creditos": cred, "oferta": ofertas.get(str(x["id"])) or None})
+    return sorted(saida, key=lambda p: p["preco_brl"])
+
+
+def studio_pack_of(store, product_id: str, hint: str, amount_cents) -> dict | None:
+    """Qual faixa foi comprada: pelo id do produto (studio_pack_products), pelo numero de creditos no nome, ou pelo valor pago (o mais perto, ate 20%)."""
+    import re
+    packs = studio_packs(store)
+    if not packs:
+        return None
+    ids = _json_setting(store, "studio_pack_products")
+    for pid_pack, prod in ids.items():
+        if prod and product_id and prod == product_id:
+            achado = next((p for p in packs if p["id"] == pid_pack), None)
+            if achado:
+                return achado
+    nums = [int(n.replace(".", "")) for n in re.findall(r"\d{1,3}(?:\.\d{3})+|\d{3,6}", hint or "")]
+    for n in nums:
+        achado = next((p for p in packs if p["creditos"] == n), None)
+        if achado:
+            return achado
+    try:
+        pago = float(amount_cents) / 100 if amount_cents else 0
+    except (TypeError, ValueError):
+        pago = 0
+    if pago > 0:
+        perto = min(packs, key=lambda p: abs(p["preco_brl"] - pago))
+        if abs(perto["preco_brl"] - pago) <= perto["preco_brl"] * 0.2:
+            return perto
+    return None

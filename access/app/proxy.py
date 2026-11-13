@@ -179,8 +179,53 @@ def _finalize(ctx, p, res, limits, route, meter: Meter, in_est, reserve, complet
         pass
 
 
+# Visao (13/11/2026): o modelo "visao" vai ao ChatGPT pelo 9Router global (2 s e entende melhor que o nosso, ~30-100 s);
+# se o ChatGPT falhar ou recusar, cai no modelo da casa. A chave do 9Router fica so aqui no servidor.
+VISAO_MODELOS = ("visao", "sb-visao")
+
+
+async def _visao_chatgpt(ctx: Ctx, body: dict):
+    u = ctx.s.image_router_url.rstrip("/")
+    u = u if u.endswith("/v1") else u + "/v1"
+    corpo = {k: v for k, v in body.items() if k not in ("stream", "stream_options")}
+    corpo["model"] = ctx.store.get_setting("visao_modelo") or "cx/gpt-5.6-luna"
+    r = await ctx.http.post(u + "/chat/completions", json=corpo, headers={"Authorization": f"Bearer {ctx.s.image_router_key}"}, timeout=90)
+    if r.status_code != 200:
+        raise RuntimeError(f"9router {r.status_code}")
+    j = r.json()
+    txt = (((j.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+    if not txt:
+        raise RuntimeError("resposta vazia")
+    j["model"] = body.get("model")
+    return j
+
+
+def _sse_de(j: dict):
+    """Resposta de visao em streaming (quem pediu stream recebe um bloco so com o texto todo)."""
+    txt = j["choices"][0]["message"]["content"]
+    pedaco = {"id": j.get("id", "visao"), "object": "chat.completion.chunk", "model": j.get("model"), "choices": [{"index": 0, "delta": {"role": "assistant", "content": txt}, "finish_reason": "stop"}], "usage": j.get("usage")}
+    return "data: " + json.dumps(pedaco, ensure_ascii=False) + "\n\ndata: [DONE]\n\n"
+
+
 @router.post("/v1/chat/completions")
 async def chat(request: Request):
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        body = None
+    if isinstance(body, dict) and body.get("model") in VISAO_MODELOS:
+        ctx = _ctx(request)
+        authenticate(ctx, request)
+        if ctx.s.image_router_url and ctx.s.image_router_key:
+            try:
+                j = await _visao_chatgpt(ctx, body)
+                if body.get("stream"):
+                    return Response(_sse_de(j), media_type="text/event-stream")
+                return Response(json.dumps(j, ensure_ascii=False), media_type="application/json")
+            except Exception:  # noqa: BLE001  ChatGPT fora ou recusou: segue no modelo da casa
+                pass
+        body["model"] = ctx.store.get_setting("visao_modelo_reserva") or "qwen-abliterated"
+        request._json = body  # forward le o corpo ja ajustado
     return await forward(request, "/v1/chat/completions", "chat")
 
 

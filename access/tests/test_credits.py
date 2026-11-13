@@ -223,3 +223,20 @@ async def test_painel_valida_ajustes_e_revoga_pacote(rig2):
     assert (await rig.client.delete(f"/admin/api/credits/{g['id']}")).status_code == 200
     assert (await rig.client.delete(f"/admin/api/credits/{g['id']}")).status_code == 404
     assert (await rig.client.get(f"/admin/api/people/{pid}/credits")).json()["balances"]["image"] == 0
+
+
+async def test_rota_de_creditos_avisa_renovacao_pagamento_recusado_e_saldo_baixo(rig2):
+    """Pop-ups do app (spec 34 secao 6.18): o servidor diz quando vence, se o pagamento falhou e qual cota esta no fim."""
+    rig = rig2
+    ctx = rig.app.state.ctx
+    pid, key, email = await assinante(rig, "light")
+    h = {"Authorization": f"Bearer {key}"}
+    acc = ctx.store.one("SELECT id FROM accounts WHERE person_id=?", (pid,))["id"]
+    with ctx.store.tx() as c:
+        c.execute("UPDATE subscriptions SET next_payment_at=?, status='late' WHERE account_id=?", (rig.clock() + 2 * 86400, acc))
+        c.execute("UPDATE plans SET video_quota_month=3 WHERE id='light'")
+        c.execute("INSERT INTO media_usage(ts,person_id,kind,units) VALUES(?,?,?,?)", (rig.clock(), pid, "video", 2))
+    j = (await rig.client.get("/v1/credits", headers=h)).json()
+    assert j["payment_failed"] is True and j["renews_in_days"] == 2.0 and j["renews_at"]
+    assert "video" in j["low"] and j["low"]["video"]["restante_plano"] == 1 and "image" not in j["low"]
+    assert j["manage_url"].endswith("/conta")

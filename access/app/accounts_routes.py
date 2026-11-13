@@ -164,8 +164,20 @@ async def client_credits(request: Request):
         url = f"https://pay.cakto.com.br/{ofertas[kind]}?email={quote(acc['email'])}" if kind in ofertas else None
         packs.append({"kind": kind, "label": credits.LABEL[kind], "price_usd": credits.price_usd(ctx.store), "currency": "USD", "units": units, "expires_days": int(credits.expiry_days(ctx.store)), "checkout_url": url})
     url_prox = "https://wa.me/5562985613482" if nxt == "enterprise" else f"{site}/#planos"  # Enterprise e venda consultiva
+    # pop-ups do app (spec 34 secao 6.18): o servidor decide quando o saldo esta baixo e quando a assinatura vence ou falhou
+    from app import mediaquota
+    saldos = credits.balances(ctx.store, p.person_id, now)
+    cota = mediaquota.view(ctx.store, p.person_id, now)
+    low = {}
+    for kind in ("image", "video", "audio"):
+        c = cota.get(kind) or {}
+        if c.get("limit") and (c.get("remaining") or 0) <= 2 and saldos.get(kind, 0) <= 2:
+            low[kind] = {"restante_plano": c.get("remaining"), "credito": saldos.get(kind, 0), "renova": c.get("resets_at")}
+    renews_at = iso(sub["next_payment_at"]) if sub and sub["next_payment_at"] else None
+    dias = round((sub["next_payment_at"] - now) / 86400, 1) if sub and sub["next_payment_at"] else None
     return {"plan": plan_id, "next_plan": ({"id": nxt_row["id"], "name": nxt_row["name"], "url": url_prox} if nxt_row else None),
-            "balances": credits.balances(ctx.store, p.person_id, now), "packs": packs}
+            "balances": saldos, "packs": packs, "low": low, "renews_at": renews_at, "renews_in_days": dias,
+            "payment_failed": bool(sub and sub["status"] == "late"), "manage_url": f"{site}/conta"}
 
 
 @router.post("/v1/auth/set-password")

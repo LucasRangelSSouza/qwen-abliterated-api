@@ -372,6 +372,42 @@ async def audio_transcriptions(request: Request):
     return Response(r.content, status_code=r.status_code, headers=_pass_headers(r.headers), media_type=r.headers.get("content-type", "application/json"))
 
 
+# ---- voz de saida: texto -> fala (vozes neurais do Edge), em stream MP3; nao gasta tokens, so autentica e registra
+@router.post("/v1/audio/speech")
+async def audio_speech(request: Request):
+    from app import voz
+    ctx = _ctx(request)
+    p = authenticate(ctx, request)
+    try:
+        body = await request.json()
+    except Exception:  # noqa: BLE001
+        raise fail(400, "envie JSON com o campo input", "invalid_request_error", "invalid_json")
+    texto = voz.limpar_texto(str((body or {}).get("input") or ""))
+    if not texto:
+        raise fail(400, "texto vazio", "invalid_request_error", "empty_input")
+    if len(texto) > voz.MAX_TEXTO:
+        raise fail(413, f"texto grande demais (limite de {voz.MAX_TEXTO} caracteres)", "invalid_request_error", "input_too_long")
+    gen = voz.falar(texto, voz.escolher_voz(body.get("voice")), voz.taxa(body.get("speed")))
+    try:
+        primeiro = await gen.__anext__()  # erro antes do 1o pedaco vira 502 limpo, nao um stream quebrado
+    except StopAsyncIteration:
+        primeiro = b""
+    except Exception:  # noqa: BLE001
+        _log(ctx, p, "voz", 0, 0, 0, "upstream_error", None)
+        return JSONResponse(err("falha ao gerar a voz agora", "server_error", "upstream_error"), status_code=502)
+    _log(ctx, p, "voz", 0, 0, 0, "ok", None)
+
+    async def corpo():
+        if primeiro:
+            yield primeiro
+        try:
+            async for c in gen:
+                yield c
+        except Exception:  # noqa: BLE001  queda no meio: o cliente toca o que chegou
+            return
+    return StreamingResponse(corpo(), media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
+
+
 @router.get("/v1/jobs/{job_id}")
 async def job_status(job_id: str, request: Request):
     ctx = _ctx(request)

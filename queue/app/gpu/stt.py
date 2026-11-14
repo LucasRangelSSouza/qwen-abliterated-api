@@ -11,7 +11,7 @@ REMOTE = Path(__file__).resolve().parents[2] / "remote"
 
 # roda no host da GPU; baixa prioridade para nunca atrapalhar o vLLM; a porta so escuta em 127.0.0.1
 PROVISION = r"""#!/bin/bash
-curl -s -m 3 http://127.0.0.1:18002/health >/dev/null && exit 0
+curl -s -m 3 http://127.0.0.1:18002/health | grep -q "\"v\": *$STT_VERSAO" && exit 0
 mkdir -p /workspace/stt && cd /workspace/stt
 echo "$STT_SERVER_B64" | base64 -d > stt_server.py
 if [ ! -x venv/bin/uvicorn ]; then
@@ -25,10 +25,17 @@ exit 1
 """
 
 
+def versao() -> int:
+    """VERSAO declarada no stt_server.py (o provisionamento reinicia o servico quando ela muda)."""
+    import re
+    m = re.search(r"^VERSAO = (\d+)", (REMOTE / "stt_server.py").read_text(encoding="utf-8"), re.M)
+    return int(m.group(1)) if m else 1
+
+
 def command(threads: int = 16) -> str:
     """Comando unico para `ssh host <cmd>`: o servidor Python viaja em base64 dentro do proprio comando."""
     srv = base64.b64encode((REMOTE / "stt_server.py").read_bytes()).decode()
     script = base64.b64encode(PROVISION.encode()).decode()
     # o script vai para um ARQUIVO e roda de la: dentro de `bash -c "<texto>"` o pgrep -f do proprio script casaria com a linha de comando
     # dele mesmo (que contem o texto) e ele se mataria antes de subir o servico.
-    return f"mkdir -p /workspace/stt && echo {script} | base64 -d > /workspace/stt/provision.sh && STT_SERVER_B64='{srv}' STT_THREADS={int(threads)} bash /workspace/stt/provision.sh"
+    return f"mkdir -p /workspace/stt && echo {script} | base64 -d > /workspace/stt/provision.sh && STT_SERVER_B64='{srv}' STT_VERSAO={versao()} STT_THREADS={int(threads)} bash /workspace/stt/provision.sh"

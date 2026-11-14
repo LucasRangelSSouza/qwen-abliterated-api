@@ -51,13 +51,28 @@ def main():
         manifesto.append({"src": src, "out": out})
         saidas.append(out)
     import json
-    escrever_json(os.path.join(work, "manifesto.json"), manifesto)
-    sh(["bash", RUN, "cb", "/workspace/voz/vc_one.py", alvo, os.path.join(work, "manifesto.json")])
-    lista = os.path.join(work, "lista.txt")
-    with open(lista, "w", encoding="utf-8") as f:
-        f.write("".join(f"file '{p}'\n" for p in saidas))
     conv = os.path.join(work, "conv.wav")
-    sh(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", lista, "-ar", "44100", "-ac", "2", conv])
+    motor = "seedvc"
+    try:
+        # Seed-VC: a fala inteira de uma vez (ele mesmo divide em blocos com crossfade); referencia de ate 25 s
+        if os.environ.get("VOZ_VC_MOTOR", "seedvc") != "seedvc":
+            raise RuntimeError("Seed-VC desligado por VOZ_VC_MOTOR")
+        saida_svc = os.path.join(work, "svc")
+        sh(["bash", RUN, "svc", "/workspace/voz/seed-vc/inference.py", "--source", mono, "--target", alvo, "--output", saida_svc,
+            "--diffusion-steps", "25", "--inference-cfg-rate", "0.7", "--fp16", "True"])
+        gerado = glob.glob(os.path.join(saida_svc, "vc_*.wav"))
+        if not gerado:
+            raise RuntimeError("Seed-VC nao gerou o arquivo")
+        sh(["ffmpeg", "-y", "-loglevel", "error", "-i", gerado[0], "-ar", "44100", "-ac", "2", conv])
+    except Exception as e:  # noqa: BLE001  reserva: Chatterbox, trecho a trecho
+        print("seedvc falhou, usando chatterbox:", e)
+        motor = "chatterbox"
+        escrever_json(os.path.join(work, "manifesto.json"), manifesto)
+        sh(["bash", RUN, "cb", "/workspace/voz/vc_one.py", alvo, os.path.join(work, "manifesto.json")])
+        lista = os.path.join(work, "lista.txt")
+        with open(lista, "w", encoding="utf-8") as f:
+            f.write("".join(f"file '{p}'\n" for p in saidas))
+        sh(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", lista, "-ar", "44100", "-ac", "2", conv])
     t2 = agora()
     if fundo:
         mix = os.path.join(work, "mix.wav")
@@ -68,7 +83,7 @@ def main():
         sh(["ffmpeg", "-y", "-loglevel", "error", "-i", a.inp, "-i", mix, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-shortest", a.out])
     else:
         sh(["ffmpeg", "-y", "-loglevel", "error", "-i", mix, a.out])
-    m = {"duracao_s": round(duration(a.out), 2), "trechos": len(cortes), "separar_s": round(t1 - t0, 1), "converter_s": round(t2 - t1, 1), "total_s": round(agora() - t0, 1), "video": video}
+    m = {"duracao_s": round(duration(a.out), 2), "motor": motor, "trechos": len(cortes), "separar_s": round(t1 - t0, 1), "converter_s": round(t2 - t1, 1), "total_s": round(agora() - t0, 1), "video": video}
     if a.metrics:
         m["semelhanca_com_alvo"] = similarity(alvo, conv)
         m["semelhanca_com_original"] = similarity(mono, conv)

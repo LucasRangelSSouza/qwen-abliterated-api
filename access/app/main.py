@@ -79,6 +79,7 @@ def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = No
 
     from app import accounts_routes  # registra o CRM no router do painel antes dele ser incluido
     from app import free
+    from app import custos  # noqa: F401  aba de custos: registra /admin/api/custos antes do include_router(admin.api)
     from app import produtos  # noqa: F401  painel do ecossistema: registra /admin/api/produtos antes do include_router(admin.api)
     from app import diag  # relatorio de falha de instalacao: registra GET /admin/api/diag antes do include_router(admin.api)
     from fastapi.middleware.cors import CORSMiddleware

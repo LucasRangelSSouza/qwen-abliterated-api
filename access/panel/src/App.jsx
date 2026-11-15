@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Users, UserCheck, Activity, Cpu, Server, Wallet, ShieldAlert, Settings as Cog, LogOut, Sun, Moon, ShieldCheck, Loader2, BadgePercent, ScrollText } from 'lucide-react'
+import { Users, UserCheck, Activity, Cpu, Server, Wallet, ShieldAlert, Settings as Cog, LogOut, Sun, Moon, ShieldCheck, Loader2, BadgePercent, ScrollText, Scissors, Coins, Link2 } from 'lucide-react'
 import { api, setUnauthorizedHandler } from './lib/api.js'
 import { cn } from './lib/format.js'
 import { ToastProvider, Button, Card, Field, Input, IconButton } from './components/ui.jsx'
@@ -12,6 +12,11 @@ import Settings from './pages/Settings.jsx'
 import VMs from './pages/VMs.jsx'
 import Affiliates from './pages/Affiliates.jsx'
 import Terms from './pages/Terms.jsx'
+import Produto from './pages/Produto.jsx'
+import Links from './pages/Links.jsx'
+
+const Cortai = () => <Produto id="cortai" />
+const Rendai = () => <Produto id="rendai" />
 
 const NAV = [
   { id: 'pessoas', label: 'Pessoas', icon: Users, el: People },
@@ -20,6 +25,9 @@ const NAV = [
   { id: 'llm', label: 'Máquina LLM', short: 'LLM', icon: Cpu, el: MachineLlm },
   { id: 'fornecedores', label: 'Fornecedores', icon: Wallet, el: Providers },
   { id: 'vms', label: 'Máquinas virtuais', short: 'VMs', icon: Server, el: VMs },
+  { id: 'cortai', label: 'Cortaí', icon: Scissors, el: Cortai },
+  { id: 'rendai', label: 'Rendaí', icon: Coins, el: Rendai },
+  { id: 'links', label: 'Links e cupons', short: 'Links', icon: Link2, el: Links },
   { id: 'afiliados', label: 'Afiliados', icon: BadgePercent, el: Affiliates },
   { id: 'termos', label: 'Termos de uso', short: 'Termos', icon: ScrollText, el: Terms },
   { id: 'config', label: 'Configurações', short: 'Ajustes', icon: Cog, el: Settings },

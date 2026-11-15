@@ -48,3 +48,29 @@ async def test_chatgpt_fora_cai_no_modelo_da_casa(rig_v: Rig):
     r = await rig_v.client.post("/v1/chat/completions", json=IMG, headers=H)
     assert r.status_code == 200
     assert rig_v.up.casa and rig_v.up.casa[0]["model"] == "qwen-abliterated"
+
+
+# ---- combos rt-* (spec 40)
+async def test_rt_planejar_vai_ao_chatgpt(rig_v: Rig):
+    r = await rig_v.client.post("/v1/chat/completions", json={"model": "rt-planejar", "messages": [{"role": "user", "content": "planeje"}]}, headers=H)
+    assert r.status_code == 200 and r.json()["model"] == "rt-planejar"
+    assert rig_v.up.vis[0]["model"] == "cx/gpt-5.6-sol" and not rig_v.up.casa
+
+
+async def test_rt_planejar_cai_na_casa_e_rt_geral_vai_direto(rig_v: Rig):
+    rig_v.up.falha = True
+    r = await rig_v.client.post("/v1/chat/completions", json={"model": "rt-planejar", "messages": [{"role": "user", "content": "x"}]}, headers=H)
+    assert r.status_code == 200 and rig_v.up.casa[-1]["model"] == "qwen-abliterated"
+    r = await rig_v.client.post("/v1/chat/completions", json={"model": "rt-geral", "messages": [{"role": "user", "content": "x"}]}, headers=H)
+    assert r.status_code == 200 and rig_v.up.casa[-1]["model"] == "qwen-abliterated"
+
+
+async def test_combo_editavel_pelo_painel(rig_v: Rig):
+    await rig_v.login()
+    r = await rig_v.client.post("/admin/api/combos", json={"combos": {"rt-geral": [{"router": "mmf/minimax-m2"}, {"casa": "qwen-abliterated"}]}})
+    assert r.status_code == 200
+    assert (await rig_v.client.post("/admin/api/combos", json={"combos": {"x": [{"router": "a"}]}})).status_code == 422
+    await rig_v.client.post("/v1/chat/completions", json={"model": "rt-geral", "messages": [{"role": "user", "content": "x"}]}, headers=H)
+    assert rig_v.up.vis[-1]["model"] == "mmf/minimax-m2"
+    r = await rig_v.client.post("/v1/chat/completions", json={"model": "rt-naoexiste", "messages": []}, headers=H)
+    assert r.status_code == 404

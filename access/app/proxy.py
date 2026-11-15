@@ -184,12 +184,12 @@ def _finalize(ctx, p, res, limits, route, meter: Meter, in_est, reserve, complet
 VISAO_MODELOS = ("visao", "sb-visao")
 
 
-async def _visao_chatgpt(ctx: Ctx, body: dict):
+async def _visao_chatgpt(ctx: Ctx, body: dict, modelo: str | None = None, timeout: float = 90):
     u = ctx.s.image_router_url.rstrip("/")
     u = u if u.endswith("/v1") else u + "/v1"
     corpo = {k: v for k, v in body.items() if k not in ("stream", "stream_options")}
-    corpo["model"] = ctx.store.get_setting("visao_modelo") or "cx/gpt-5.6-luna"
-    r = await ctx.http.post(u + "/chat/completions", json=corpo, headers={"Authorization": f"Bearer {ctx.s.image_router_key}"}, timeout=90)
+    corpo["model"] = modelo or ctx.store.get_setting("visao_modelo") or "cx/gpt-5.6-luna"
+    r = await ctx.http.post(u + "/chat/completions", json=corpo, headers={"Authorization": f"Bearer {ctx.s.image_router_key}"}, timeout=timeout)
     if r.status_code != 200:
         raise RuntimeError(f"9router {r.status_code}")
     j = r.json()
@@ -226,6 +226,33 @@ async def chat(request: Request):
                 pass
         body["model"] = ctx.store.get_setting("visao_modelo_reserva") or "qwen-abliterated"
         request._json = body  # forward le o corpo ja ajustado
+    elif isinstance(body, dict) and str(body.get("model") or "").startswith("rt-"):
+        # combos do ecossistema (spec 40): o primeiro destino que responder vence
+        from app import combos as cb
+        ctx = _ctx(request)
+        authenticate(ctx, request)
+        lista = cb.combos(ctx.store).get(body["model"])
+        if not lista:
+            raise fail(404, f"combo {body['model']} nao existe", "invalid_request_error", "model_not_found")
+        apelido = body["model"]
+        for alvo in lista:
+            if "router" in alvo:
+                if not (ctx.s.image_router_url and ctx.s.image_router_key):
+                    continue
+                try:
+                    j = await _visao_chatgpt(ctx, body, alvo["router"], timeout=180)
+                    j["model"] = apelido
+                    if body.get("stream"):
+                        return Response(_sse_de(j), media_type="text/event-stream")
+                    return Response(json.dumps(j, ensure_ascii=False), media_type="application/json")
+                except Exception:  # noqa: BLE001  destino fora ou recusou: proximo da lista
+                    continue
+            if "casa" in alvo:
+                body["model"] = alvo["casa"]
+                request._json = body
+                break
+        else:
+            raise fail(503, f"nenhum destino do combo {apelido} respondeu", "server_error", "combo_indisponivel")
     return await forward(request, "/v1/chat/completions", "chat")
 
 

@@ -61,13 +61,19 @@ def salvar_fixos(store, itens) -> list[dict]:
 async def cotacao(ctx) -> float:
     if _cotacao["v"] and time.time() - _cotacao["t"] < 6 * 3600:
         return _cotacao["v"]
-    try:
-        r = await ctx.http.get("https://economia.awesomeapi.com.br/json/last/USD-BRL", timeout=8)
-        v = float(r.json()["USDBRL"]["bid"])
-        _cotacao.update(v=v, t=time.time())
-        return v
-    except (httpx.HTTPError, ValueError, KeyError, TypeError):
-        return _cotacao["v"] or COTACAO_RESERVA
+    # duas fontes gratuitas: a AwesomeAPI estoura cota (429) em IP compartilhado; a ExchangeRate-API (open.er-api.com) é a reserva
+    fontes = (("https://open.er-api.com/v6/latest/USD", lambda j: j["rates"]["BRL"]),
+              ("https://economia.awesomeapi.com.br/json/last/USD-BRL", lambda j: j["USDBRL"]["bid"]))
+    for url, ler in fontes:
+        try:
+            r = await ctx.http.get(url, timeout=8)
+            v = float(ler(r.json()))
+            if 2 < v < 20:
+                _cotacao.update(v=v, t=time.time())
+                return v
+        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+            continue
+    return _cotacao["v"] or COTACAO_RESERVA
 
 
 async def _vast_mes(ctx) -> dict:

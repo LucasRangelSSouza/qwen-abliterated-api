@@ -283,7 +283,8 @@ async def chat(request: Request):
                 return Response(rt.sse_de(resposta), media_type="text/event-stream", headers=h)
             return Response(json.dumps(resposta, ensure_ascii=False), media_type="application/json", headers=h)
         _log_rota(ctx, pedido, apelido, casa, "casa", motivo, time.time())
-        if apelido == "rt-livre" and "chat_template_kwargs" not in body:
+        curto = int(body.get("max_tokens") or body.get("max_completion_tokens") or 0) or 99999
+        if (apelido == "rt-livre" or (apelido == "rt-mao" and curto < 1500)) and "chat_template_kwargs" not in body:
             # conteúdo sem trava não precisa do "pensamento" do Qwen: resposta sai mais rápido e nunca vem vazia por gastar tokens pensando
             body["chat_template_kwargs"] = {"enable_thinking": False}
         body["model"] = casa

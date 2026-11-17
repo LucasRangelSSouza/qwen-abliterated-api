@@ -489,6 +489,9 @@ async def audio_transcriptions(request: Request):
         except Exception:  # noqa: BLE001
             logging.getLogger("uvicorn.error").exception("stt local falhou")
             _log(ctx, p, "audio", 0, 0, 0, "upstream_error", None)
+            if r is not None:  # plano B fora: o cliente recebe o erro real da GPU (ex.: 503 gpu_unavailable)
+                return Response(r.content, status_code=r.status_code, headers=_pass_headers(r.headers),
+                                media_type=r.headers.get("content-type", "application/json"))
             return JSONResponse(err("falha ao falar com o servico de transcricao", "server_error", "upstream_error"), status_code=502)
     _log(ctx, p, "audio", 0, 0, 0, "ok" if r.status_code == 200 else "upstream_error", None)
     return Response(r.content, status_code=r.status_code, headers=_pass_headers(r.headers), media_type=r.headers.get("content-type", "application/json"))

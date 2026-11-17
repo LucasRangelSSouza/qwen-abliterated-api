@@ -131,6 +131,36 @@ async def test_garante_o_whisper_uma_vez_por_endereco(redis):
     await ctl.stop_loop()
 
 
+async def test_reconfere_o_whisper_no_mesmo_endereco_depois_de_5_min(redis):
+    """17/11/2026: a GPU religou com o MESMO endereco e o Whisper sumiu; conferir uma vez so por endereco deixava o ditado fora."""
+    from app.alerts import Alerts
+    from app.gpu import controller as C
+    from app.gpu.ledger import Ledger
+    from tests.fakes import FakeVast
+    chamadas, agora = [], [1000.0]
+
+    class T:
+        async def open(self, h, p): return True
+        async def healthy(self): return True
+        async def run(self, h, p, cmd, timeout=90.0):
+            chamadas.append(h)
+            return True
+        async def close(self): pass
+
+    async def probe(): return True
+    ctl = C.GPUController(Settings(tunnel_mode="ssh", stt_enabled=True), FakeVast(), T(), Ledger(redis), Alerts(""), redis,
+                          health_probe=probe, onstart="#!/bin/bash\n", clock=lambda: agora[0])
+    ctl._ensure_stt("1.2.3.4", 2222)
+    await ctl._stt_task
+    agora[0] += 60
+    ctl._ensure_stt("1.2.3.4", 2222)  # 1 min depois: nao repete
+    agora[0] += C.STT_RECONFERIR_S
+    ctl._ensure_stt("1.2.3.4", 2222)  # passou o intervalo: confere de novo (sai na hora se estiver saudavel)
+    await ctl._stt_task
+    assert chamadas == ["1.2.3.4", "1.2.3.4"]
+    await ctl.stop_loop()
+
+
 async def test_desligado_nao_instala_nada(redis):
     from app.alerts import Alerts
     from app.gpu.controller import GPUController

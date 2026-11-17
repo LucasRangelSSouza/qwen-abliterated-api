@@ -39,6 +39,8 @@ LABEL = "llmq-gpu"
 ETA_DEFAULT = {"restart": 120, "known": 380, "new": 650}
 
 
+STT_RECONFERIR_S = 300  # a cada 5 min o comando idempotente confere a saude do Whisper (sai na hora se esta ok)
+
 class GPUUnavailable(Exception):
     def __init__(self, reason: str, message: str = "", retry_after: int = 60):
         super().__init__(message or reason)
@@ -96,6 +98,8 @@ class GPUController:
         self.spec_id = hashlib.sha256((self.onstart + json.dumps(render_env(s), sort_keys=True)).encode()).hexdigest()[:12]
         self.state = OFF
         self._stt_done: tuple | None = None  # (host, porta) em que o servico de transcricao ja foi garantido
+        self._stt_task = None
+        self._stt_t = 0.0  # quando foi a ultima conferencia (a maquina religa com o MESMO endereco e o servico some; confere de novo)
         self.inst: dict | None = None  # {"id","machine_id","dph","storage_h","stopped_at","created_at"}
         self.inflight = 0
         self.last_activity = clock()
@@ -852,15 +856,19 @@ class GPUController:
         if not self.s.stt_enabled or self.s.tunnel_mode == "none" or not host or not port:
             return
         alvo = (host, int(port))
-        if self._stt_done == alvo:
+        now = self.clock()
+        if self._stt_done == alvo and now - self._stt_t < STT_RECONFERIR_S:
             return
-        self._stt_done = alvo
+        if self._stt_task is not None and not self._stt_task.done():
+            return
+        self._stt_done, self._stt_t = alvo, now
 
         async def _go() -> None:
             ok = await self.tunnel.run(alvo[0], alvo[1], stt.command(self.s.stt_threads), timeout=1500.0)
             if not ok:
                 self._stt_done = None  # tenta de novo na proxima abertura do tunel
-            await self.alerts.notify("stt_provision", f"transcricao (ditado) na maquina {alvo[0]}:{alvo[1]}: {'ok' if ok else 'falhou'}", "info")
+            if not ok:  # conferencia a cada 5 min: so avisa quando falha (sucesso nao enche o painel de alertas)
+                await self.alerts.notify("stt_provision", f"transcricao (ditado) na maquina {alvo[0]}:{alvo[1]}: falhou", "info")
         self._stt_task = asyncio.create_task(_go())
 
     async def _static_religar(self, i: Instance) -> None:

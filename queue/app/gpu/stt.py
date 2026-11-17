@@ -19,7 +19,8 @@ if [ ! -x venv/bin/uvicorn ]; then
   nice -n 15 ./venv/bin/pip install -q --no-cache-dir faster-whisper fastapi uvicorn python-multipart "av>=14,<17" || exit 1
 fi
 for p in $(pgrep -f "[u]vicorn stt_server"); do kill "$p"; done
-setsid nohup nice -n 15 env STT_THREADS=${STT_THREADS:-16} HF_HOME=/workspace/stt/hf ./venv/bin/uvicorn stt_server:app --host 127.0.0.1 --port 18002 > server.log 2>&1 < /dev/null &
+# setsid -f: o servico sai da sessao do SSH (com "nohup ... &" ele morria quando a conexao fechava; visto em 17/11/2026)
+setsid -f nice -n 15 env STT_THREADS=${STT_THREADS:-16} HF_HOME=/workspace/stt/hf ./venv/bin/python -m uvicorn stt_server:app --host 127.0.0.1 --port 18002 > server.log 2>&1 < /dev/null
 for _ in $(seq 1 60); do curl -s -m 2 http://127.0.0.1:18002/health >/dev/null && exit 0; sleep 3; done
 exit 1
 """

@@ -191,6 +191,9 @@ async def _visao_chatgpt(ctx: Ctx, body: dict, modelo: str | None = None, timeou
     corpo = {k: v for k, v in body.items() if k not in ("stream", "stream_options")}
     corpo["model"] = modelo or ctx.store.get_setting("visao_modelo") or "cx/gpt-5.6-luna"
     corpo["stream"] = False  # sem o campo, o 9Router responde em SSE para o Claude (cc/) e o .json() quebra
+    if corpo["model"].startswith("cc/") and "opus" in corpo["model"]:
+        # o Opus pensa antes de escrever: com max_tokens curto ele gasta tudo pensando e volta sem texto
+        corpo["max_tokens"] = max(int(corpo.get("max_tokens") or 0), 6000)
     r = await ctx.http.post(u + "/chat/completions", json=corpo, headers={"Authorization": f"Bearer {ctx.s.image_router_key}"}, timeout=timeout)
     if r.status_code != 200:
         raise RuntimeError(f"9router {r.status_code}")

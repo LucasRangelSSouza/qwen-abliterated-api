@@ -2,6 +2,7 @@
 
 - `rt-planejar`: planejamento (Claude Code quando a conta estiver ativa; hoje ChatGPT), com a IA da casa de reserva.
 - `rt-geral`: o dia a dia dos produtos (MiniMax quando as contas entrarem; hoje a IA da casa).
+- `rt-rapido`, `rt-livre` e o roteador `rt-auto` (spec 45): ver app/roteador.py.
 Destino `{"router": "<modelo do 9Router global>"}` ou `{"casa": "<modelo do llm-queue>"}`. O primeiro que responder vence; erro ou
 resposta vazia passa para o próximo. A lista fica em `settings.combos` e muda pelo painel (POST /admin/api/combos), sem deploy.
 """
@@ -15,7 +16,10 @@ from app.admin import _json, api, require
 from app.ctx import fail
 
 PADRAO = {
-    "rt-planejar": [{"router": "cx/gpt-5.6-sol"}, {"casa": "qwen-abliterated"}],
+    # spec 45: os destinos "router" de um combo giram em rodízio (Claude <-> GPT); a casa fica sempre por último, de reserva
+    "rt-planejar": [{"router": "cc/claude-opus-5-5"}, {"router": "cx/gpt-6.1-sol"}, {"casa": "qwen-abliterated"}],
+    "rt-rapido": [{"router": "cc/claude-haiku-4-5-20251001"}, {"router": "cx/gpt-6-luna"}, {"casa": "qwen-abliterated"}],
+    "rt-livre": [{"casa": "qwen-abliterated"}],
     "rt-geral": [{"casa": "qwen-abliterated"}],
 }
 

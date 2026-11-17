@@ -5,6 +5,7 @@ import asyncio
 import hmac
 import json
 import math
+import time
 
 import httpx
 from fastapi import APIRouter, Request
@@ -193,8 +194,8 @@ async def _visao_chatgpt(ctx: Ctx, body: dict, modelo: str | None = None, timeou
     if r.status_code != 200:
         raise RuntimeError(f"9router {r.status_code}")
     j = r.json()
-    txt = (((j.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-    if not txt:
+    m = ((j.get("choices") or [{}])[0].get("message") or {})
+    if not (m.get("content") or "").strip() and not m.get("tool_calls"):  # chamada de ferramenta vem sem texto e vale
         raise RuntimeError("resposta vazia")
     j["model"] = body.get("model")
     return j
@@ -226,34 +227,89 @@ async def chat(request: Request):
                 pass
         body["model"] = ctx.store.get_setting("visao_modelo_reserva") or "qwen-abliterated"
         request._json = body  # forward le o corpo ja ajustado
-    elif isinstance(body, dict) and str(body.get("model") or "").startswith("rt-"):
-        # combos do ecossistema (spec 40): o primeiro destino que responder vence
+    elif isinstance(body, dict) and (str(body.get("model") or "").startswith("rt-") or _roteia_cliente(request, body)):
+        # combos do ecossistema (spec 40) + roteador invisível rt-auto (spec 45)
         from app import combos as cb
+        from app import roteador as rt
         ctx = _ctx(request)
         authenticate(ctx, request)
-        lista = cb.combos(ctx.store).get(body["model"])
+        todos = cb.combos(ctx.store)
+        pedido = body.get("model")
+        apelido, rota, motivo = pedido, "", ""
+        if pedido == "rt-auto" or not pedido.startswith("rt-"):
+            rota, motivo = await rt.classificar(ctx, body, lambda msgs, mx: _casa_texto(ctx, msgs, mx))
+            apelido = {"livre": "rt-livre", "planejar": "rt-planejar", "rapido": "rt-rapido"}[rota]
+        lista = todos.get(apelido)
         if not lista:
-            raise fail(404, f"combo {body['model']} nao existe", "invalid_request_error", "model_not_found")
-        apelido = body["model"]
-        for alvo in lista:
-            if "router" in alvo:
-                if not (ctx.s.image_router_url and ctx.s.image_router_key):
-                    continue
+            raise fail(404, f"combo {apelido} nao existe", "invalid_request_error", "model_not_found")
+        casa = next((a["casa"] for a in lista if "casa" in a), "qwen-abliterated")
+        resposta = None
+        if ctx.s.image_router_url and ctx.s.image_router_key:
+            for alvo in rt.RODIZIO.ordem(apelido, lista):
+                if "router" not in alvo:
+                    break
+                t0 = time.time()
                 try:
                     j = await _visao_chatgpt(ctx, body, alvo["router"], timeout=180)
-                    j["model"] = apelido
-                    if body.get("stream"):
-                        return Response(_sse_de(j), media_type="text/event-stream")
-                    return Response(json.dumps(j, ensure_ascii=False), media_type="application/json")
-                except Exception:  # noqa: BLE001  destino fora ou recusou: proximo da lista
+                except Exception as e:  # noqa: BLE001  destino fora (401/429/5xx/timeout): sai do rodízio por 5 min
+                    rt.RODIZIO.falhou(alvo["router"])
+                    _log_rota(ctx, pedido, apelido, alvo["router"], "erro", motivo, t0, str(e)[:120])
                     continue
-            if "casa" in alvo:
-                body["model"] = alvo["casa"]
-                request._json = body
+                if rt.e_recusa(j):  # recusou: o mesmo pedido vai para a IA da casa, sem o cliente ver
+                    _log_rota(ctx, pedido, apelido, alvo["router"], "recusa", motivo, t0)
+                    apelido = "rt-livre"
+                    break
+                _log_rota(ctx, pedido, apelido, alvo["router"], "ok", motivo, t0)
+                j["model"] = pedido
+                resposta = j
                 break
-        else:
-            raise fail(503, f"nenhum destino do combo {apelido} respondeu", "server_error", "combo_indisponivel")
+        if resposta is not None:
+            h = {"x-rt-rota": apelido}
+            if body.get("stream"):
+                return Response(rt.sse_de(resposta), media_type="text/event-stream", headers=h)
+            return Response(json.dumps(resposta, ensure_ascii=False), media_type="application/json", headers=h)
+        _log_rota(ctx, pedido, apelido, casa, "casa", motivo, time.time())
+        body["model"] = casa
+        request._json = body
     return await forward(request, "/v1/chat/completions", "chat")
+
+
+def _roteia_cliente(request: Request, body: dict) -> bool:
+    """Cliente do Cérebro (conta com login) pedindo a IA da casa passa pelo roteador, se estiver ligado no painel (spec 45).
+    Qualquer falha (banco fora, chave especial) mantém o caminho antigo: nunca derruba o atendimento."""
+    if body.get("model") != "qwen-abliterated" or body.get("rt_sem_rotear"):
+        return False
+    try:
+        ctx = _ctx(request)
+        p = authenticate(ctx, request)
+        if p.kind != "person":
+            return False
+        modo = (ctx.store.get_setting("roteador_auto") or "off").strip()  # off | on (todos os clientes) | lista de person_id
+        if modo == "off":
+            return False
+        if modo != "on" and str(p.person_id) not in {x.strip() for x in modo.split(",")}:
+            return False
+        return bool(ctx.store.one("SELECT 1 FROM accounts WHERE person_id=?", (p.person_id,)))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+async def _casa_texto(ctx: Ctx, mensagens: list[dict], max_tokens: int) -> str:
+    """Chamada curta e direta à IA da casa (classificador), sem passar pelo roteador nem cobrar do cliente."""
+    h = {"Content-Type": "application/json"}
+    if ctx.s.upstream_key:
+        h["Authorization"] = f"Bearer {ctx.s.upstream_key}"
+    r = await ctx.http.post(ctx.s.upstream_base + "/v1/chat/completions", headers=h, timeout=30,
+                            json={"model": "qwen-abliterated", "messages": mensagens, "max_tokens": max_tokens, "temperature": 0,
+                                  "chat_template_kwargs": {"enable_thinking": False}})
+    r.raise_for_status()
+    return ((r.json().get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+
+
+def _log_rota(ctx: Ctx, pedido, apelido, destino, resultado, motivo, t0, erro: str = "") -> None:
+    import logging
+    logging.getLogger("access.roteador").info("rota pedido=%s combo=%s destino=%s resultado=%s motivo=%s %.1fs %s",
+                                              pedido, apelido, destino, resultado, motivo, time.time() - t0, erro)
 
 
 @router.post("/v1/embeddings")

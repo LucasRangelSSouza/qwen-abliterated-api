@@ -311,7 +311,7 @@ async def _casa_texto(ctx: Ctx, mensagens: list[dict], max_tokens: int) -> str:
 
 def _log_rota(ctx: Ctx, pedido, apelido, destino, resultado, motivo, t0, erro: str = "") -> None:
     import logging
-    logging.getLogger("access.roteador").info("rota pedido=%s combo=%s destino=%s resultado=%s motivo=%s %.1fs %s",
+    logging.getLogger("uvicorn.error").info("rota pedido=%s combo=%s destino=%s resultado=%s motivo=%s %.1fs %s",
                                               pedido, apelido, destino, resultado, motivo, time.time() - t0, erro)
 
 

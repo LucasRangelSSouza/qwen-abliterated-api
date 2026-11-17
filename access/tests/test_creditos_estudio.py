@@ -124,3 +124,12 @@ async def test_webhook_reconhece_a_faixa_pelo_nome_e_pelo_valor(rig3: Rig):
     r = await rig3.client.post("/v1/billing/cakto", content=json.dumps(corpo), headers={"content-type": "application/json", "x-webhook-secret": SEG})
     assert r.status_code == 200
     assert C.studio_balance(ctx.store, pid, ctx.clock()) == antes + 2000 + 5450
+
+
+async def test_infinity_tem_estudio_e_plano_sem_estudio_nao_avisa_acabando(rig3: Rig):
+    """17/11/2026: o Infinity ficou fora da tabela (0 credito) e o app abria 'creditos do Estudio acabando' 8 s depois de ligar."""
+    from app import credits as C2
+    pid, key, _ = await assinante(rig3, "infinity")
+    assert C2.studio_balance(rig3.app.state.ctx.store, pid, rig3.clock()) == 2000
+    r = (await rig3.client.get("/v1/credits", headers={"Authorization": f"Bearer {key}"})).json()
+    assert "studio" not in r["low"] and r["next_plan"] in (None, "enterprise") or r["next_plan"].get("id") == "enterprise"

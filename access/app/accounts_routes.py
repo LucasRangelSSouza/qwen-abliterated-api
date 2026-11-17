@@ -176,7 +176,7 @@ async def client_credits(request: Request):
     try:  # creditos do Estudio acabando (<= 25 = menos de um pedido pequeno)
         est = credits.studio_balance(ctx.store, p.person_id, now)
         saldos["studio"] = est
-        if est <= 25:
+        if 0 < est <= 25:  # zero = plano sem Estudio (ou nunca comprou): nao e "acabando"; o aviso na hora do uso cobre quem zerou
             low["studio"] = {"restante_plano": est, "credito": est, "renova": None}
     except Exception:  # noqa: BLE001
         pass

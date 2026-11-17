@@ -12,14 +12,14 @@ DEFAULT_USD_BRL = 5.5               # cotacao de referencia (ajuste do painel: u
 DEFAULT_UNITS = {"image": 500, "video": 30, "audio": 150, "studio": 900}  # studio: 1 credito = US$ 0,02; o pacote de US$ 18 = 900 creditos
 STUDIO_USD = 0.02
 STUDIO_ARREDONDA = 5            # o cliente ve sempre multiplos de 5 ("185 creditos")
-PLANO_STUDIO_PADRAO = {"light": 100, "max": 300, "ultra": 1000, "enterprise": 2000}  # creditos gratis por mes (o painel pode mudar: setting studio_plan_credits)
+PLANO_STUDIO_PADRAO = {"light": 100, "max": 300, "ultra": 1000, "infinity": 2000, "enterprise": 2000}  # creditos gratis por mes (o painel pode mudar: setting studio_plan_credits)
 TOKENS_MULT = 2                     # pacote de uso = 2 x o limite da sessao de 5 h do plano
 DEFAULT_EXPIRY_DAYS = 30
 DAY = 86400
 # nome do produto (minusculo) -> tipo, quando o id do produto nao estiver configurado
 NAME_HINTS = (("créditos do estúdio", "studio"), ("créditos do segundo cérebro", "studio"), ("creditos do segundo cerebro", "studio"), ("creditos do estudio", "studio"), ("crédito do estúdio", "studio"), ("credito do estudio", "studio"), ("crédito de uso", "tokens"), ("credito de uso", "tokens"), ("crédito de imagens", "image"), ("credito de imagens", "image"),
               ("crédito de vídeos", "video"), ("credito de videos", "video"), ("crédito de áudio", "audio"), ("credito de audio", "audio"))
-NEXT_PLAN = {"light": "max", "max": "ultra", "ultra": "enterprise"}
+NEXT_PLAN = {"light": "max", "max": "ultra", "ultra": "enterprise", "infinity": "enterprise"}
 
 
 def _json_setting(store, key: str) -> dict:

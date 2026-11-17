@@ -190,6 +190,7 @@ async def _visao_chatgpt(ctx: Ctx, body: dict, modelo: str | None = None, timeou
     u = u if u.endswith("/v1") else u + "/v1"
     corpo = {k: v for k, v in body.items() if k not in ("stream", "stream_options")}
     corpo["model"] = modelo or ctx.store.get_setting("visao_modelo") or "cx/gpt-5.6-luna"
+    corpo["stream"] = False  # sem o campo, o 9Router responde em SSE para o Claude (cc/) e o .json() quebra
     r = await ctx.http.post(u + "/chat/completions", json=corpo, headers={"Authorization": f"Bearer {ctx.s.image_router_key}"}, timeout=timeout)
     if r.status_code != 200:
         raise RuntimeError(f"9router {r.status_code}")

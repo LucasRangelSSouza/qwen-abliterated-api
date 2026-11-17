@@ -70,6 +70,7 @@ async def test_pergunta_comum_gira_entre_claude_e_gpt_baratos(rr: Rig):
         assert r.status_code == 200 and r.headers["x-rt-rota"] == "rt-rapido" and r.json()["model"] == "rt-auto"
         modelos.append(rr.up.router[-1]["model"])
     assert modelos == ["cc/claude-haiku-4-5-20251001", "cx/gpt-6-luna"] * 2 and not rr.up.casa
+    assert all(b.get("stream") is False for b in rr.up.router)  # o 9Router precisa do stream=false explícito (Claude)
 
 
 async def test_planejamento_vai_para_os_fortes(rr: Rig):

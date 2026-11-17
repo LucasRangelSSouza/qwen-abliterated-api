@@ -29,7 +29,9 @@ _PESADO = re.compile(r"\b(sexo|sexual|transar|transa|nud[ea]s?|pelad[ao]s?|porn\
                      r"nude|naked|horny|blowjob|cum\b|fuck\w*|dick|pussy|boobs|erotic|explicit)\b", re.I)
 _PLANO = re.compile(r"\b(planej\w*|plano|arquitet\w*|estrat[eé]gi\w*|roadmap|cronograma|especifica\w*|spec\b|projet\w*|"
                     r"passo a passo|etapas|desenvolv\w*|crie um (sistema|app|site|produto|neg[oó]cio)|monte um|estruture|"
-                    r"analis\w* (completa|profunda)|compare|business plan|plan\b|architect\w*|design a)\b", re.I)
+                    r"analis\w* (completa|profunda)|compare|business plan|plan\b|architect\w*|design a|"
+                    # direção de vídeo/animação também vai ao diretor forte (spec 45 D.9.1: a animação ficava fraca sem direção)
+                    r"anima[cç][aã]o|animar|motion|roteiro|storyboard|comercial|vinheta)\b", re.I)
 CLASSIFICAR = ("Classifique a mensagem do usuário. Responda SÓ uma palavra:\n"
                "livre = pede conteúdo sexual/adulto explícito, violência gráfica, drogas, armas, hacking ofensivo ou qualquer tema que "
                "um assistente comercial (ChatGPT/Claude) recusaria;\n"

@@ -78,7 +78,7 @@ async def classificar(ctx, body: dict, chamar_casa) -> tuple[str, str]:
 
 
 # ------------------------------------------------------------------ recusa
-_RECUSA = re.compile(r"(n[aã]o posso (ajudar|fazer|criar|gerar|fornecer|atender|responder)|n[aã]o consigo (ajudar|fazer|criar|gerar) (com )?isso|"
+_RECUSA = re.compile(r"(\bn[aã]o (posso|vou|consigo|devo) (te )?(ajudar|fazer|criar|gerar|fornecer|atender|responder|ensinar|explicar|escrever|dar|passar|orientar|descrever|detalhar|incentivar|participar)|n[aã]o consigo (ajudar|fazer|criar|gerar) (com )?isso|"
                      r"n[aã]o [eé] (algo|poss[ií]vel) (que|para) (eu )?(possa|posso)|desculpe,? mas n[aã]o|sinto muito,? mas n[aã]o posso|"
                      r"contra (as )?(minhas )?(diretrizes|pol[ií]ticas)|viola(r|ria)? (as )?(diretrizes|pol[ií]ticas)|"
                      r"i can'?t (help|assist|do|create|provide|write)|i'?m not able to|i cannot (help|assist|provide|create)|"
@@ -90,7 +90,7 @@ def e_recusa(j: dict) -> bool:
     if msg.get("tool_calls"):
         return False
     txt = (msg.get("content") or "").strip()
-    return not txt or (len(txt) < 900 and bool(_RECUSA.search(txt[:600])))
+    return not txt or bool(_RECUSA.search(txt[:350]))  # recusa aparece logo no começo; resposta longa que recusa no início também conta
 
 
 # ------------------------------------------------------------------ rodízio com pausa de quem falha

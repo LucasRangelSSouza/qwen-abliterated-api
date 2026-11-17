@@ -73,7 +73,7 @@ async def test_pergunta_comum_gira_entre_claude_e_gpt_baratos(rr: Rig):
 
 async def test_planejamento_vai_para_os_fortes(rr: Rig):
     r = await rr.client.post("/v1/chat/completions", json=msg("Planeje a arquitetura de um app de delivery com pagamento e entregadores"), headers=H)
-    assert r.headers["x-rt-rota"] == "rt-planejar" and rr.up.router[-1]["model"] in ("cc/claude-opus-5-5", "cx/gpt-6.1-sol")
+    assert r.headers["x-rt-rota"] == "rt-planejar" and rr.up.router[-1]["model"] in ("cc/claude-opus-5-5", "cx/gpt-6-sol")
 
 
 async def test_recusa_do_gpt_vira_resposta_da_casa(rr: Rig):
@@ -132,3 +132,13 @@ async def test_roteador_desligado_por_padrao_e_liberado_por_conta(rr: Rig):
     ctx.store.set_setting("roteador_auto", f"999,{pid}")
     r = await rr.client.post("/v1/chat/completions", json=corpo, headers=hk)
     assert r.headers.get("x-rt-rota") == "rt-rapido"  # só a conta liberada
+
+
+def test_detector_de_recusa():
+    def j(t):
+        return {"choices": [{"message": {"content": t}}]}
+    assert rt.e_recusa(j("Não posso ensinar a fabricar ou usar uma gazua, porque isso pode facilitar crimes."))
+    assert rt.e_recusa(j("Desculpe, mas não posso ajudar com isso."))
+    assert rt.e_recusa(j("I can't help with that request."))
+    assert not rt.e_recusa(j("A capital da Austrália é Canberra."))
+    assert not rt.e_recusa(j("# Arquitetura. Para um app de delivery... " + "x" * 2000))

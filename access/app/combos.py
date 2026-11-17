@@ -17,7 +17,7 @@ from app.ctx import fail
 
 PADRAO = {
     # spec 45: os destinos "router" de um combo giram em rodízio (Claude <-> GPT); a casa fica sempre por último, de reserva
-    "rt-planejar": [{"router": "cc/claude-opus-5-5"}, {"router": "cx/gpt-6.1-sol"}, {"casa": "qwen-abliterated"}],
+    "rt-planejar": [{"router": "cc/claude-opus-5-5"}, {"router": "cx/gpt-6-sol"}, {"casa": "qwen-abliterated"}],
     "rt-rapido": [{"router": "cc/claude-haiku-4-5-20251001"}, {"router": "cx/gpt-6-luna"}, {"casa": "qwen-abliterated"}],
     "rt-livre": [{"casa": "qwen-abliterated"}],
     "rt-geral": [{"casa": "qwen-abliterated"}],

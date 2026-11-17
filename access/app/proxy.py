@@ -264,7 +264,8 @@ async def chat(request: Request):
                     break
                 t0 = time.time()
                 try:
-                    j = await _visao_chatgpt(ctx, body, alvo["router"], timeout=180)
+                    # Opus pensa e escreve muito (decisão do Lucas: sem limite); os outros respondem em segundos
+                    j = await _visao_chatgpt(ctx, body, alvo["router"], timeout=600 if "opus" in alvo["router"] else 180)
                 except Exception as e:  # noqa: BLE001  destino fora (401/429/5xx/timeout): sai do rodízio por 5 min
                     rt.RODIZIO.falhou(alvo["router"])
                     _log_rota(ctx, pedido, apelido, alvo["router"], "erro", motivo, t0, str(e)[:120])

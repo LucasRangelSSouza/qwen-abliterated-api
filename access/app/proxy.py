@@ -245,8 +245,9 @@ async def chat(request: Request):
         if interno == "rt-auto" or not interno.startswith("rt-"):
             rota, motivo = await rt.classificar(ctx, body, lambda msgs, mx: _casa_texto(ctx, msgs, mx))
             # spec 45 §E: o pedido comum vai para a mão de obra (Qwen); o rodízio Claude/GPT fica para o médio/forte
-            apelido = {"livre": "rt-livre", "planejar": "rt-planejar", "rapido": "rt-mao"}[rota]
-        if apelido == "rt-planejar" and quem.kind == "person":
+            apelido = {"livre": "rt-livre", "planejar": "rt-forte", "rapido": "rt-mao"}[rota]
+        # teto do diretor caro: só para o cliente (automático ou nome neutro); o diretor dos produtos (rt-planejar) não entra
+        if apelido == "rt-forte" and quem.kind == "person" and not str(pedido).startswith("rt-"):
             try:
                 teto = int(ctx.store.get_setting("diretor_teto") or 2)
             except Exception:  # noqa: BLE001

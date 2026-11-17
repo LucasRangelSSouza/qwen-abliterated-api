@@ -93,7 +93,7 @@ async def test_lista_de_modelos_mostra_nomes_neutros(rr: Rig):
 
 async def test_planejamento_vai_para_os_fortes(rr: Rig):
     r = await rr.client.post("/v1/chat/completions", json=msg("Planeje a arquitetura de um app de delivery com pagamento e entregadores"), headers=H)
-    assert r.headers["x-rt-rota"] == "rt-planejar" and rr.up.router[-1]["model"] in ("cc/claude-opus-5-5", "cx/gpt-6-sol")
+    assert r.headers["x-rt-rota"] == "rt-forte" and rr.up.router[-1]["model"] in ("cc/claude-opus-5-5", "cx/gpt-6-sol")
 
 
 async def test_recusa_do_gpt_vira_resposta_da_casa(rr: Rig):
@@ -134,7 +134,7 @@ async def test_so_conta_de_cliente_e_roteada(rr: Rig):
         c.execute("INSERT INTO accounts(email,name,status,person_id,created_at) VALUES(?,?,?,?,?)", ("c@x.com", "c", "active", pid, 1.0))
     corpo_plano = {**corpo, "messages": [{"role": "user", "content": "Planeje a arquitetura completa de um app de delivery"}]}
     r = await rr.client.post("/v1/chat/completions", json=corpo_plano, headers=hk)
-    assert r.headers.get("x-rt-rota") == "rt-planejar" and rr.up.router  # cliente do Cérebro: plano vai ao diretor
+    assert r.headers.get("x-rt-rota") == "rt-forte" and rr.up.router  # cliente do Cérebro: plano vai ao diretor (Opus)
     assert r.json()["model"] == "qwen-abliterated"  # o nome pedido volta; o cliente nunca vê o modelo de verdade
     ctx.store.set_setting("roteador_auto", "off")
     n = len(rr.up.router)
@@ -153,7 +153,7 @@ async def test_roteador_desligado_por_padrao_e_liberado_por_conta(rr: Rig):
     assert not rr.up.router  # padrão: desligado
     ctx.store.set_setting("roteador_auto", f"999,{pid}")
     r = await rr.client.post("/v1/chat/completions", json=corpo, headers=hk)
-    assert r.headers.get("x-rt-rota") == "rt-planejar"  # só a conta liberada
+    assert r.headers.get("x-rt-rota") == "rt-forte"  # só a conta liberada
 
 
 async def test_teto_do_diretor_cai_no_medio(rr: Rig):
@@ -166,7 +166,14 @@ async def test_teto_do_diretor_cai_no_medio(rr: Rig):
     for _ in range(3):
         r = await rr.client.post("/v1/chat/completions", json=msg("Planeje a arquitetura de um sistema", model="planejamento-forte"), headers=hk)
         rotas.append(r.headers.get("x-rt-rota"))
-    assert rotas == ["rt-planejar", "rt-planejar", "rt-medio"]
+    assert rotas == ["rt-forte", "rt-forte", "rt-medio"]
+
+
+async def test_diretor_dos_produtos_e_sonnet_sem_teto(rr: Rig):
+    for _ in range(4):
+        r = await rr.client.post("/v1/chat/completions", json=msg("Roteiro de 6 cenas", model="rt-planejar"), headers=H)
+        assert r.headers["x-rt-rota"] == "rt-planejar"
+    assert {b["model"] for b in rr.up.router} == {"cc/claude-sonnet-5-5"}
 
 
 def test_detector_de_recusa():

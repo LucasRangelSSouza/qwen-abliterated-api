@@ -54,7 +54,7 @@ async def test_chatgpt_fora_cai_no_modelo_da_casa(rig_v: Rig):
 async def test_rt_planejar_vai_ao_chatgpt(rig_v: Rig):
     r = await rig_v.client.post("/v1/chat/completions", json={"model": "rt-planejar", "messages": [{"role": "user", "content": "planeje"}]}, headers=H)
     assert r.status_code == 200 and r.json()["model"] == "rt-planejar"
-    assert rig_v.up.vis[0]["model"] in ("cc/claude-opus-5-5", "cx/gpt-6-sol") and not rig_v.up.casa
+    assert rig_v.up.vis[0]["model"] == "cc/claude-sonnet-5-5" and not rig_v.up.casa  # diretor dos produtos: Sonnet
 
 
 async def test_rt_planejar_cai_na_casa_e_rt_geral_vai_direto(rig_v: Rig):

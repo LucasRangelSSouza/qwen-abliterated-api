@@ -17,8 +17,11 @@ from app.ctx import fail
 
 PADRAO = {
     # spec 45: os destinos "router" de um combo giram em rodízio (Claude <-> GPT); a casa fica sempre por último, de reserva
-    # spec 45 §E (17/11): Opus é o diretor principal; GPT forte (gasta mais) e o médio só de reserva
-    "rt-planejar": [{"router": "cc/claude-opus-5-5"}, {"router": "cx/gpt-6-sol", "reserva": True},
+    # spec 45 §E (17/11): planejamento forte do Cérebro = Opus principal; GPT forte (gasta mais) e o médio só de reserva
+    "rt-forte": [{"router": "cc/claude-opus-5-5"}, {"router": "cx/gpt-6-sol", "reserva": True},
+                 {"router": "cc/claude-haiku-4-5-20251001", "reserva": True}, {"casa": "qwen-abliterated"}],
+    # diretor dos PRODUTOS (Anima, Cortaí, Posta, Perfil, Rendaí): Sonnet 5.5, forte e rápido (~10 s); GPT forte só de reserva
+    "rt-planejar": [{"router": "cc/claude-sonnet-5-5"}, {"router": "cx/gpt-6-sol", "reserva": True},
                     {"router": "cc/claude-haiku-4-5-20251001", "reserva": True}, {"casa": "qwen-abliterated"}],
     # planejamento médio: Claude barato (contas em rodízio no 9Router), GPT barato de reserva
     "rt-medio": [{"router": "cc/claude-haiku-4-5-20251001"}, {"router": "cx/gpt-6-luna", "reserva": True}, {"casa": "qwen-abliterated"}],
@@ -32,7 +35,7 @@ PADRAO = {
 
 # Nomes neutros que o cliente vê dentro da conexão Unlimited (nunca nome comercial de modelo)
 NOMES = {"unlimited": "rt-auto", "mao-de-obra": "rt-mao", "planejamento-medio": "rt-medio",
-         "planejamento-forte": "rt-planejar", "livre": "rt-livre"}
+         "planejamento-forte": "rt-forte", "livre": "rt-livre"}
 
 
 def combos(store) -> dict:

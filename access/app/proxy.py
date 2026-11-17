@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import json
+import logging
 import math
 import time
 
@@ -480,10 +481,32 @@ async def audio_transcriptions(request: Request):
     try:
         r = await ctx.http.post(ctx.s.upstream_base + "/v1/audio/transcriptions", content=corpo, headers=headers, timeout=120)
     except httpx.HTTPError:
-        _log(ctx, p, "audio", 0, 0, 0, "upstream_error", None)
-        return JSONResponse(err("falha ao falar com o servico de transcricao", "server_error", "upstream_error"), status_code=502)
+        r = None
+    if r is None or r.status_code >= 500:
+        # GPU fora (sem crédito, host caiu): plano B na CPU da VPS, mesmo formato de resposta
+        try:
+            return await _stt_local(request)
+        except Exception:  # noqa: BLE001
+            logging.getLogger("uvicorn.error").exception("stt local falhou")
+            _log(ctx, p, "audio", 0, 0, 0, "upstream_error", None)
+            return JSONResponse(err("falha ao falar com o servico de transcricao", "server_error", "upstream_error"), status_code=502)
     _log(ctx, p, "audio", 0, 0, 0, "ok" if r.status_code == 200 else "upstream_error", None)
     return Response(r.content, status_code=r.status_code, headers=_pass_headers(r.headers), media_type=r.headers.get("content-type", "application/json"))
+
+
+async def _stt_local(request: Request) -> Response:
+    from starlette.concurrency import run_in_threadpool
+    from app import stt_local
+    form = await request.form()
+    arq = form.get("file")
+    if arq is None or not hasattr(arq, "read"):
+        raise ValueError("sem arquivo")
+    dados = await arq.read()
+    verbose = str(form.get("response_format") or "") == "verbose_json"
+    idioma = str(form.get("language") or "pt") or None
+    out = await run_in_threadpool(stt_local.transcrever, dados, getattr(arq, "filename", "") or "audio.webm", idioma, verbose)
+    logging.getLogger("uvicorn.error").info("stt local (cpu): %d bytes -> %d letras", len(dados), len(out.get("text", "")))
+    return Response(json.dumps(out, ensure_ascii=False), media_type="application/json", headers={"x-stt": "cpu"})
 
 
 # ---- voz de saida: texto -> fala (vozes neurais do Edge), em stream MP3; nao gasta tokens, so autentica e registra

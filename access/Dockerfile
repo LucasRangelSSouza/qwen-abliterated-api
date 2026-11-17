@@ -12,7 +12,7 @@ WORKDIR /srv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
  && useradd --system --uid 10001 --no-create-home app \
- && mkdir /data && chown 10001:10001 /data
+ && mkdir /data && chown 10001:10001 /data  && python -c "from faster_whisper import WhisperModel; WhisperModel('small', device='cpu', compute_type='int8', download_root='/srv/whisper')"  && chown -R 10001:10001 /srv/whisper
 COPY app ./app
 COPY --from=panel /panel/dist ./panel/dist
 ARG GIT_COMMIT=dev

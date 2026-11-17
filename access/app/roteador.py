@@ -98,17 +98,36 @@ class Rodizio:
     def __init__(self):
         self._contador: dict[str, itertools.count] = {}
         self._fora: dict[str, float] = {}
+        self._diretor: dict[str, list[float]] = {}
 
     def ordem(self, apelido: str, destinos: list[dict]) -> list[dict]:
-        router = [d for d in destinos if "router" in d]
+        router = [d for d in destinos if "router" in d and not d.get("reserva")]
+        reserva = [d for d in destinos if "router" in d and d.get("reserva")]  # só depois dos principais, fora da rotação
         casa = [d for d in destinos if "casa" in d]
         if router:
             n = next(self._contador.setdefault(apelido, itertools.count())) % len(router)
             router = router[n:] + router[:n]
             agora = time.time()
             vivos = [d for d in router if self._fora.get(d["router"], 0) < agora]
-            router = vivos + [d for d in router if d not in vivos]  # quem está fora vai para o fim (tenta se os outros falharem)
-        return router + casa
+            mortos = [d for d in router if d not in vivos]
+            router = vivos
+        else:
+            mortos = []
+        agora = time.time()
+        rv = [d for d in reserva if self._fora.get(d["router"], 0) < agora]
+        rm = [d for d in reserva if d not in rv]
+        # vivos principais → reservas vivas → quem está fora (tenta se nada mais respondeu) → casa
+        return router + rv + mortos + rm + casa
+
+    # teto do diretor (spec 45 §E): no máximo N chamadas de planejamento forte por cliente na janela; depois cai no médio
+    def diretor_ok(self, quem: str, teto: int = 2, janela: int = 900) -> bool:
+        agora = time.time()
+        lst = [t for t in self._diretor.get(quem, []) if t > agora - janela]
+        if len(lst) >= teto:
+            self._diretor[quem] = lst
+            return False
+        self._diretor[quem] = lst + [agora]
+        return True
 
     def falhou(self, destino: str, segundos: int = 300) -> None:
         self._fora[destino] = time.time() + segundos

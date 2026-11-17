@@ -231,19 +231,29 @@ async def chat(request: Request):
                 pass
         body["model"] = ctx.store.get_setting("visao_modelo_reserva") or "qwen-abliterated"
         request._json = body  # forward le o corpo ja ajustado
-    elif isinstance(body, dict) and (str(body.get("model") or "").startswith("rt-") or _roteia_cliente(request, body)):
+    elif isinstance(body, dict) and (str(body.get("model") or "").startswith("rt-") or str(body.get("model") or "") in _NOMES
+                                     or _roteia_cliente(request, body)):
         # combos do ecossistema (spec 40) + roteador invisível rt-auto (spec 45)
         from app import combos as cb
         from app import roteador as rt
         ctx = _ctx(request)
-        authenticate(ctx, request)
+        quem = authenticate(ctx, request)
         todos = cb.combos(ctx.store)
-        pedido = body.get("model")
-        apelido, rota, motivo = pedido, "", ""
-        if pedido == "rt-auto" or not pedido.startswith("rt-"):
+        pedido = body.get("model")  # o nome que o cliente pediu volta na resposta (nunca o modelo de verdade)
+        interno = cb.NOMES.get(pedido, pedido)
+        apelido, rota, motivo = interno, "", ""
+        if interno == "rt-auto" or not interno.startswith("rt-"):
             rota, motivo = await rt.classificar(ctx, body, lambda msgs, mx: _casa_texto(ctx, msgs, mx))
-            apelido = {"livre": "rt-livre", "planejar": "rt-planejar", "rapido": "rt-rapido"}[rota]
-        lista = todos.get(apelido)
+            # spec 45 §E: o pedido comum vai para a mão de obra (Qwen); o rodízio Claude/GPT fica para o médio/forte
+            apelido = {"livre": "rt-livre", "planejar": "rt-planejar", "rapido": "rt-mao"}[rota]
+        if apelido == "rt-planejar" and quem.kind == "person":
+            try:
+                teto = int(ctx.store.get_setting("diretor_teto") or 2)
+            except Exception:  # noqa: BLE001
+                teto = 2
+            if not rt.RODIZIO.diretor_ok(str(quem.person_id), teto):
+                apelido, motivo = "rt-medio", "teto_diretor"
+        lista = todos.get(apelido) or (todos.get("rt-rapido") if apelido == "rt-medio" else None)
         if not lista:
             raise fail(404, f"combo {apelido} nao existe", "invalid_request_error", "model_not_found")
         casa = next((a["casa"] for a in lista if "casa" in a), "qwen-abliterated")
@@ -279,6 +289,9 @@ async def chat(request: Request):
         body["model"] = casa
         request._json = body
     return await forward(request, "/v1/chat/completions", "chat")
+
+
+from app.combos import NOMES as _NOMES  # noqa: E402
 
 
 def _roteia_cliente(request: Request, body: dict) -> bool:
@@ -333,6 +346,14 @@ async def models(request: Request):
                                headers={"Authorization": f"Bearer {ctx.s.upstream_key}"} if ctx.s.upstream_key else {}, timeout=15)
     except httpx.HTTPError:
         raise fail(502, "falha ao falar com o servico de IA", "server_error", "upstream_error")
+    try:  # spec 45 §E: os tipos de chamada da Unlimited aparecem na lista, com nomes neutros
+        j = r.json()
+        if r.status_code == 200 and isinstance(j.get("data"), list):
+            tem = {m.get("id") for m in j["data"] if isinstance(m, dict)}
+            j["data"] += [{"id": n, "object": "model", "owned_by": "unlimited"} for n in _NOMES if n not in tem]
+            return Response(json.dumps(j), media_type="application/json")
+    except Exception:  # noqa: BLE001
+        pass
     return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
 
 

@@ -17,11 +17,22 @@ from app.ctx import fail
 
 PADRAO = {
     # spec 45: os destinos "router" de um combo giram em rodízio (Claude <-> GPT); a casa fica sempre por último, de reserva
-    "rt-planejar": [{"router": "cc/claude-opus-5-5"}, {"router": "cx/gpt-6-sol"}, {"casa": "qwen-abliterated"}],
+    # spec 45 §E (17/11): Opus é o diretor principal; GPT forte (gasta mais) e o médio só de reserva
+    "rt-planejar": [{"router": "cc/claude-opus-5-5"}, {"router": "cx/gpt-6-sol", "reserva": True},
+                    {"router": "cc/claude-haiku-4-5-20251001", "reserva": True}, {"casa": "qwen-abliterated"}],
+    # planejamento médio: Claude barato (contas em rodízio no 9Router), GPT barato de reserva
+    "rt-medio": [{"router": "cc/claude-haiku-4-5-20251001"}, {"router": "cx/gpt-6-luna", "reserva": True}, {"casa": "qwen-abliterated"}],
     "rt-rapido": [{"router": "cc/claude-haiku-4-5-20251001"}, {"router": "cx/gpt-6-luna"}, {"casa": "qwen-abliterated"}],
+    # mão de obra: o Qwen da casa (não pagamos token); é o padrão de todo pedido comum
+    "rt-mao": [{"casa": "qwen-abliterated"}],
     "rt-livre": [{"casa": "qwen-abliterated"}],
     "rt-geral": [{"casa": "qwen-abliterated"}],
 }
+
+
+# Nomes neutros que o cliente vê dentro da conexão Unlimited (nunca nome comercial de modelo)
+NOMES = {"unlimited": "rt-auto", "mao-de-obra": "rt-mao", "planejamento-medio": "rt-medio",
+         "planejamento-forte": "rt-planejar", "livre": "rt-livre"}
 
 
 def combos(store) -> dict:
@@ -46,8 +57,10 @@ def validar(novo) -> dict:
             raise fail(422, f"combo inválido: {apelido}", "invalid_request_error", "combos_invalidos")
         dest = []
         for d in lista:
+            res = bool(d.get("reserva")) if isinstance(d, dict) else False
+            d = {k: v for k, v in d.items() if k != "reserva"} if isinstance(d, dict) else d
             if isinstance(d, dict) and len(d) == 1 and next(iter(d)) in ("router", "casa") and str(next(iter(d.values()))).strip():
-                dest.append({next(iter(d)): str(next(iter(d.values()))).strip()[:120]})
+                dest.append({next(iter(d)): str(next(iter(d.values()))).strip()[:120], **({"reserva": True} if res else {})})
             else:
                 raise fail(422, f"destino inválido em {apelido}", "invalid_request_error", "combos_invalidos")
         limpo[str(apelido)] = dest

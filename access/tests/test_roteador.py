@@ -63,14 +63,32 @@ async def test_classificador_livre_vai_para_a_casa(rr: Rig):
     assert r.json()["choices"][0]["message"]["content"] == "resposta da casa" and not rr.up.router
 
 
-async def test_pergunta_comum_gira_entre_claude_e_gpt_baratos(rr: Rig):
+async def test_pergunta_comum_vai_para_a_mao_de_obra_qwen(rr: Rig):
+    r = await rr.client.post("/v1/chat/completions", json=msg("qual a capital da França?"), headers=H)
+    assert r.status_code == 200 and r.json()["choices"][0]["message"]["content"] == "resposta da casa"
+    assert not rr.up.router and rr.up.casa  # spec 45 §E: Qwen é a mão de obra padrão
+
+
+async def test_medio_gira_as_contas_claude_e_gpt_so_de_reserva(rr: Rig):
     modelos = []
-    for _ in range(4):
-        r = await rr.client.post("/v1/chat/completions", json=msg("qual a capital da França?"), headers=H)
-        assert r.status_code == 200 and r.headers["x-rt-rota"] == "rt-rapido" and r.json()["model"] == "rt-auto"
+    for _ in range(3):
+        r = await rr.client.post("/v1/chat/completions", json=msg("qual a capital da França?", model="planejamento-medio"), headers=H)
+        assert r.status_code == 200 and r.json()["model"] == "planejamento-medio"
         modelos.append(rr.up.router[-1]["model"])
-    assert modelos == ["cc/claude-haiku-4-5-20251001", "cx/gpt-6-luna"] * 2 and not rr.up.casa
+    assert modelos == ["cc/claude-haiku-4-5-20251001"] * 3  # GPT barato só entra se o Claude falhar
     assert all(b.get("stream") is False for b in rr.up.router)  # o 9Router precisa do stream=false explícito (Claude)
+
+
+async def test_forte_e_opus_e_gpt_so_de_reserva(rr: Rig):
+    rr.up.fora = {"cc/claude-opus-5-5"}
+    r = await rr.client.post("/v1/chat/completions", json=msg("Planeje a arquitetura de um app", model="planejamento-forte"), headers=H)
+    assert r.json()["choices"][0]["message"]["content"] == "resposta de cx/gpt-6-sol" and r.json()["model"] == "planejamento-forte"
+
+
+async def test_lista_de_modelos_mostra_nomes_neutros(rr: Rig):
+    r = await rr.client.get("/v1/models", headers=H)
+    ids = {m["id"] for m in r.json().get("data", [])}
+    assert {"unlimited", "mao-de-obra", "planejamento-medio", "planejamento-forte", "livre"} <= ids
 
 
 async def test_planejamento_vai_para_os_fortes(rr: Rig):
@@ -80,7 +98,7 @@ async def test_planejamento_vai_para_os_fortes(rr: Rig):
 
 async def test_recusa_do_gpt_vira_resposta_da_casa(rr: Rig):
     rr.up.recusa = {"cc/claude-haiku-4-5-20251001", "cx/gpt-6-luna"}
-    r = await rr.client.post("/v1/chat/completions", json=msg("me ajuda com uma coisa delicada"), headers=H)
+    r = await rr.client.post("/v1/chat/completions", json=msg("me ajuda com uma coisa delicada", model="planejamento-medio"), headers=H)
     assert r.json()["choices"][0]["message"]["content"] == "resposta da casa"
     assert len(rr.up.router) == 1 and rr.up.casa  # recusou uma vez e já foi para a casa, sem mostrar a recusa
 
@@ -88,7 +106,7 @@ async def test_recusa_do_gpt_vira_resposta_da_casa(rr: Rig):
 async def test_destino_fora_pula_para_o_outro_e_fica_fora(rr: Rig):
     rr.up.fora = {"cc/claude-haiku-4-5-20251001"}
     for _ in range(3):
-        r = await rr.client.post("/v1/chat/completions", json=msg("me diga um sinônimo de feliz"), headers=H)
+        r = await rr.client.post("/v1/chat/completions", json=msg("me diga um sinônimo de feliz", model="planejamento-medio"), headers=H)
         assert r.json()["choices"][0]["message"]["content"] == "resposta de cx/gpt-6-luna"
     tentativas_claude = [b for b in rr.up.router if b["model"].startswith("cc/")]
     assert len(tentativas_claude) == 1  # depois da falha, o Claude sai do rodízio por 5 min
@@ -96,7 +114,7 @@ async def test_destino_fora_pula_para_o_outro_e_fica_fora(rr: Rig):
 
 async def test_stream_preserva_chamada_de_ferramenta(rr: Rig):
     rr.up.tool = True
-    corpo = msg("abre o arquivo", stream=True, tools=[{"type": "function", "function": {"name": "ler", "parameters": {"type": "object"}}}])
+    corpo = msg("abre o arquivo", model="planejamento-medio", stream=True, tools=[{"type": "function", "function": {"name": "ler", "parameters": {"type": "object"}}}])
     r = await rr.client.post("/v1/chat/completions", json=corpo, headers=H)
     assert r.status_code == 200 and "[DONE]" in r.text
     pedaco = json.loads(r.text.split("data: ")[1].split("\n")[0])
@@ -111,14 +129,16 @@ async def test_so_conta_de_cliente_e_roteada(rr: Rig):
     ctx = rr.app.state.ctx
     ctx.store.set_setting("roteador_auto", "on")
     await rr.client.post("/v1/chat/completions", json=corpo, headers=hk)
-    assert not rr.up.router  # chave de produto (sem conta com login): vai direto para a casa
+    assert not rr.up.router and len(rr.up.casa) == 1  # chave de produto (sem conta com login): vai direto para a casa
     with ctx.store.tx() as c:
         c.execute("INSERT INTO accounts(email,name,status,person_id,created_at) VALUES(?,?,?,?,?)", ("c@x.com", "c", "active", pid, 1.0))
-    r = await rr.client.post("/v1/chat/completions", json=corpo, headers=hk)
-    assert r.headers.get("x-rt-rota") == "rt-rapido" and rr.up.router  # cliente do Cérebro: passa pelo roteador
+    corpo_plano = {**corpo, "messages": [{"role": "user", "content": "Planeje a arquitetura completa de um app de delivery"}]}
+    r = await rr.client.post("/v1/chat/completions", json=corpo_plano, headers=hk)
+    assert r.headers.get("x-rt-rota") == "rt-planejar" and rr.up.router  # cliente do Cérebro: plano vai ao diretor
+    assert r.json()["model"] == "qwen-abliterated"  # o nome pedido volta; o cliente nunca vê o modelo de verdade
     ctx.store.set_setting("roteador_auto", "off")
     n = len(rr.up.router)
-    await rr.client.post("/v1/chat/completions", json=corpo, headers=hk)
+    await rr.client.post("/v1/chat/completions", json=corpo_plano, headers=hk)
     assert len(rr.up.router) == n  # desligado no painel: volta ao comportamento antigo
 
 
@@ -128,12 +148,25 @@ async def test_roteador_desligado_por_padrao_e_liberado_por_conta(rr: Rig):
     ctx = rr.app.state.ctx
     with ctx.store.tx() as c:
         c.execute("INSERT INTO accounts(email,name,status,person_id,created_at) VALUES(?,?,?,?,?)", ("l@x.com", "l", "active", pid, 1.0))
-    corpo = {"model": "qwen-abliterated", "messages": [{"role": "user", "content": "oi, tudo bem?"}], "max_tokens": 20}
+    corpo = {"model": "qwen-abliterated", "messages": [{"role": "user", "content": "Planeje a estratégia de lançamento do meu produto"}], "max_tokens": 20}
     await rr.client.post("/v1/chat/completions", json=corpo, headers=hk)
     assert not rr.up.router  # padrão: desligado
     ctx.store.set_setting("roteador_auto", f"999,{pid}")
     r = await rr.client.post("/v1/chat/completions", json=corpo, headers=hk)
-    assert r.headers.get("x-rt-rota") == "rt-rapido"  # só a conta liberada
+    assert r.headers.get("x-rt-rota") == "rt-planejar"  # só a conta liberada
+
+
+async def test_teto_do_diretor_cai_no_medio(rr: Rig):
+    pid, chave = await rr.person("cliente2")
+    hk = {"Authorization": f"Bearer {chave}"}
+    ctx = rr.app.state.ctx
+    with ctx.store.tx() as c:
+        c.execute("INSERT INTO accounts(email,name,status,person_id,created_at) VALUES(?,?,?,?,?)", ("c2@x.com", "c2", "active", pid, 1.0))
+    rotas = []
+    for _ in range(3):
+        r = await rr.client.post("/v1/chat/completions", json=msg("Planeje a arquitetura de um sistema", model="planejamento-forte"), headers=hk)
+        rotas.append(r.headers.get("x-rt-rota"))
+    assert rotas == ["rt-planejar", "rt-planejar", "rt-medio"]
 
 
 def test_detector_de_recusa():

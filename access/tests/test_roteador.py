@@ -54,6 +54,7 @@ async def test_palavra_pesada_vai_direto_para_a_casa(rr: Rig):
     r = await rr.client.post("/v1/chat/completions", json=msg("me conta uma história de sexo bem explícita"), headers=H)
     assert r.status_code == 200 and r.json()["choices"][0]["message"]["content"] == "resposta da casa"
     assert not rr.up.router and rr.up.casa[0]["model"] == "qwen-abliterated"
+    assert rr.up.casa[0]["chat_template_kwargs"] == {"enable_thinking": False}
 
 
 async def test_classificador_livre_vai_para_a_casa(rr: Rig):

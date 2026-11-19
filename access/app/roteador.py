@@ -138,6 +138,40 @@ class Rodizio:
 RODIZIO = Rodizio()
 
 
+# ------------------------------------------------------------------ usage honesto
+def estimar_tokens(body: dict) -> int:
+    """Tamanho do pedido em tokens, pela contagem de caracteres (mensagens, chamadas de ferramenta e definições de ferramenta).
+    ~3,3 caracteres por token em português com código; imagens não contam. É estimativa, não cobrança."""
+    partes: list[str] = []
+    for m in body.get("messages") or []:
+        c = m.get("content")
+        if isinstance(c, str):
+            partes.append(c)
+        elif isinstance(c, list):
+            partes += [str(x.get("text") or "") for x in c if isinstance(x, dict)]
+        if m.get("tool_calls"):
+            partes.append(json.dumps(m["tool_calls"], ensure_ascii=False))
+    if body.get("tools"):
+        partes.append(json.dumps(body["tools"], ensure_ascii=False))
+    n = sum(len(p) for p in partes)
+    return int(n / 3.3) if n else 0
+
+
+def uso_real(body: dict, usage: dict | None) -> dict | None:
+    """O 9Router global devolve prompt_tokens bem abaixo do real nos destinos cc/ (medido 19/11/2026: pedido de ~13 mil tokens voltou
+    prompt_tokens=2009, sem campos de cache). O Hermes decide quando comprimir pelo usage: com o número falso ele achava o contexto
+    pequeno e não comprimia (e o Qwen, com janela de 131 mil, estouraria). Se o informado for menos de 60% da estimativa, vale a
+    estimativa. Só o que volta ao cliente muda; a cobrança não passa por aqui."""
+    est = estimar_tokens(body)
+    u = dict(usage or {})
+    p = int(u.get("prompt_tokens") or 0)
+    if est and p < est * 0.6:
+        c = int(u.get("completion_tokens") or 0)
+        u["prompt_tokens"] = est
+        u["total_tokens"] = est + c
+    return u or None
+
+
 def sse_de(j: dict) -> str:
     """Resposta completa em SSE, com texto E chamadas de ferramenta (o agente do Hermes depende delas)."""
     msg = (j.get("choices") or [{}])[0].get("message") or {}

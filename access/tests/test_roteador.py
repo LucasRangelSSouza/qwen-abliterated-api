@@ -184,3 +184,20 @@ def test_detector_de_recusa():
     assert rt.e_recusa(j("I can't help with that request."))
     assert not rt.e_recusa(j("A capital da Austrália é Canberra."))
     assert not rt.e_recusa(j("# Arquitetura. Para um app de delivery... " + "x" * 2000))
+
+
+def test_usage_do_roteador_reflete_o_tamanho_real_do_pedido():
+    # 19/11/2026: o 9Router devolveu prompt_tokens=2009 para um pedido de ~13 mil tokens; o Hermes nao comprimia
+    from app import roteador as rt
+    body = {"messages": [{"role": "system", "content": "Regra de exemplo para ocupar contexto. " * 1500},
+                         {"role": "user", "content": "diga ok"}],
+            "tools": [{"type": "function", "function": {"name": "ler", "parameters": {"type": "object"}}}]}
+    est = rt.estimar_tokens(body)
+    assert est > 15000
+    u = rt.uso_real(body, {"prompt_tokens": 2009, "completion_tokens": 4, "total_tokens": 2013})
+    assert u["prompt_tokens"] == est and u["total_tokens"] == est + 4 and u["completion_tokens"] == 4
+    # numero coerente (mais de 60% da estimativa) fica como veio
+    assert rt.uso_real(body, {"prompt_tokens": est, "completion_tokens": 1})["prompt_tokens"] == est
+    # sem usage nenhum, ainda devolve a estimativa
+    assert rt.uso_real(body, None)["prompt_tokens"] == est
+    assert rt.uso_real({"messages": []}, None) is None

@@ -278,6 +278,7 @@ async def chat(request: Request):
                     break
                 _log_rota(ctx, pedido, apelido, alvo["router"], "ok", motivo, t0)
                 j["model"] = pedido
+                j["usage"] = rt.uso_real(body, j.get("usage"))  # o agente decide a compressão por este número: tem que ser o tamanho real
                 resposta = j
                 break
         if resposta is not None:

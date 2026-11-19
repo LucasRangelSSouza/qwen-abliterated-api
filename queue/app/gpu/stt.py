@@ -18,8 +18,6 @@ if [ ! -x venv/bin/uvicorn ]; then
   python3 -m venv venv || exit 1
   nice -n 15 ./venv/bin/pip install -q --no-cache-dir faster-whisper fastapi uvicorn python-multipart "av>=14,<17" || exit 1
 fi
-# ditado ao vivo (VERSAO 3): o uvicorn so aceita WebSocket com o pacote websockets; venv antigo nao tinha
-./venv/bin/python -c "import websockets" 2>/dev/null || nice -n 15 ./venv/bin/pip install -q --no-cache-dir websockets || exit 1
 for p in $(pgrep -f "[u]vicorn stt_server"); do kill "$p"; done
 setsid nohup nice -n 15 env STT_THREADS=${STT_THREADS:-16} HF_HOME=/workspace/stt/hf ./venv/bin/uvicorn stt_server:app --host 127.0.0.1 --port 18002 > server.log 2>&1 < /dev/null &
 for _ in $(seq 1 60); do curl -s -m 2 http://127.0.0.1:18002/health >/dev/null && exit 0; sleep 3; done

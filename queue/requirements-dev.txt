@@ -2,5 +2,3 @@
 pytest==8.3.4
 pytest-asyncio==0.25.0
 fakeredis==2.26.2
-python-multipart==0.0.20  # testes do ditado importam o stt_server (rota de upload usa Form)
-numpy==1.26.4  # Fluxo do stt_server entrega o audio como float32 (na maquina vem com o faster-whisper)

@@ -14,7 +14,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 import redis.asyncio as aioredis
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
@@ -518,6 +518,62 @@ def create_app(s: Settings | None = None, *, controller: GPUController | None = 
         except httpx.HTTPError:
             raise HTTPException(502, detail=_err("falha ao falar com o servico de transcricao", "server_error", "upstream_error"))
         return Response(r.content, status_code=r.status_code, media_type=r.headers.get("content-type", "application/json"))
+
+    @app.websocket("/v1/audio/stream")
+    async def audio_stream(ws: WebSocket):
+        """Ditado ao vivo (spec 49): repassa o WebSocket, nos dois sentidos, ao stt_server da maquina do LLM (mesmo tunel da 18002).
+        Nao acorda a GPU nem entra na fila do chat; maquina fora do ar = Error na hora (o app volta ao ditado antigo)."""
+        import websockets
+
+        q: App = ws.app.state.q
+        await ws.accept()
+
+        async def erro(msg: str, codigo: int = 1011):
+            await ws.send_text(json.dumps({"type": "Error", "data": msg}))
+            await ws.close(codigo)
+
+        try:
+            q.auth(ws)
+        except HTTPException:
+            return await erro("chave de API invalida", 1008)
+        if not q.s.stt_enabled:
+            return await erro("ditado desligado nesta instalacao (STT_ENABLED)")
+        if q.ctl.state != READY:
+            return await erro("a maquina da IA nao esta pronta agora", 1013)
+        alvo = q.s.stt_upstream.replace("http://", "ws://").replace("https://", "wss://").rstrip("/") + "/v1/audio/stream"
+        if ws.url.query:
+            alvo += "?" + ws.url.query
+        try:
+            async with websockets.connect(alvo, open_timeout=10, max_size=2**22) as up:
+                async def subir():
+                    while True:
+                        m = await ws.receive()
+                        if m.get("type") == "websocket.disconnect":
+                            await up.close()
+                            return
+                        if m.get("bytes") is not None:
+                            await up.send(m["bytes"])
+                        elif m.get("text") is not None:
+                            await up.send(m["text"])
+
+                async def descer():
+                    async for m in up:
+                        await (ws.send_bytes(m) if isinstance(m, bytes) else ws.send_text(m))
+
+                tarefas = [asyncio.create_task(subir()), asyncio.create_task(descer())]
+                _, pendentes = await asyncio.wait(tarefas, return_when=asyncio.FIRST_COMPLETED)
+                for t in pendentes:
+                    t.cancel()
+        except Exception:  # noqa: BLE001  servico de voz fora do ar ou conexao caiu
+            try:
+                await erro("falha ao falar com o servico de ditado")
+            except Exception:  # noqa: BLE001
+                pass
+            return
+        try:
+            await ws.close()
+        except Exception:  # noqa: BLE001
+            pass
 
     @app.post("/v1/embeddings")
     async def embeddings(request: Request):

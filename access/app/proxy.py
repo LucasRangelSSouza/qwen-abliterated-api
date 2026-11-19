@@ -9,7 +9,7 @@ import math
 import time
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request, WebSocket
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from app.dberr import DB_ERRORS
@@ -460,6 +460,70 @@ async def _media_generate(request: Request, path: str, route: str):
         mediaquota.undo(ctx.store, cota)  # pedido recusado ou falho: nao gasta a cota
     _log(ctx, p, route, 0, 0, 0, "ok" if r.status_code in (200, 202) else "upstream_error", None)
     return Response(r.content, status_code=r.status_code, headers=_pass_headers(r.headers), media_type=r.headers.get("content-type", "application/json"))
+
+
+# ---- ditado ao vivo (spec 49): WebSocket do app -> llm-queue -> stt_server da maquina do LLM, no protocolo
+# linear16/KeepAlive/CloseStream/TranscriptInterim/TranscriptText/TranscriptEndpoint. Aceita `Authorization: <chave>` ou `Bearer <chave>`.
+class _SoCabecalhos:
+    def __init__(self, chave: str):
+        self.headers = {"authorization": "Bearer " + chave}
+
+
+@router.websocket("/v1/audio/stream")
+async def audio_stream(ws: WebSocket):
+    from websockets.asyncio.client import connect as ws_connect  # cliente novo (websockets >= 13): additional_headers
+
+    await ws.accept()
+    ctx = ws.app.state.ctx
+
+    async def erro(msg: str, codigo: int = 1011):
+        await ws.send_text(json.dumps({"type": "Error", "data": msg}, ensure_ascii=False))
+        await ws.close(codigo)
+
+    bruto = ws.headers.get("authorization", "").strip()
+    chave = bruto[7:].strip() if bruto.lower().startswith("bearer ") else bruto
+    try:
+        p = authenticate(ctx, _SoCabecalhos(chave))
+    except HTTPException as e:
+        return await erro(str(getattr(e, "detail", "chave invalida"))[:120] if e.status_code != 401 else "chave de API invalida", 1008)
+    alvo = ctx.s.upstream_base.replace("http://", "ws://").replace("https://", "wss://").rstrip("/") + "/v1/audio/stream"
+    if ws.url.query:
+        alvo += "?" + ws.url.query
+    t0 = time.time()
+    status = "ok"
+    try:
+        async with ws_connect(alvo, additional_headers=_media_headers(ctx, p), open_timeout=10, max_size=2**22) as up:
+            async def subir():
+                while True:
+                    m = await ws.receive()
+                    if m.get("type") == "websocket.disconnect":
+                        await up.close()
+                        return
+                    if m.get("bytes") is not None:
+                        await up.send(m["bytes"])
+                    elif m.get("text") is not None:
+                        await up.send(m["text"])
+
+            async def descer():
+                async for m in up:
+                    await (ws.send_bytes(m) if isinstance(m, bytes) else ws.send_text(m))
+
+            tarefas = [asyncio.create_task(subir()), asyncio.create_task(descer())]
+            _, pendentes = await asyncio.wait(tarefas, return_when=asyncio.FIRST_COMPLETED)
+            for t in pendentes:
+                t.cancel()
+    except Exception:  # noqa: BLE001  llm-queue fora ou conexao caiu: o app volta ao ditado antigo
+        status = "upstream_error"
+        try:
+            await erro("falha ao falar com o servico de ditado")
+        except Exception:  # noqa: BLE001
+            pass
+    finally:
+        _log(ctx, p, "audio_stream", 0, 0, int(time.time() - t0), status, None)  # total = segundos de conexao
+        try:
+            await ws.close()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 # ---- ditado: o audio (multipart) segue como veio para o Whisper da maquina do LLM; nao gasta tokens, so autentica e registra o uso

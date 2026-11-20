@@ -48,6 +48,8 @@ class Settings:
     image_router_url: str = ""      # IMAGE_ROUTER_URL: 9Router global (llm-gateway). Com URL e chave, imagem sai pelo ChatGPT em vez da GPU de midia
     image_router_key: str = ""
     image_router_model: str = "cx/gpt-image-2"
+    stt_stream_url: str = "wss://gw.rangeltech.net/api/ws/speech_to_text/voice_stream"  # STT_STREAM_URL: transcricao ao vivo (spec 52), stream do 9Router global
+    stt_stream_key: str = ""        # STT_STREAM_KEY: chave do 9Router para o stream; vazia = usa IMAGE_ROUTER_KEY
     media_backend: str = "gpu"       # MEDIA_BACKEND=runware: video e voz pela Runware (Estudio) em vez da GPU de midia
     runware_mock: bool = False      # RUNWARE_MOCK=1: responde sem chamar a Runware (QA e desenvolvimento, custo zero)
 
@@ -84,6 +86,8 @@ class Settings:
             image_router_url=e("IMAGE_ROUTER_URL", ""),
             image_router_key=_secret("IMAGE_ROUTER_KEY"),
             image_router_model=e("IMAGE_ROUTER_MODEL", cls.image_router_model),
+            stt_stream_url=e("STT_STREAM_URL", cls.stt_stream_url),
+            stt_stream_key=_secret("STT_STREAM_KEY"),
             media_backend=e("MEDIA_BACKEND", "gpu"),
             runware_mock=e("RUNWARE_MOCK", "0").strip().lower() in ("1", "true", "yes", "on"),
         )

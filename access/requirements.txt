@@ -7,3 +7,4 @@ edge-tts==7.3.1
 faster-whisper==1.1.1
 python-multipart==0.0.20
 requests==2.32.3  # faster-whisper baixa o modelo na montagem da imagem e o huggingface_hub novo nao traz mais o requests (CI quebrado desde 17/11)
+websockets==13.1  # spec 52: o uvicorn so aceita WebSocket com ele, e o llm-access abre o stream do 9Router

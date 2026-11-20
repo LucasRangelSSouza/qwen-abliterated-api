@@ -395,7 +395,7 @@ async def test_vm_ainda_nao_pronta_manda_email_do_espaco_exclusivo_e_pronta_mand
     from tests.test_accounts import definir_senha
     await r.login()
     await definir_senha(r, aid)
-    assert len(enviados) == 1 and "preparado" in enviados[0][1] and "workspace" in enviados[0][2] and "remoto.rangeltech.net" not in enviados[0][2]
+    assert len(enviados) == 1 and "preparado" in enviados[0][1] and "workspace" in enviados[0][2] and "app.segundocerebro.pro" not in enviados[0][2]
     # Contabo recusa o cartao: o motivo aparece no painel e ninguem recebe e-mail de "pronta"
     inst = list(fake.instances.values())[-1]
     inst["status"], inst["errorMessage"] = "pending_payment", "insufficient_funds,O cartão de crédito não tem fundos suficientes."

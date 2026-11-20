@@ -384,7 +384,7 @@ async def test_depois_de_definir_a_senha_manda_e_mail_ensinando_onde_e_como_entr
     para, assunto, texto = enviados[0]
     # sem maquina virtual: ensina a BAIXAR o aplicativo (links da ultima versao), cita o plano e o acesso pelo navegador (Spec 25 §11.1)
     assert para == "ana@exemplo.com" and "baixe" in assunto.lower()
-    assert "releases/latest/download/Segundo-Cerebro-Windows.exe" in texto and "remoto.rangeltech.net" in texto and "ana@exemplo.com" in texto
+    assert "releases/latest/download/Segundo-Cerebro-Windows.exe" in texto and "app.segundocerebro.pro" in texto and "ana@exemplo.com" in texto
     assert "Seu plano:" in texto
 
 

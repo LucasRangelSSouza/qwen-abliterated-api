@@ -41,7 +41,7 @@ class Settings:
     session_ttl_s: float = 12 * 3600
     request_timeout_s: float = 1800.0
     cakto_webhook_secret: str = ""  # CAKTO_WEBHOOK_SECRET: sem ele o webhook responde 503 (nunca fica aberto)
-    site_origins: str = "https://brain.rangeltech.net,https://remoto.rangeltech.net"  # SITE_ORIGINS: origens que podem chamar /v1/free pelo navegador
+    site_origins: str = "https://segundocerebro.pro,https://www.segundocerebro.pro,https://app.segundocerebro.pro,https://brain.rangeltech.net,https://remoto.rangeltech.net"  # SITE_ORIGINS: origens que podem chamar /v1/free pelo navegador
     secrets_key: str = ""           # SECRETS_KEY: chave mestra que cifra credenciais guardadas no banco (Contabo); sem ela nao guarda
     runware_api_key: str = ""       # RUNWARE_API_KEY: Estudio (modelos de ponta na Runware, spec 36). Vazia = Estudio responde "em breve"; a chave nunca sai do servidor
     runware_url: str = "https://api.runware.ai/v1"

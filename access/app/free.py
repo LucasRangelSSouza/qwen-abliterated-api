@@ -210,7 +210,7 @@ async def login(request: Request):
     if not acc or acc["status"] != "active" or not A.verify_password(senha, acc["pw_hash"]):
         raise fail(401, "E-mail ou senha incorretos.", "invalid_request_error", "bad_login")
     if _pago(ctx, acc["id"]):  # já é assinante: o teste não se aplica
-        return {"paid": True, "email": email, "message": "Você já é assinante. Entre pelo aplicativo ou em remoto.rangeltech.net."}
+        return {"paid": True, "email": email, "message": "Você já é assinante. Entre pelo aplicativo ou em app.segundocerebro.pro."}
     t = _trial(ctx, acc["id"])
     if not t:
         raise fail(403, "Esta conta não tem teste grátis. Entre pelo aplicativo.", "invalid_request_error", "no_trial")

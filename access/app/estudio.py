@@ -32,8 +32,8 @@ MAX_WAIT_S = 900.0
 # Efeito -> modelo da Runware. `taxas`: preco por unidade (dolar) por qualidade; `unidade`: segundo de video, caractere de texto ou imagem.
 # `qualidade` padrao = a mais barata que resolve. `entrada`: o que o cliente precisa mandar (URL publica ou dataURI, como a Runware aceita).
 CATALOGO: dict[str, dict] = {
-    "video-rapido": {"rotulo": "Vídeo a partir de texto ou foto (rápido)", "kind": "video", "task": "videoInference", "modelo": "prunaai:p-video@2-pro",
-                     "unidade": "segundo", "taxas": {"480p": 0.01, "768p": 0.025, "1080p": 0.05}, "padrao": "480p", "entrada": ["positivePrompt", "frameImages?"],
+    "video-rapido": {"rotulo": "Vídeo a partir de texto ou foto (rápido)", "kind": "video", "task": "videoInference", "modelo": "prunaai:p-video@2-pro", "dur": (5, 15),
+                     "unidade": "segundo", "taxas": {"480p": 0.0207, "768p": 0.05, "1080p": 0.10}, "padrao": "480p", "entrada": ["positivePrompt", "frameImages?"],
                      "tempo_s": {"480p": 35, "768p": 60, "1080p": 90}},
     "video-ponta": {"rotulo": "Vídeo de ponta (Wan 3.0)", "kind": "video", "task": "videoInference", "modelo": "alibaba:wan@3.0",
                     "unidade": "segundo", "taxas": {"480p": 0.05, "720p": 0.10, "1080p": 0.20}, "padrao": "480p", "entrada": ["positivePrompt", "frameImages?", "referenceImages?"],
@@ -41,7 +41,7 @@ CATALOGO: dict[str, dict] = {
     "video-premium": {"rotulo": "Vídeo premium (Seedance 2.0)", "kind": "video", "task": "videoInference", "modelo": "bytedance:seedance@2.0",
                       "unidade": "segundo", "taxas": {"480p": 0.07, "720p": 0.16, "1080p": 0.40}, "padrao": "480p", "entrada": ["positivePrompt", "referenceImages?", "referenceVideos?"],
                       "tempo_s": {"480p": 120, "720p": 160, "1080p": 240}},
-    "video-google": {"rotulo": "Vídeo com som (Veo 3.1)", "kind": "video", "task": "videoInference", "modelo": "google:3@2",
+    "video-google": {"rotulo": "Vídeo com som (Veo 3.1)", "kind": "video", "task": "videoInference", "modelo": "google:3@2", "dur": (4, 8),
                      "unidade": "segundo", "taxas": {"720p": 0.20, "720p-audio": 0.40}, "padrao": "720p", "entrada": ["positivePrompt", "frameImages?"],
                      "tempo_s": {"720p": 120, "720p-audio": 150}},
     "trocar-personagem": {"rotulo": "Me coloca nesse vídeo (troca de personagem)", "kind": "video", "task": "videoInference", "modelo": "prunaai:p-video@2-pro-replace",
@@ -78,7 +78,10 @@ def _quantidade(efeito: dict, body: dict) -> float:
     if efeito["unidade"] == "segundo":
         n = max(1.0, float(body.get("segundos") or body.get("seconds") or 5))
         if efeito["entrada"][0] not in ("video", "referenceImages") and "partes_s" not in efeito:  # gera do zero: 4 a 15 s por pedido
-            n = min(max(n, DURACAO["min"]), DURACAO["max"])
+            lo, hi = efeito.get("dur") or (DURACAO["min"], DURACAO["max"])  # cada modelo tem a sua faixa (Runware recusa fora dela)
+            n = min(max(n, lo), hi)
+            if efeito.get("modelo", "").startswith("google:"):  # Veo so aceita 4, 6 ou 8 s
+                n = min(8.0, max(4.0, 2 * round(n / 2)))
         return n
     if efeito["unidade"] == "caractere":
         return max(1.0, float(len(str(body.get("texto") or body.get("text") or ""))))

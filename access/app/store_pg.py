@@ -96,6 +96,8 @@ class PgStore:
             c.execute("ALTER TABLE limits ADD COLUMN IF NOT EXISTS custom BIGINT NOT NULL DEFAULT 0")
             c.execute("ALTER TABLE plans ADD COLUMN IF NOT EXISTS video_quota_month BIGINT")
             c.execute("ALTER TABLE plans ADD COLUMN IF NOT EXISTS audio_quota_month BIGINT")
+            c.execute("ALTER TABLE accounts ADD COLUMN IF NOT EXISTS email_ok_em DOUBLE PRECISION")  # spec 53: e-mail confirmado (informativo)
+            c.execute("ALTER TABLE accounts ADD COLUMN IF NOT EXISTS email_ok_hash TEXT")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS external_id TEXT")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS billing_status TEXT")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS next_payment_at DOUBLE PRECISION")

@@ -51,7 +51,8 @@ def test_boas_vindas_tem_texto_e_html_com_logo_e_conta_liberada(monkeypatch):
     assert msg.get_content_type() == "multipart/alternative"
     partes = _partes(msg)
     link = "https://brain.teste/definir-senha?token=tok123"
-    assert link in partes["text/plain"] and "já está liberada" in partes["text/plain"] and "equipe" not in partes["text/plain"]
+    # spec 53: o e-mail so informa (entra direto no app e cria a senha na hora); o link continua para quem preferir
+    assert link in partes["text/plain"] and "criar a sua senha ali mesmo" in partes["text/plain"] and "equipe" not in partes["text/plain"]
     assert link in partes["text/html"] and 'src="https://brain.teste/assets/img/logo.png"' in partes["text/html"] and "#cc6a47" in partes["text/html"]
     assert "Olá, Ana!" in partes["text/html"] and "equipe" not in partes["text/html"]
 

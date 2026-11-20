@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import secrets
 from collections import defaultdict, deque
 
 from fastapi import APIRouter, Request
@@ -92,6 +93,37 @@ def _check_login(ctx, request: Request, email: str, pw: str):
     return acc, person, sub, plan
 
 
+def _primeiro_acesso(ctx, request: Request, b: dict, email: str, pw: str) -> bool:
+    """Spec 53 (cadastro direto): quem comprou e ainda NAO tem senha cria a senha ali mesmo, na tela de entrar, e ja entra.
+    So vale para conta ativa, com assinatura em uso e SEM senha; quem ja tem senha segue o login normal (e o "esqueci a senha").
+    O e-mail continua indo, mas so informa e traz o link para confirmar o endereco (nao bloqueia nada)."""
+    acc = A.find_account(ctx, email)
+    if acc is None or acc["pw_hash"]:
+        return False
+    now = ctx.clock()
+    if not (_limit(request, "ip:" + _ip(request), 30, 600, now) and _limit(request, "em:" + email, 10, 600, now)):
+        raise fail(429, "muitas tentativas; aguarde alguns minutos", "rate_limit_error", "too_many_attempts", headers={"Retry-After": "600"})
+    if acc["status"] != "active":
+        raise fail(403, "conta bloqueada; fale com o suporte", "invalid_request_error", "account_blocked")
+    A.lapse_sweep(ctx)
+    if not A.sub_allows_use(ctx, A.current_sub(ctx, acc["id"])):
+        raise fail(403, "nao achamos uma assinatura ativa com este e-mail; confira o e-mail da compra", "invalid_request_error", "subscription_inactive")
+    problema = A.weak_password(pw)
+    if problema:
+        raise fail(422, problema, "invalid_request_error", "weak_password", first_access=True)
+    from app import terms
+    if terms.aceitou(ctx, acc["email"], acc["id"]) is None:  # conta nova: o aceite dos termos continua obrigatorio (caixa na tela)
+        terms.exigir_aceite(ctx, b, request, acc["email"], "app", account_id=acc["id"])
+    tok = secrets.token_urlsafe(32)
+    with ctx.store.tx() as c:
+        c.execute("UPDATE accounts SET pw_hash=?, setup_hash=NULL, setup_expires=NULL, email_ok_hash=? WHERE id=?", (A.hash_password(pw), sha256(tok), acc["id"]))
+    try:
+        mailer.send_bem_vindo(ctx, acc["email"], acc["name"] or "", tok)
+    except Exception:  # noqa: BLE001  e-mail nunca derruba a entrada
+        pass
+    return True
+
+
 @router.post("/v1/auth/login")
 @_db
 async def auth_login(request: Request):
@@ -99,13 +131,14 @@ async def auth_login(request: Request):
     now = ctx.clock()
     b = await _json(request)
     email, pw, device = A.norm_email(b.get("email")), str(b.get("password") or ""), str(b.get("device") or "")
+    primeiro = _primeiro_acesso(ctx, request, b, email, pw)
     acc, person, sub, plan = _check_login(ctx, request, email, pw)
     key = A.device_key(ctx, person["id"], device, int(plan["max_devices"] or 0) if plan else 0)
     with ctx.store.tx() as c:
         c.execute("UPDATE accounts SET last_login=? WHERE id=?", (now, acc["id"]))
     lvl = ctx.store.one("SELECT safety_level FROM people WHERE id=?", (person["id"],))
     return {"api_key": key, "safety_level": int(lvl["safety_level"]) if lvl else 1, "account": {"email": acc["email"], "name": acc["name"]}, "plan": {"id": sub["plan"], "name": plan["name"] if plan else sub["plan"], "skill_pack": A.skill_pack(sub["plan"])},
-            "next_payment_at": iso(sub["next_payment_at"])}
+            "next_payment_at": iso(sub["next_payment_at"]), "first_access": primeiro, "email_confirmed": bool(acc["email_ok_em"])}
 
 
 @router.post("/v1/auth/verify")
@@ -114,8 +147,10 @@ async def auth_verify(request: Request):
     """Confere e-mail+senha SEM emitir chave de maquina (nao gasta o limite de computadores). Usada pelo acesso web remoto."""
     ctx = request.app.state.ctx
     b = await _json(request)
-    acc, _person, sub, plan = _check_login(ctx, request, A.norm_email(b.get("email")), str(b.get("password") or ""))
-    return {"account_id": acc["id"], "email": acc["email"], "name": acc["name"], "plan": {"id": sub["plan"], "name": plan["name"] if plan else sub["plan"]}}
+    email, pw = A.norm_email(b.get("email")), str(b.get("password") or "")
+    primeiro = _primeiro_acesso(ctx, request, b, email, pw)  # o acesso pelo navegador (app.segundocerebro.pro) tambem cria a senha na hora
+    acc, _person, sub, plan = _check_login(ctx, request, email, pw)
+    return {"account_id": acc["id"], "email": acc["email"], "name": acc["name"], "plan": {"id": sub["plan"], "name": plan["name"] if plan else sub["plan"]}, "first_access": primeiro}
 
 
 @router.get("/v1/auth/whoami")
@@ -125,7 +160,7 @@ async def auth_whoami(request: Request):
     from app.proxy import authenticate
     ctx = request.app.state.ctx
     p = authenticate(ctx, request)
-    acc = ctx.store.one("SELECT id,email,name,status FROM accounts WHERE person_id=?", (p.person_id,)) if p.kind == "person" else None
+    acc = ctx.store.one("SELECT id,email,name,status,email_ok_em FROM accounts WHERE person_id=?", (p.person_id,)) if p.kind == "person" else None
     if acc is None or acc["status"] != "active":
         raise fail(403, "esta chave nao pertence a uma conta ativa", "invalid_request_error", "no_account")
     sub = A.current_sub(ctx, acc["id"])
@@ -134,7 +169,8 @@ async def auth_whoami(request: Request):
     lvl = ctx.store.one("SELECT safety_level FROM people WHERE id=?", (p.person_id,))
     return {"account_id": acc["id"], "email": acc["email"], "name": acc["name"], "safety_level": int(lvl["safety_level"]) if lvl else 1,
             "plan": {"id": sub["plan"], "skill_pack": A.skill_pack(sub["plan"])},
-            "termos_aceitos": __import__("app.terms", fromlist=["aceitou"]).aceitou(ctx, acc["email"], acc["id"])}
+            "termos_aceitos": __import__("app.terms", fromlist=["aceitou"]).aceitou(ctx, acc["email"], acc["id"]),
+            "email_confirmed": bool(acc["email_ok_em"])}
 
 
 @router.get("/v1/credits")
@@ -209,7 +245,7 @@ async def auth_set_password(request: Request):
     elif b.get("aceite_termos"):
         terms.exigir_aceite(ctx, b, request, acc["email"], "site", account_id=acc["id"])
     with ctx.store.tx() as c:
-        c.execute("UPDATE accounts SET pw_hash=?, setup_hash=NULL, setup_expires=NULL WHERE id=?", (A.hash_password(str(b["password"])), acc["id"]))
+        c.execute("UPDATE accounts SET pw_hash=?, setup_hash=NULL, setup_expires=NULL, email_ok_em=COALESCE(email_ok_em, ?) WHERE id=?", (A.hash_password(str(b["password"])), now, acc["id"]))
     try:
         # o e-mail depois da senha muda conforme o plano e a maquina (Spec 25 §11.1)
         vm = ctx.store.one("SELECT status FROM vms WHERE account_id=? AND status NOT IN ('canceled','error') ORDER BY id DESC LIMIT 1", (acc["id"],))
@@ -225,6 +261,48 @@ async def auth_set_password(request: Request):
     except Exception:  # noqa: BLE001  e-mail nunca derruba a troca de senha
         pass
     return {"ok": True}
+
+
+@router.get("/v1/auth/confirmar-email")
+@_db
+async def auth_confirmar_email(request: Request, t: str = ""):
+    """Link do e-mail de boas-vindas (spec 53): marca o endereco como confirmado e mostra uma pagina simples. Nunca bloqueou nada."""
+    from fastapi.responses import HTMLResponse
+    ctx = request.app.state.ctx
+    acc = ctx.store.one("SELECT id FROM accounts WHERE email_ok_hash=?", (sha256(t),)) if t else None
+    if acc is not None:
+        with ctx.store.tx() as c:
+            c.execute("UPDATE accounts SET email_ok_em=COALESCE(email_ok_em, ?), email_ok_hash=NULL WHERE id=?", (ctx.clock(), acc["id"]))
+    ok = acc is not None
+    titulo = "E-mail confirmado" if ok else "Link já usado ou vencido"
+    texto = ("Pronto! Seu e-mail está confirmado. Pode fechar esta página e voltar ao Cérebro Pro." if ok
+             else "Se o seu e-mail ainda aparece como não confirmado no aplicativo, peça um link novo por lá.")
+    marca = "✓" if ok else "!"
+    return HTMLResponse(f'<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{titulo}</title>'
+                        f'<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0f19;color:#e8f4ff;font-family:system-ui,sans-serif">'
+                        f'<div style="max-width:420px;padding:32px;text-align:center"><div style="font-size:44px">{marca}</div><h1 style="font-size:22px">{titulo}</h1>'
+                        f'<p style="color:#9fb6cc;line-height:1.6">{texto}</p></div>')
+
+
+@router.post("/v1/auth/reenviar-confirmacao")
+@_db
+async def auth_reenviar_confirmacao(request: Request):
+    """Botao do alerta "confirme seu e-mail" no app: manda um link novo (com limite)."""
+    from app.proxy import authenticate
+    ctx = request.app.state.ctx
+    p = authenticate(ctx, request)
+    acc = ctx.store.one("SELECT id,email,name,email_ok_em FROM accounts WHERE person_id=?", (p.person_id,)) if p.kind == "person" else None
+    if acc is None:
+        raise fail(403, "esta chave nao pertence a uma conta", "invalid_request_error", "no_account")
+    if acc["email_ok_em"]:
+        return {"ok": True, "email_confirmed": True}
+    if not _limit(request, "rc:" + str(acc["id"]), 3, 3600, ctx.clock()):
+        raise fail(429, "ja mandamos alguns links; confira a caixa de entrada e o spam", "rate_limit_error", "too_many_attempts", headers={"Retry-After": "3600"})
+    tok = secrets.token_urlsafe(32)
+    with ctx.store.tx() as c:
+        c.execute("UPDATE accounts SET email_ok_hash=? WHERE id=?", (sha256(tok), acc["id"]))
+    mailer.send_confirmar_email(ctx, acc["email"], acc["name"] or "", tok)
+    return {"ok": True, "email_confirmed": False}
 
 
 @router.post("/v1/auth/forgot")

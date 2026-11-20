@@ -129,6 +129,10 @@ class Store:
             for col in ("video_quota_month", "audio_quota_month"):  # cota de midia por plano (NULL = ainda nao configurada, nao bloqueia)
                 if col not in cols_plans:
                     c.execute(f"ALTER TABLE plans ADD COLUMN {col} INTEGER")
+            cols_acc = {r["name"] for r in c.execute("PRAGMA table_info(accounts)").fetchall()}
+            for col, tipo in (("email_ok_em", "REAL"), ("email_ok_hash", "TEXT")):  # spec 53: e-mail confirmado (so informativo, nao bloqueia)
+                if col not in cols_acc:
+                    c.execute(f"ALTER TABLE accounts ADD COLUMN {col} {tipo}")
             cols_vms = {r["name"] for r in c.execute("PRAGMA table_info(vms)").fetchall()}
             for col, tipo in (("external_id", "TEXT"), ("billing_status", "TEXT"), ("next_payment_at", "REAL")):  # cobranca propria da VM (produto da Cakto)
                 if col not in cols_vms:

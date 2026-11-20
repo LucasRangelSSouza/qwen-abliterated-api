@@ -21,6 +21,10 @@ def setup_link(token: str) -> str:
     return f"{site_url()}/definir-senha?token={token}"
 
 
+def api_url() -> str:
+    return os.environ.get("API_URL", "https://api.segundocerebro.pro").rstrip("/")
+
+
 def logo_url() -> str:
     return f"{site_url()}/assets/img/logo.png"
 
@@ -68,14 +72,41 @@ def render_html(title: str, paragraphs: list[str], button_label: str, link: str,
 
 
 def send_welcome(ctx, to: str, name: str, token: str, liberada: bool = True) -> bool:
+    """Compra aprovada (spec 53): o e-mail so INFORMA. A pessoa entra direto no app ou no navegador com este e-mail e cria a senha na
+    hora; o link continua aqui para quem preferir criar a senha pelo e-mail."""
     link = setup_link(token)
+    remoto = "https://app.segundocerebro.pro"
     ola = f"Olá, {name}!" if name else "Olá!"
-    depois = ("Sua conta já está liberada: assim que você definir a senha, é só abrir o aplicativo e entrar com este e-mail."
-              if liberada else "Depois de definir a senha, nossa equipe confirma a liberação da sua conta e avisa você.")
-    texto = f"{ola}\n\nSua assinatura foi registrada. Defina a sua senha por este link (vale por 7 dias):\n{link}\n\n{depois}\n"
-    corpo = render_html("Defina a sua senha", [ola, "Sua assinatura foi registrada. Falta só criar a sua senha de acesso.", depois],
-                        "Definir minha senha", link, "Este link vale por 7 dias e só pode ser usado por você.")
-    return send(to, "Defina a sua senha do Segundo Cérebro", texto, corpo)
+    depois = ("" if liberada else "Nossa equipe confirma a liberação da sua conta em seguida e avisa você.")
+    paras = [ola + " Sua compra foi aprovada e a sua conta do Cérebro Pro já existe.",
+             f"Para entrar é só abrir o aplicativo (ou {remoto} no navegador), digitar este e-mail ({to}) e criar a sua senha ali mesmo, na hora.",
+             "Prefere criar a senha por aqui? Use o botão abaixo (vale por 7 dias)."] + ([depois] if depois else [])
+    texto = "\n\n".join(paras) + f"\n\nCriar a senha pelo e-mail: {link}\nBaixar o aplicativo: {site_url()}/#baixar\n"
+    corpo = render_html("Sua conta está pronta", paras, "Criar minha senha agora", link, f"Baixar o aplicativo: {site_url()}/#baixar")
+    return send(to, "Sua conta do Cérebro Pro está pronta", texto, corpo)
+
+
+def confirmar_link(token: str) -> str:
+    return f"{api_url()}/v1/auth/confirmar-email?t={token}"
+
+
+def send_bem_vindo(ctx, to: str, name: str, token: str) -> bool:
+    """Primeiro acesso direto no app (spec 53): a pessoa ja entrou; o e-mail da boas-vindas e pede, sem obrigar, para confirmar o endereco."""
+    link = confirmar_link(token)
+    ola = f"Olá, {name}!" if name else "Olá!"
+    paras = [ola + " Que bom ter você no Cérebro Pro. Sua senha foi criada e você já está dentro.",
+             "Só falta uma coisinha: confirme que este e-mail é seu, para recuperar a senha e receber os avisos da sua conta.",
+             "Se não foi você que criou essa conta, responda este e-mail na hora."]
+    texto = "\n\n".join(paras) + f"\n\nConfirmar meu e-mail: {link}\n"
+    return send(to, "Bem-vindo ao Cérebro Pro: confirme seu e-mail", texto, render_html("Bem-vindo ao Cérebro Pro", paras, "Confirmar meu e-mail", link, "Isso não bloqueia nada: você já pode usar tudo."))
+
+
+def send_confirmar_email(ctx, to: str, name: str, token: str) -> bool:
+    link = confirmar_link(token)
+    ola = f"Olá, {name}!" if name else "Olá!"
+    paras = [ola + " Aqui está o link para confirmar o seu e-mail no Cérebro Pro.", "Se não foi você que pediu, pode ignorar."]
+    texto = "\n\n".join(paras) + f"\n\nConfirmar meu e-mail: {link}\n"
+    return send(to, "Confirme seu e-mail do Cérebro Pro", texto, render_html("Confirme seu e-mail", paras, "Confirmar meu e-mail", link, ""))
 
 
 DOWNLOADS = {  # sempre a última versão publicada

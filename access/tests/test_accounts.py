@@ -101,8 +101,8 @@ async def test_fluxo_completo_compra_senha_liberacao_login(make_rig):
     await webhook(r, compra())
     await r.login()
     sid = (await lista(r))["rows"][0]["id"]
-    # antes de definir a senha nao entra
-    assert (await login(r)).status_code == 401
+    # spec 53: sem senha ainda, o login vira "primeiro acesso" (cria a senha na hora) e pede o aceite dos termos
+    assert (await login(r)).json()["error"]["code"] == "terms_required"
     await definir_senha(r, sid)
     # senha definida, mas a conta ainda nao foi liberada pelo administrador
     resp = await login(r)

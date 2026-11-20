@@ -142,7 +142,9 @@ async def test_mock_responde_sem_rede(tmp_path):
 
 def test_tarefa_veo_com_audio_e_imagem():
     t = estudio._tarefa("video-google", {"prompt": "p", "segundos": 8}, "720p-audio")
-    assert t["model"] == "google:veo@3.1" and t["resolution"] == "720p" and t["settings"] == {"audio": True} and t["duration"] == 8
+    assert t["model"] == "google:3@2" and t["resolution"] == "720p" and t["providerSettings"] == {"google": {"generateAudio": True}} and t["duration"] == 8
+    t = estudio._tarefa("video-google", {"prompt": "p", "segundos": 8, "largura": 720, "altura": 1280}, "720p-audio")
+    assert t["width"] == 720 and t["height"] == 1280 and "resolution" not in t and "settings" not in t
     t = estudio._tarefa("imagem-ponta", {"prompt": "p"}, "2K")
     assert t["taskType"] == "imageInference" and t["resolution"] == "2K" and t["outputFormat"] == "PNG"
     assert json.dumps(t)  # serializavel

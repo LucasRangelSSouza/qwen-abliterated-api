@@ -41,7 +41,7 @@ CATALOGO: dict[str, dict] = {
     "video-premium": {"rotulo": "Vídeo premium (Seedance 2.0)", "kind": "video", "task": "videoInference", "modelo": "bytedance:seedance@2.0",
                       "unidade": "segundo", "taxas": {"480p": 0.07, "720p": 0.16, "1080p": 0.40}, "padrao": "480p", "entrada": ["positivePrompt", "referenceImages?", "referenceVideos?"],
                       "tempo_s": {"480p": 120, "720p": 160, "1080p": 240}},
-    "video-google": {"rotulo": "Vídeo com som (Veo 3.1)", "kind": "video", "task": "videoInference", "modelo": "google:veo@3.1",
+    "video-google": {"rotulo": "Vídeo com som (Veo 3.1)", "kind": "video", "task": "videoInference", "modelo": "google:3@2",
                      "unidade": "segundo", "taxas": {"720p": 0.20, "720p-audio": 0.40}, "padrao": "720p", "entrada": ["positivePrompt", "frameImages?"],
                      "tempo_s": {"720p": 120, "720p-audio": 150}},
     "trocar-personagem": {"rotulo": "Me coloca nesse vídeo (troca de personagem)", "kind": "video", "task": "videoInference", "modelo": "prunaai:p-video@2-pro-replace",
@@ -136,8 +136,8 @@ def _tarefa(nome: str, body: dict, q: str) -> dict:
     if e["unidade"] == "segundo" and e["task"] == "videoInference" and nome not in ("trocar-personagem", "sincronia-labial", "sincronia-labial-pro", "avatar-foto", "editar-video"):
         t["duration"] = int(_quantidade(e, body))
     if nome == "video-google":
-        t["resolution"] = "720p"
-        t["settings"] = {"audio": q.endswith("-audio")}
+        t["resolution"] = "720p"  # Veo nao aceita `settings`: o audio vai em providerSettings.google (medido 19/11/2026)
+        t["providerSettings"] = {"google": {"generateAudio": q.endswith("-audio")}}
     elif q not in ("padrao", "turbo", "hd", "1.5K", "2K"):
         t["resolution"] = q
     if nome == "imagem-livre":  # FLUX schnell: 4 passos, sem filtro de conteudo; tamanho em multiplos de 64
@@ -160,6 +160,7 @@ def _tarefa(nome: str, body: dict, q: str) -> dict:
         t["speech"] = {"text": str(body["texto_fala"])}
     if body.get("largura") and body.get("altura") and e["task"] == "videoInference":
         t["width"], t["height"] = int(body["largura"]), int(body["altura"])
+        t.pop("resolution", None)  # a Runware recusa width/height junto com resolution (conflictParameters)
     if body.get("seed") is not None:
         t["seed"] = int(body["seed"])
     if inputs:
@@ -395,7 +396,7 @@ async def atualizar(ctx: Ctx, job: dict) -> dict:
 async def atualizar_tabela(http: httpx.AsyncClient) -> dict:
     """Relê `info.x-pricing` dos schema.json publicos de cada modelo e devolve o que mudou (o admin decide se grava em CATALOGO). Sem chave, sem custo."""
     slug = {"prunaai:p-video@2-pro": "prunaai-p-video-2-pro", "alibaba:wan@3.0": "alibaba-wan3-0", "bytedance:seedance@2.0": "bytedance-seedance-2-0",
-            "google:veo@3.1": "google-veo-3-1", "prunaai:p-video@2-pro-replace": "prunaai-p-video-2-pro-replace", "prunaai:p-video@avatar": "prunaai-p-video-avatar",
+            "google:3@2": "google-veo-3-1", "prunaai:p-video@2-pro-replace": "prunaai-p-video-2-pro-replace", "prunaai:p-video@avatar": "prunaai-p-video-avatar",
             "pixverse:lipsync@1": "pixverse-lipsync", "sync:lipsync-2@1": "sync-lipsync-2", "heygen:voice@1.0": "heygen-voice-1-0",
             "minimax:speech@2.8": "minimax-speech-2-8", "bytedance:seedream@5.5": "bytedance-seedream-5-5"}
     out = {}

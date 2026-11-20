@@ -89,8 +89,8 @@ def traduzir(path: str, body: dict) -> tuple[str, dict] | None:
                                      "inputs": {"video": _data_uri(v, "video/mp4"), "referenceImages": [_data_uri(body.get("image"), "image/jpeg")]}}
     if path == "/v1/videos/generations":
         rapida = body.get("recipe") == "ltx-video" or str(body.get("quality") or "").lower() == "rapida"
-        efeito, q = ("video-rapido", "480p") if rapida else ("video-ponta", "720p")
-        w, h = TAMANHO.get((str(body.get("format") or "paisagem"), q), TAMANHO[("paisagem", q)])
+        efeito, q = ("video-rapido", "rascunho") if rapida else ("video-rapido", "720p")  # sempre o modelo mais barato (P-Video); alta = 720p sem rascunho
+        w, h = TAMANHO.get((str(body.get("format") or "paisagem"), "720p"), TAMANHO[("paisagem", "720p")])
         prompt = str(body.get("prompt") or "")
         if body.get("negative_prompt"):
             prompt += f"\nAvoid: {str(body['negative_prompt'])[:400]}."

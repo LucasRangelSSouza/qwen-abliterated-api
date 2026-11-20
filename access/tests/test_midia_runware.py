@@ -68,10 +68,10 @@ async def test_troca_de_personagem_vai_para_a_runware_com_duracao_do_video(rig_m
 async def test_video_por_texto_alta_e_rapida(rig_m: Rig):
     r = await rig_m.client.post("/v1/videos/generations", json={"prompt": "a red car", "format": "retrato", "seconds": 30, "recipe": "wan22-a14b", "async": True}, headers=H)
     t = rig_m.up.rw[-1][0]
-    assert r.status_code == 202 and t["model"] == "alibaba:wan@3.0" and "resolution" not in t and (t["width"], t["height"]) == (720, 1280) and t["duration"] == 15
+    assert r.status_code == 202 and t["model"] == "prunaai:p-video@0" and "resolution" not in t and (t["width"], t["height"]) == (720, 1280) and t["duration"] == 10 and t["settings"] == {"audio": True, "draft": False}
     r = await rig_m.client.post("/v1/videos/generations", json={"prompt": "a red car", "recipe": "ltx-video", "seconds": 4, "image": base64.b64encode(b"\x89PNG....").decode(), "async": True}, headers=H)
     t = rig_m.up.rw[-1][0]
-    assert t["model"] == "prunaai:p-video@2-pro" and t["inputs"]["frameImages"] == ["m-%d" % (len(rig_m.up.rw) - 1)]
+    assert t["model"] == "prunaai:p-video@0" and t["settings"]["draft"] is True and t["inputs"]["frameImages"] == ["m-%d" % (len(rig_m.up.rw) - 1)]
 
 
 async def test_clone_de_voz_e_em_breve(rig_m: Rig):

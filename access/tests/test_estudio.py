@@ -142,7 +142,7 @@ async def test_mock_responde_sem_rede(tmp_path):
 
 def test_tarefa_veo_com_audio_e_imagem():
     t = estudio._tarefa("video-google", {"prompt": "p", "segundos": 8}, "720p-audio")
-    assert t["model"] == "google:3@2" and t["resolution"] == "720p" and t["providerSettings"] == {"google": {"generateAudio": True}} and t["duration"] == 8
+    assert t["model"] == "google:veo@3.1-lite" and t["resolution"] == "720p" and t["providerSettings"] == {"google": {"generateAudio": True}} and t["duration"] == 8
     t = estudio._tarefa("video-google", {"prompt": "p", "segundos": 8, "largura": 720, "altura": 1280}, "720p-audio")
     assert t["width"] == 720 and t["height"] == 1280 and "resolution" not in t and "settings" not in t
     t = estudio._tarefa("imagem-ponta", {"prompt": "p"}, "2K")
@@ -157,7 +157,7 @@ async def test_teto_de_20_reais_e_piso_de_margem(rig_rw: Rig):
     o = (await rig_rw.client.post("/v1/estudio/orcar", json={"efeito": "trocar-personagem", "segundos": 180}, headers=H)).json()
     assert o["custo_usd"] == 9.0 and o["preco_usd"] == 13.5 and o["acima_do_teto"] is True and o["preco_brl"] == 74.25
     o = (await rig_rw.client.post("/v1/estudio/orcar", json={"efeito": "editar-video", "segundos": 40}, headers=H)).json()
-    assert o["partes"] == 3 and o["qualidade"] == "720p"
+    assert o["partes"] == 3 and o["qualidade"] == "480p"
 
 
 async def test_gerar_video_curto_e_cortado_em_4_a_15_s(rig_rw: Rig):

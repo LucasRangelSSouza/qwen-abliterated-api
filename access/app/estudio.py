@@ -32,17 +32,18 @@ MAX_WAIT_S = 900.0
 # Efeito -> modelo da Runware. `taxas`: preco por unidade (dolar) por qualidade; `unidade`: segundo de video, caractere de texto ou imagem.
 # `qualidade` padrao = a mais barata que resolve. `entrada`: o que o cliente precisa mandar (URL publica ou dataURI, como a Runware aceita).
 CATALOGO: dict[str, dict] = {
-    "video-rapido": {"rotulo": "Vídeo a partir de texto ou foto (rápido)", "kind": "video", "task": "videoInference", "modelo": "prunaai:p-video@2-pro", "dur": (5, 15),
-                     "unidade": "segundo", "taxas": {"480p": 0.0207, "768p": 0.05, "1080p": 0.10}, "padrao": "480p", "entrada": ["positivePrompt", "frameImages?"],
-                     "tempo_s": {"480p": 35, "768p": 60, "1080p": 90}},
+    # Mais barato da Runware (medido 19/11/2026): P-Video em rascunho, 720p, COM som (canta/fala), US$ 0,005/s -> 8 s = US$ 0,04.
+    "video-rapido": {"rotulo": "Vídeo a partir de texto ou foto (rápido, com som)", "kind": "video", "task": "videoInference", "modelo": "prunaai:p-video@0", "dur": (1, 10),
+                     "unidade": "segundo", "taxas": {"rascunho": 0.005, "720p": 0.02, "1080p": 0.04}, "padrao": "rascunho", "entrada": ["positivePrompt", "frameImages?"],
+                     "tempo_s": {"rascunho": 20, "720p": 40, "1080p": 60}},
     "video-ponta": {"rotulo": "Vídeo de ponta (Wan 3.0)", "kind": "video", "task": "videoInference", "modelo": "alibaba:wan@3.0",
                     "unidade": "segundo", "taxas": {"480p": 0.05, "720p": 0.10, "1080p": 0.20}, "padrao": "480p", "entrada": ["positivePrompt", "frameImages?", "referenceImages?"],
                     "tempo_s": {"480p": 90, "720p": 130, "1080p": 190}},
     "video-premium": {"rotulo": "Vídeo premium (Seedance 2.0)", "kind": "video", "task": "videoInference", "modelo": "bytedance:seedance@2.0",
                       "unidade": "segundo", "taxas": {"480p": 0.07, "720p": 0.16, "1080p": 0.40}, "padrao": "480p", "entrada": ["positivePrompt", "referenceImages?", "referenceVideos?"],
                       "tempo_s": {"480p": 120, "720p": 160, "1080p": 240}},
-    "video-google": {"rotulo": "Vídeo com som (Veo 3.1)", "kind": "video", "task": "videoInference", "modelo": "google:3@2", "dur": (4, 8),
-                     "unidade": "segundo", "taxas": {"720p": 0.20, "720p-audio": 0.40}, "padrao": "720p", "entrada": ["positivePrompt", "frameImages?"],
+    "video-google": {"rotulo": "Vídeo com som (Veo 3.1 Lite)", "kind": "video", "task": "videoInference", "modelo": "google:veo@3.1-lite", "dur": (4, 8),
+                     "unidade": "segundo", "taxas": {"720p": 0.03, "720p-audio": 0.05}, "padrao": "720p", "entrada": ["positivePrompt", "frameImages?"],
                      "tempo_s": {"720p": 120, "720p-audio": 150}},
     "trocar-personagem": {"rotulo": "Me coloca nesse vídeo (troca de personagem)", "kind": "video", "task": "videoInference", "modelo": "prunaai:p-video@2-pro-replace",
                           "unidade": "segundo", "taxas": {"480p": 0.05, "768p": 0.10, "1080p": 0.12}, "padrao": "480p", "entrada": ["video", "referenceImages"],
@@ -57,7 +58,7 @@ CATALOGO: dict[str, dict] = {
                              "unidade": "segundo", "taxas": {"padrao": 0.044}, "padrao": "padrao", "entrada": ["video", "audio"],
                              "tempo_s": {"padrao": 120}},
     "editar-video": {"rotulo": "Trocar objeto, roupa ou cenário no seu vídeo", "kind": "video", "task": "videoInference", "modelo": "alibaba:wan@3.0",
-                     "unidade": "segundo", "taxas": {"480p": 0.05, "720p": 0.10, "1080p": 0.20}, "padrao": "720p", "entrada": ["video", "positivePrompt", "referenceImages?"],
+                     "unidade": "segundo", "taxas": {"480p": 0.05, "720p": 0.10, "1080p": 0.20}, "padrao": "480p", "entrada": ["video", "positivePrompt", "referenceImages?"],
                      "tempo_s": {"480p": 120, "720p": 160, "1080p": 220}, "partes_s": 15},
     "voz": {"rotulo": "Narração com voz natural (e clone de voz)", "kind": "audio", "task": "audioInference", "modelo": "heygen:voice@1.0",
             "unidade": "caractere", "taxas": {"padrao": 0.00003}, "padrao": "padrao", "entrada": ["speech.text", "audio?"],
@@ -71,7 +72,8 @@ CATALOGO: dict[str, dict] = {
                      "unidade": "imagem", "taxas": {"1.5K": 0.02, "2K": 0.035}, "padrao": "1.5K", "entrada": ["positivePrompt", "referenceImages?"],
                      "tempo_s": {"1.5K": 25, "2K": 35}},
 }
-TABELA_LIDA_EM = "2026-11-12"
+CATALOGO["video-viral"] = CATALOGO["video-rapido"]  # nome usado pelo Viralizai (sempre o mais barato)
+TABELA_LIDA_EM = "2026-11-19"
 
 
 def _quantidade(efeito: dict, body: dict) -> float:
@@ -141,6 +143,9 @@ def _tarefa(nome: str, body: dict, q: str) -> dict:
     if nome == "video-google":
         t["resolution"] = "720p"  # Veo nao aceita `settings`: o audio vai em providerSettings.google (medido 19/11/2026)
         t["providerSettings"] = {"google": {"generateAudio": q.endswith("-audio")}}
+    elif e["modelo"] == "prunaai:p-video@0":  # rascunho = mais barato; o som (canto/fala) vem junto
+        t["settings"] = {"audio": True, "draft": q == "rascunho"}
+        t["resolution"] = "720p" if q == "rascunho" else q
     elif q not in ("padrao", "turbo", "hd", "1.5K", "2K"):
         t["resolution"] = q
     if nome == "imagem-livre":  # FLUX schnell: 4 passos, sem filtro de conteudo; tamanho em multiplos de 64
@@ -163,6 +168,8 @@ def _tarefa(nome: str, body: dict, q: str) -> dict:
         t["speech"] = {"text": str(body["texto_fala"])}
     if body.get("largura") and body.get("altura") and e["task"] == "videoInference":
         t["width"], t["height"] = int(body["largura"]), int(body["altura"])
+        if e["modelo"] in ("prunaai:p-video@0", "google:veo@3.1-lite"):  # so aceitam tamanhos fixos: vertical 720x1280 ou deitado 1280x720
+            t["width"], t["height"] = (720, 1280) if t["height"] >= t["width"] else (1280, 720)
         t.pop("resolution", None)  # a Runware recusa width/height junto com resolution (conflictParameters)
     if body.get("seed") is not None:
         t["seed"] = int(body["seed"])

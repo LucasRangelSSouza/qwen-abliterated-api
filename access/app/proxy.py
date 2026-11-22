@@ -246,6 +246,7 @@ async def chat(request: Request):
         fora = await _casa_fora(ctx)
         if fora and (interno == "rt-auto" or not interno.startswith("rt-")):
             rota, motivo = "rapido", "casa_fora"  # o classificador também é a IA da casa: com ela fora, nem tenta
+            apelido = "rt-mao"
         elif interno == "rt-auto" or not interno.startswith("rt-"):
             rota, motivo = await rt.classificar(ctx, body, lambda msgs, mx: _casa_texto(ctx, msgs, mx))
             # spec 45 §E: o pedido comum vai para a mão de obra (Qwen); o rodízio Claude/GPT fica para o médio/forte

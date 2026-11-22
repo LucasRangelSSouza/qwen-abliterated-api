@@ -201,3 +201,19 @@ def test_usage_do_roteador_reflete_o_tamanho_real_do_pedido():
     # sem usage nenhum, ainda devolve a estimativa
     assert rt.uso_real(body, None)["prompt_tokens"] == est
     assert rt.uso_real({"messages": []}, None) is None
+
+
+async def test_casa_fora_vai_para_o_rodizio_sem_esperar_a_gpu(rr: Rig, monkeypatch):
+    """GPU da casa fora (fixa offline): pedido comum vai para o Claude/GPT barato em vez de ficar na fila (22/11/2026)."""
+    from app import proxy
+
+    async def fora(ctx):
+        return True
+    monkeypatch.setattr(proxy, "_casa_fora", fora)
+    r = await rr.client.post("/v1/chat/completions", json=msg("qual a capital da França?"), headers=H)
+    assert r.status_code == 200, r.text
+    assert r.json()["choices"][0]["message"]["content"].startswith("resposta de cc/claude-haiku")
+    assert not rr.up.casa
+    for modelo in ("qwen-abliterated", "rt-mao", "mao-de-obra"):
+        r = await rr.client.post("/v1/chat/completions", json={**msg("oi"), "model": modelo}, headers=H)
+        assert r.status_code == 200, (modelo, r.text)

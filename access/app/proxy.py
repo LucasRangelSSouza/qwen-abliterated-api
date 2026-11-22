@@ -243,7 +243,10 @@ async def chat(request: Request):
         pedido = body.get("model")  # o nome que o cliente pediu volta na resposta (nunca o modelo de verdade)
         interno = cb.NOMES.get(pedido, pedido)
         apelido, rota, motivo = interno, "", ""
-        if interno == "rt-auto" or not interno.startswith("rt-"):
+        fora = await _casa_fora(ctx)
+        if fora and (interno == "rt-auto" or not interno.startswith("rt-")):
+            rota, motivo = "rapido", "casa_fora"  # o classificador também é a IA da casa: com ela fora, nem tenta
+        elif interno == "rt-auto" or not interno.startswith("rt-"):
             rota, motivo = await rt.classificar(ctx, body, lambda msgs, mx: _casa_texto(ctx, msgs, mx))
             # spec 45 §E: o pedido comum vai para a mão de obra (Qwen); o rodízio Claude/GPT fica para o médio/forte
             apelido = {"livre": "rt-livre", "planejar": "rt-forte", "rapido": "rt-mao"}[rota]
@@ -259,6 +262,13 @@ async def chat(request: Request):
         if not lista:
             raise fail(404, f"combo {apelido} nao existe", "invalid_request_error", "model_not_found")
         casa = next((a["casa"] for a in lista if "casa" in a), "qwen-abliterated")
+        if fora:
+            # GPU da casa fora (máquina caiu, troca em andamento): o pedido vai para o Claude/GPT barato do rodízio em vez de ficar
+            # parado na fila esperando a GPU (21/11/2026: voz e chat esperavam 22 s ou mais e caíam). A casa continua de último recurso.
+            routers = [a for a in lista if "router" in a] or [a for a in (todos.get("rt-rapido") or []) if "router" in a]
+            if routers:
+                lista = routers + [{"casa": casa}]
+                motivo = motivo or "casa_fora"
         resposta = None
         if ctx.s.image_router_url and ctx.s.image_router_key:
             for alvo in rt.RODIZIO.ordem(apelido, lista):
@@ -317,6 +327,27 @@ def _roteia_cliente(request: Request, body: dict) -> bool:
         return bool(ctx.store.one("SELECT 1 FROM accounts WHERE person_id=?", (p.person_id,)))
     except Exception:  # noqa: BLE001
         return False
+
+
+_CASA_ESTADO = {"em": 0.0, "fora": False}
+
+
+async def _casa_fora(ctx: Ctx) -> bool:
+    """A GPU da casa está fora? Pergunta ao llm-queue (cache de 15 s). Qualquer erro ao perguntar = considera no ar (nunca piora o caminho antigo)."""
+    agora = time.time()
+    if agora - _CASA_ESTADO["em"] < 15:
+        return _CASA_ESTADO["fora"]
+    fora = False
+    try:
+        h = {"Authorization": f"Bearer {ctx.s.upstream_key}"} if ctx.s.upstream_key else {}
+        r = await ctx.http.get(ctx.s.upstream_base + "/v1/gpu/status", headers=h, timeout=3)
+        if r.status_code == 200:
+            j = r.json()
+            fora = bool(j.get("degraded")) or (bool(j.get("static")) and j.get("state") != "READY")
+    except Exception:  # noqa: BLE001
+        fora = False
+    _CASA_ESTADO.update(em=agora, fora=fora)
+    return fora
 
 
 async def _casa_texto(ctx: Ctx, mensagens: list[dict], max_tokens: int) -> str:

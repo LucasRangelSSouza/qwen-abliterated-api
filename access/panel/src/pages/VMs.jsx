@@ -161,7 +161,7 @@ function Machines() {
                     const v = d.rows[i]
                     if (aberta !== v.id) return [linha]
                     return [linha, <tr key={v.id + '-tl'} className="border-b border-border-subtle bg-bg-alt/40"><td colSpan={8} className="px-5 py-3">
-                      <ol className="space-y-1.5">{(v.eventos || []).map((e, k) => <li key={k} className="text-xs flex gap-3"><span className="text-text-muted whitespace-nowrap w-36">{dia(e.quando)} {(e.quando || '').slice(11, 16)}</span><b className="w-36 text-text-main">{e.tipo}</b><span className="text-text-muted">{e.detalhe}</span></li>)}</ol>
+                      <ol className="space-y-1.5">{(v.eventos || []).map((e, k) => <li key={k} className="text-xs flex gap-3"><span className="text-text-muted whitespace-nowrap w-36">{e.quando ? new Date(e.quando).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : ''}</span><b className="w-36 text-text-main">{e.tipo}</b><span className="text-text-muted">{e.detalhe}</span></li>)}</ol>
                     </td></tr>]
                   })}
                 </tbody>

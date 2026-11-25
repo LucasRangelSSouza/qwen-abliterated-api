@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { ExternalLink, Github, Activity, BookOpen, Rocket, Shield, Search, Users, AlertTriangle, Link2 } from 'lucide-react'
+import { ExternalLink, Github, Activity, BookOpen, Rocket, Shield, Search, Users, AlertTriangle, Link2, UserCheck, Copy, Eye, EyeOff, LogIn } from 'lucide-react'
 import { api } from '../lib/api.js'
 import PageHeader from '../components/PageHeader.jsx'
-import { Card, CardHeader, Badge, Button, Input, Select, Skeleton, EmptyState, ErrorState, useLoad } from '../components/ui.jsx'
+import { Card, CardHeader, Badge, Button, Input, Select, Skeleton, EmptyState, ErrorState, useLoad, useToast } from '../components/ui.jsx'
 
 const data = (t) => (t ? new Date(t * 1000).toLocaleDateString('pt-BR') : '—')
 
@@ -25,6 +25,34 @@ const LINKS = [
   ['deploy', 'Onde faz o deploy', Rocket],
   ['monitor', 'Monitor (Uptime Kuma)', Activity],
 ]
+
+function CartaoQa({ id }) {
+  const qa = useLoad(() => api.painelQa(id), [id])
+  const toast = useToast()
+  const [ver, setVer] = useState(false)
+  const [abrindo, setAbrindo] = useState(false)
+  if (qa.loading || !qa.data?.configurado) return null
+  const copiar = async (t, o) => { try { await navigator.clipboard.writeText(t); toast?.(o + ' copiado') } catch {} }
+  const entrar = async () => {
+    const janela = window.open('about:blank', '_blank')
+    setAbrindo(true)
+    try { const r = await api.painelEntrarQa(id); if (janela) janela.location = r.link; else location.href = r.link }
+    catch (e) { janela?.close(); toast?.(e.message) } finally { setAbrindo(false) }
+  }
+  return (
+    <Card className="mt-4" data-cartao="qa">
+      <CardHeader title="Usuário de QA (demo)" subtitle={'Plano ' + qa.data.plano + '; fora das métricas e da conciliação'} icon={UserCheck} />
+      <div className="flex flex-wrap items-center gap-3 px-5 pb-5 text-sm">
+        <span className="text-text-main" data-qa="email">{qa.data.email}</span>
+        <Button size="sm" variant="ghost" icon={Copy} onClick={() => copiar(qa.data.email, 'E-mail')}>Copiar</Button>
+        <span className="num text-text-main" data-qa="senha">{ver ? qa.data.senha : '••••••••••'}</span>
+        <Button size="sm" variant="ghost" icon={ver ? EyeOff : Eye} onClick={() => setVer(!ver)} data-acao="mostrar">{ver ? 'Esconder' : 'Mostrar'}</Button>
+        <Button size="sm" variant="ghost" icon={Copy} onClick={() => copiar(qa.data.senha, 'Senha')}>Copiar</Button>
+        <Button size="sm" icon={LogIn} loading={abrindo} onClick={entrar} data-acao="entrar-qa">Entrar como QA</Button>
+      </div>
+    </Card>
+  )
+}
 
 // Aba de produto do painel único (spec 57 §6.2): dados do banco `produtos` e links do registro único.
 export default function ProdutoPainel({ id }) {
@@ -64,6 +92,7 @@ export default function ProdutoPainel({ id }) {
               ))}
             </div>
           </Card>
+          <CartaoQa id={id} />
           {emBreve ? <Card className="mt-4"><EmptyState title="Em breve" text="Este produto ainda não tem base de usuários no banco." /></Card> : (
           <Card className="mt-4">
             <CardHeader title="Usuários" subtitle="Do banco do produto (contas de QA marcadas)" icon={Users} />

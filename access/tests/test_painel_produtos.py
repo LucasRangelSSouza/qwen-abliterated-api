@@ -20,3 +20,12 @@ def test_qa_marcado_e_cliente_nao():
 def test_schema_invalido_recusado():
     assert pp._schema_valido("cortai") == "cortai"
     assert pp._schema_valido("x; drop table") is None and pp._schema_valido(None) is None
+
+
+def test_qa_da_variante_usa_o_da_base(monkeypatch):
+    import json
+    monkeypatch.setenv("PAINEL_QA", json.dumps({"perfilai": {"email": "demo@rangeltech.net", "senha": "x"}}))
+    reg = {p["id"]: p for p in pp.registro()}
+    assert pp._qa_de(reg["perfilai"])["email"] == "demo@rangeltech.net"
+    assert pp._qa_de(reg["insta-ai"])["senha"] == "x"
+    assert pp._qa_de(reg["cortai"]) is None

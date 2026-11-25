@@ -113,3 +113,43 @@ def painel_usuarios(pid: str, request: Request, q: str = "", situacao: str = "to
         out.append({"id": r["id"], "email": r["email"], "criado": r["criado"], "plano": r["plano"], "ativo_ate": r["ativo_ate"],
                     "assinante": ativo_, "qa": qa})
     return {"id": pid, "usuarios": out}
+
+
+# ------------------------------------------------------------------ usuário de QA (spec 57 §6.2A)
+def _qa_de(p: dict) -> dict | None:
+    try:
+        tudo = json.loads(os.environ.get("PAINEL_QA") or "{}")
+    except ValueError:
+        return None
+    return tudo.get(p["id"]) or tudo.get(p.get("base") or "")
+
+
+@api.get("/painel/produtos/{pid}/qa")
+def painel_qa(pid: str, request: Request):
+    require(request)
+    p = next((x for x in registro() if x["id"] == pid), None)
+    qa = _qa_de(p) if p else None
+    if not qa:
+        return {"configurado": False}
+    return {"configurado": True, "email": qa.get("email"), "senha": qa.get("senha"), "plano": "completo (cortesia, sem cobrança)"}
+
+
+@api.post("/painel/produtos/{pid}/entrar-qa")
+async def painel_entrar_qa(pid: str, request: Request):
+    """Pede ao produto um link de entrada de uso único do usuário de QA (rota /api/acesso/link-qa do produtos-core)."""
+    ctx = require(request)
+    p = next((x for x in registro() if x["id"] == pid), None)
+    if not p or not p.get("links", {}).get("produto"):
+        raise fail(404, "produto sem endereço no registro", "invalid_request_error", "produto_desconhecido")
+    tok = os.environ.get("PAINEL_PRODUTOS_TOKEN", "")
+    if not tok:
+        raise fail(503, "PAINEL_PRODUTOS_TOKEN não configurado", "server_error", "sem_token")
+    try:
+        r = await ctx.http.post(p["links"]["produto"].rstrip("/") + "/api/acesso/link-qa", headers={"Authorization": "Bearer " + tok}, timeout=20)
+    except Exception:  # noqa: BLE001
+        raise fail(502, "o produto não respondeu", "server_error", "produto_fora")
+    if r.status_code != 200:
+        raise fail(502, f"o produto respondeu {r.status_code}", "server_error", "produto_recusou")
+    import logging
+    logging.getLogger("painel").info("entrar como QA: %s", pid)  # registro do clique (quem: o admin do painel; quando: o log)
+    return {"link": r.json()["link"]}

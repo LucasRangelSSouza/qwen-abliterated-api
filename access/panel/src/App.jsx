@@ -16,36 +16,68 @@ import Produto from './pages/Produto.jsx'
 import Links from './pages/Links.jsx'
 import Custos from './pages/Custos.jsx'
 import Combos from './pages/Combos.jsx'
+import ProdutoPainel from './pages/ProdutoPainel.jsx'
+import { Boxes } from 'lucide-react'
 
 const Cortai = () => <Produto id="cortai" />
 const Rendai = () => <Produto id="rendai" />
 
+// Menu do painel único (spec 57 §6.1): Segundo Cérebro, Produtos (do registro único), Geral e Configurações.
 const NAV = [
-  { id: 'pessoas', label: 'Pessoas', icon: Users, el: People },
-  { id: 'assinantes', label: 'Assinantes', icon: UserCheck, el: Subscribers },
-  { id: 'uso', label: 'Uso', icon: Activity, el: Usage },
-  { id: 'llm', label: 'Máquina LLM', short: 'LLM', icon: Cpu, el: MachineLlm },
-  { id: 'fornecedores', label: 'Fornecedores', icon: Wallet, el: Providers },
-  { id: 'vms', label: 'Máquinas virtuais', short: 'VMs', icon: Server, el: VMs },
-  { id: 'cortai', label: 'Cortaí', icon: Scissors, el: Cortai },
-  { id: 'rendai', label: 'Rendaí', icon: Coins, el: Rendai },
-  { id: 'links', label: 'Links e cupons', short: 'Links', icon: Link2, el: Links },
-  { id: 'custos', label: 'Custos', icon: PiggyBank, el: Custos },
-  { id: 'combos', label: 'IA e combos', short: 'IA', icon: Brain, el: Combos },
-  { id: 'afiliados', label: 'Afiliados', icon: BadgePercent, el: Affiliates },
-  { id: 'termos', label: 'Termos de uso', short: 'Termos', icon: ScrollText, el: Terms },
-  { id: 'config', label: 'Configurações', short: 'Ajustes', icon: Cog, el: Settings },
+  { id: 'pessoas', grupo: 'Segundo Cérebro', label: 'Pessoas', icon: Users, el: People },
+  { id: 'assinantes', grupo: 'Segundo Cérebro', label: 'Assinantes', icon: UserCheck, el: Subscribers },
+  { id: 'uso', grupo: 'Segundo Cérebro', label: 'Uso', icon: Activity, el: Usage },
+  { id: 'llm', grupo: 'Geral', label: 'Qwen: LLM e GPU', short: 'LLM', icon: Cpu, el: MachineLlm },
+  { id: 'fornecedores', grupo: 'Geral', label: 'Fornecedores', icon: Wallet, el: Providers },
+  { id: 'vms', grupo: 'Segundo Cérebro', label: 'Máquinas virtuais', short: 'VMs', icon: Server, el: VMs },
+  { id: 'produtos', grupo: 'Produtos', label: 'Todos os produtos', short: 'Produtos', icon: Boxes, el: () => <ListaProdutos /> },
+  { id: 'links', grupo: 'Segundo Cérebro', label: 'Cupons e links', short: 'Links', icon: Link2, el: Links },
+  { id: 'custos', grupo: 'Geral', label: 'Custos', icon: PiggyBank, el: Custos },
+  { id: 'combos', grupo: 'Geral', label: 'IA e combos', short: 'IA', icon: Brain, el: Combos },
+  { id: 'afiliados', grupo: 'Segundo Cérebro', label: 'Afiliados', icon: BadgePercent, el: Affiliates },
+  { id: 'termos', grupo: 'Segundo Cérebro', label: 'Termos de uso', short: 'Termos', icon: ScrollText, el: Terms },
+  { id: 'config', grupo: 'Configurações', label: 'Configurações', short: 'Ajustes', icon: Cog, el: Settings },
 ]
 
+const GRUPOS = ['Segundo Cérebro', 'Produtos', 'Geral', 'Configurações']
+const TIPOS_PRODUTO = ['produto', 'variante', 'em_preparo']
+
+function useRegistro() {
+  const [itens, setItens] = useState([])
+  useEffect(() => { api.painelRegistro().then((r) => setItens((r.produtos || []).filter((p) => TIPOS_PRODUTO.includes(p.tipo)))).catch(() => {}) }, [])
+  return itens
+}
+
+function ListaProdutos() {
+  const itens = useRegistro()
+  return (
+    <div>
+      <h1 className="text-xl font-semibold mb-4 text-text-main">Produtos</h1>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {itens.map((p) => (
+          <a key={p.id} href={'#/p/' + p.id} className="rounded-[12px] border border-border-subtle bg-surface p-4 hover:bg-surface-2">
+            <div className="font-medium text-text-main">{p.nome}</div>
+            <div className="text-xs text-text-muted">{(p.hosts || [])[0] || ''}{p.tipo === 'variante' ? ' · variante de ' + p.base : p.tipo === 'em_preparo' ? ' · em breve' : ''}</div>
+          </a>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function useHashRoute() {
-  const read = () => (location.hash.replace(/^#\/?/, '') || 'pessoas').split(/[/?]/)[0]
+  const read = () => {
+    const h = location.hash.replace(/^#\/?/, '') || 'pessoas'
+    if (h.startsWith('p/')) return h.split(/[?]/)[0]
+    return h.split(/[/?]/)[0]
+  }
   const [r, setR] = useState(read)
   useEffect(() => {
     const h = () => setR(read())
     addEventListener('hashchange', h)
     return () => removeEventListener('hashchange', h)
   }, [])
-  return NAV.some((n) => n.id === r) ? r : 'pessoas'
+  return r.startsWith('p/') || NAV.some((n) => n.id === r) ? r : 'pessoas'
 }
 
 function useTheme() {
@@ -66,7 +98,7 @@ function Logo({ small }) {
         <ShieldCheck className="size-5 text-white" />
       </div>
       <div className="leading-tight">
-        <div className="font-semibold tracking-tight text-text-main">Acesso LLM</div>
+        <div className="font-semibold tracking-tight text-text-main">Painel Rangel Tech</div>
         <div className="text-xs text-text-muted">Painel do administrador</div>
       </div>
     </div>
@@ -105,20 +137,34 @@ function Login({ onDone, dark, toggleTheme }) {
 
 function Shell({ onLogout, dark, toggleTheme }) {
   const route = useHashRoute()
-  const Page = NAV.find((n) => n.id === route).el
+  const registro = useRegistro()
+  const Page = route.startsWith('p/') ? () => <ProdutoPainel id={route.slice(2)} /> : NAV.find((n) => n.id === route).el
   const go = (id) => { location.hash = '#/' + id }
   return (
     <div className="min-h-screen lg:flex">
       {/* Barra lateral (desktop) */}
       <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r border-border-subtle bg-bg-alt/70 sticky top-0 h-screen">
         <div className="px-5 pt-6 pb-5"><Logo /></div>
-        <nav className="flex-1 px-3 space-y-0.5" aria-label="Principal">
-          {NAV.map((n) => (
-            <a key={n.id} href={'#/' + n.id} aria-current={route === n.id ? 'page' : undefined}
-              className={cn('flex items-center gap-3 px-3 h-10 rounded-[10px] text-[13px] font-medium transition-colors',
-                route === n.id ? 'bg-brand-500/10 text-brand-text' : 'text-text-muted hover:bg-surface-2 hover:text-text-main')}>
-              <n.icon className="size-[18px]" />{n.label}
-            </a>
+        <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto pb-4" aria-label="Principal">
+          {GRUPOS.map((g) => (
+            <div key={g} className="pt-3">
+              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-subtle">{g}</div>
+              {NAV.filter((n) => n.grupo === g).map((n) => (
+                <a key={n.id} href={'#/' + n.id} aria-current={route === n.id ? 'page' : undefined}
+                  className={cn('flex items-center gap-3 px-3 h-9 rounded-[10px] text-[13px] font-medium transition-colors',
+                    route === n.id ? 'bg-brand-500/10 text-brand-text' : 'text-text-muted hover:bg-surface-2 hover:text-text-main')}>
+                  <n.icon className="size-[18px]" />{n.label}
+                </a>
+              ))}
+              {g === 'Produtos' && registro.map((p) => (
+                <a key={p.id} href={'#/p/' + p.id} aria-current={route === 'p/' + p.id ? 'page' : undefined} data-produto={p.id}
+                  className={cn('flex items-center gap-3 px-3 h-8 rounded-[10px] text-[13px] transition-colors',
+                    route === 'p/' + p.id ? 'bg-brand-500/10 text-brand-text' : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
+                    p.tipo === 'variante' && 'pl-8 text-[12px]')}>
+                  {p.nome}{p.tipo === 'em_preparo' && <span className="text-[10px] text-text-subtle">em breve</span>}
+                </a>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="p-3 border-t border-border-subtle flex items-center justify-between">

@@ -1,0 +1,686 @@
+{
+ "gerado_de": "RangelTech/vps_rt_infra registro/produtos.yml",
+ "atualizado": "2026-11-24",
+ "produtos": [
+  {
+   "id": "viralizai",
+   "nome": "Viralizaí",
+   "tipo": "produto",
+   "base": null,
+   "schema": "viralizai",
+   "servico": "viralizai",
+   "hosts": [
+    "viralizai.rangeltech.net",
+    "viralizai.fael.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas",
+    "adriano"
+   ],
+   "links": {
+    "produto": "https://viralizai.rangeltech.net/",
+    "admin": "https://viralizai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/viralizai",
+    "readme": "https://github.com/RangelTech/viralizai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/viralizai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/viralizai/qa"
+  },
+  {
+   "id": "cortai",
+   "nome": "Cortaí",
+   "tipo": "produto",
+   "base": null,
+   "schema": "cortai",
+   "servico": "cortai",
+   "hosts": [
+    "cortai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://cortai.rangeltech.net/",
+    "admin": "https://cortai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/cortai",
+    "readme": "https://github.com/RangelTech/cortai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/cortai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/cortai/qa"
+  },
+  {
+   "id": "rendai",
+   "nome": "Rendaí",
+   "tipo": "produto",
+   "base": null,
+   "schema": "rendai",
+   "servico": "rendai",
+   "hosts": [
+    "rendai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://rendai.rangeltech.net/",
+    "admin": "https://rendai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/rendai",
+    "readme": "https://github.com/RangelTech/rendai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/rendai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/rendai/qa"
+  },
+  {
+   "id": "perfilai",
+   "nome": "Perfilaí",
+   "tipo": "produto",
+   "base": null,
+   "schema": "perfilai",
+   "servico": "perfilai",
+   "hosts": [
+    "perfilai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://perfilai.rangeltech.net/",
+    "admin": "https://perfilai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/perfilai",
+    "readme": "https://github.com/RangelTech/perfilai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/perfilai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/perfilai/qa"
+  },
+  {
+   "id": "insta-ai",
+   "nome": "Insta AI",
+   "tipo": "variante",
+   "base": "perfilai",
+   "schema": "perfilai",
+   "servico": "perfilai",
+   "hosts": [
+    "insta-ai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://insta-ai.rangeltech.net/",
+    "admin": "https://insta-ai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/perfilai",
+    "readme": "https://github.com/RangelTech/perfilai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/perfilai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/perfilai/qa-insta-ai"
+  },
+  {
+   "id": "face-ai",
+   "nome": "Face AI",
+   "tipo": "variante",
+   "base": "perfilai",
+   "schema": "perfilai",
+   "servico": "perfilai",
+   "hosts": [
+    "face-ai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://face-ai.rangeltech.net/",
+    "admin": "https://face-ai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/perfilai",
+    "readme": "https://github.com/RangelTech/perfilai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/perfilai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/perfilai/qa-face-ai"
+  },
+  {
+   "id": "tittok-ai",
+   "nome": "TikTok AI",
+   "tipo": "variante",
+   "base": "perfilai",
+   "schema": "perfilai",
+   "servico": "perfilai",
+   "hosts": [
+    "tittok-ai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://tittok-ai.rangeltech.net/",
+    "admin": "https://tittok-ai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/perfilai",
+    "readme": "https://github.com/RangelTech/perfilai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/perfilai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/perfilai/qa-tittok-ai"
+  },
+  {
+   "id": "linkdn-ai",
+   "nome": "LinkedIn AI",
+   "tipo": "variante",
+   "base": "perfilai",
+   "schema": "perfilai",
+   "servico": "perfilai",
+   "hosts": [
+    "linkdn-ai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://linkdn-ai.rangeltech.net/",
+    "admin": "https://linkdn-ai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/perfilai",
+    "readme": "https://github.com/RangelTech/perfilai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/perfilai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/perfilai/qa-linkdn-ai"
+  },
+  {
+   "id": "animaai",
+   "nome": "Anima AI",
+   "tipo": "produto",
+   "base": null,
+   "schema": "animaai",
+   "servico": "animaai",
+   "hosts": [
+    "anima-ai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://anima-ai.rangeltech.net/",
+    "admin": "https://anima-ai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/animaai",
+    "readme": "https://github.com/RangelTech/animaai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/animaai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/animaai/qa"
+  },
+  {
+   "id": "postaai",
+   "nome": "Posta AI",
+   "tipo": "produto",
+   "base": null,
+   "schema": "postaai",
+   "servico": "postaai",
+   "hosts": [
+    "posta-ai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://posta-ai.rangeltech.net/",
+    "admin": "https://posta-ai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/postaai",
+    "readme": "https://github.com/RangelTech/postaai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/postaai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/postaai/qa"
+  },
+  {
+   "id": "posta-insta",
+   "nome": "Posta AI Insta",
+   "tipo": "variante",
+   "base": "postaai",
+   "schema": "postaai",
+   "servico": "postaai",
+   "hosts": [
+    "posta-insta.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://posta-insta.rangeltech.net/",
+    "admin": "https://posta-insta.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/postaai",
+    "readme": "https://github.com/RangelTech/postaai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/postaai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/postaai/qa-insta"
+  },
+  {
+   "id": "posta-face",
+   "nome": "Posta AI Face",
+   "tipo": "variante",
+   "base": "postaai",
+   "schema": "postaai",
+   "servico": "postaai",
+   "hosts": [
+    "posta-face.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://posta-face.rangeltech.net/",
+    "admin": "https://posta-face.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/postaai",
+    "readme": "https://github.com/RangelTech/postaai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/postaai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/postaai/qa-face"
+  },
+  {
+   "id": "posta-tiktok",
+   "nome": "Posta AI TikTok",
+   "tipo": "variante",
+   "base": "postaai",
+   "schema": "postaai",
+   "servico": "postaai",
+   "hosts": [
+    "posta-tiktok.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://posta-tiktok.rangeltech.net/",
+    "admin": "https://posta-tiktok.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/postaai",
+    "readme": "https://github.com/RangelTech/postaai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/postaai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/postaai/qa-tiktok"
+  },
+  {
+   "id": "posta-linkdn",
+   "nome": "Posta AI LinkedIn",
+   "tipo": "variante",
+   "base": "postaai",
+   "schema": "postaai",
+   "servico": "postaai",
+   "hosts": [
+    "posta-linkdn.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://posta-linkdn.rangeltech.net/",
+    "admin": "https://posta-linkdn.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/postaai",
+    "readme": "https://github.com/RangelTech/postaai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/postaai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/postaai/qa-linkdn"
+  },
+  {
+   "id": "atendeai",
+   "nome": "Atende AI",
+   "tipo": "produto",
+   "base": null,
+   "schema": "atendeai",
+   "servico": "atendeai",
+   "hosts": [
+    "atende-ai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://atende-ai.rangeltech.net/",
+    "admin": "https://atende-ai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/atendeai",
+    "readme": "https://github.com/RangelTech/atendeai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/atendeai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/atendeai/qa"
+  },
+  {
+   "id": "atende-whats",
+   "nome": "Atende AI Whats",
+   "tipo": "variante",
+   "base": "atendeai",
+   "schema": "atendeai",
+   "servico": "atendeai",
+   "hosts": [
+    "atende-whats.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://atende-whats.rangeltech.net/",
+    "admin": "https://atende-whats.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/atendeai",
+    "readme": "https://github.com/RangelTech/atendeai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/atendeai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/atendeai/qa-whats"
+  },
+  {
+   "id": "atende-insta",
+   "nome": "Atende AI Insta",
+   "tipo": "variante",
+   "base": "atendeai",
+   "schema": "atendeai",
+   "servico": "atendeai",
+   "hosts": [
+    "atende-insta.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://atende-insta.rangeltech.net/",
+    "admin": "https://atende-insta.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/atendeai",
+    "readme": "https://github.com/RangelTech/atendeai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/atendeai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/atendeai/qa-insta"
+  },
+  {
+   "id": "atende-face",
+   "nome": "Atende AI Face",
+   "tipo": "variante",
+   "base": "atendeai",
+   "schema": "atendeai",
+   "servico": "atendeai",
+   "hosts": [
+    "atende-face.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://atende-face.rangeltech.net/",
+    "admin": "https://atende-face.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/atendeai",
+    "readme": "https://github.com/RangelTech/atendeai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/atendeai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/atendeai/qa-face"
+  },
+  {
+   "id": "atende-tiktok",
+   "nome": "Atende AI TikTok",
+   "tipo": "variante",
+   "base": "atendeai",
+   "schema": "atendeai",
+   "servico": "atendeai",
+   "hosts": [
+    "atende-tiktok.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://atende-tiktok.rangeltech.net/",
+    "admin": "https://atende-tiktok.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/atendeai",
+    "readme": "https://github.com/RangelTech/atendeai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/atendeai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/atendeai/qa-tiktok"
+  },
+  {
+   "id": "astralai",
+   "nome": "Astral AI",
+   "tipo": "produto",
+   "base": null,
+   "schema": "astralai",
+   "servico": "astralai",
+   "hosts": [
+    "astral.rangeltech.net",
+    "astral-ai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://astral.rangeltech.net/",
+    "admin": "https://astral.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/astralai",
+    "readme": "https://github.com/RangelTech/astralai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/astralai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/astralai/qa"
+  },
+  {
+   "id": "shapeai",
+   "nome": "Shape AI",
+   "tipo": "produto",
+   "base": null,
+   "schema": "shapeai",
+   "servico": "shapeai",
+   "hosts": [
+    "shape.rangeltech.net",
+    "shape-ai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://shape.rangeltech.net/",
+    "admin": "https://shape.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/shapeai",
+    "readme": "https://github.com/RangelTech/shapeai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/shapeai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/shapeai/qa"
+  },
+  {
+   "id": "casaai",
+   "nome": "Casa AI",
+   "tipo": "produto",
+   "base": null,
+   "schema": "casaai",
+   "servico": "casaai",
+   "hosts": [
+    "casa.rangeltech.net",
+    "casa-ai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://casa.rangeltech.net/",
+    "admin": "https://casa.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/casaai",
+    "readme": "https://github.com/RangelTech/casaai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/casaai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/casaai/qa"
+  },
+  {
+   "id": "arenabruta",
+   "nome": "Arena Bruta",
+   "tipo": "produto",
+   "base": null,
+   "schema": "arenabruta",
+   "servico": "arenabruta",
+   "hosts": [
+    "arena.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://arena.rangeltech.net/",
+    "admin": "https://arena.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/arenabruta",
+    "readme": "https://github.com/RangelTech/arenabruta#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/arenabruta/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/arenabruta/qa"
+  },
+  {
+   "id": "boateazul",
+   "nome": "Boate Azul",
+   "tipo": "produto",
+   "base": null,
+   "schema": "boateazul",
+   "servico": "boateazul",
+   "hosts": [
+    "azul.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://azul.rangeltech.net/",
+    "admin": "https://azul.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/boateazul",
+    "readme": "https://github.com/RangelTech/boateazul#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/boateazul/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": "rt-produtos/boateazul/qa"
+  },
+  {
+   "id": "segundo-cerebro",
+   "nome": "Segundo Cérebro",
+   "tipo": "plataforma",
+   "base": null,
+   "schema": null,
+   "servico": "segundo-cerebro-remoto",
+   "hosts": [
+    "brain.rangeltech.net",
+    "segundocerebro.pro",
+    "app.segundocerebro.pro",
+    "remoto.rangeltech.net"
+   ],
+   "cakto": [
+    "adriano"
+   ],
+   "links": {
+    "produto": "https://brain.rangeltech.net/",
+    "admin": null,
+    "github": "https://github.com/RangelTech/second-brain",
+    "readme": "https://github.com/RangelTech/second-brain#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/second-brain/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": null
+  },
+  {
+   "id": "qwen",
+   "nome": "Qwen (LLM, fila, GPU e painel)",
+   "tipo": "plataforma",
+   "base": null,
+   "schema": null,
+   "servico": "llm-access",
+   "hosts": [
+    "qwen.rangeltech.net",
+    "api.segundocerebro.pro",
+    "painel.rangeltech.net"
+   ],
+   "cakto": [],
+   "links": {
+    "produto": "https://qwen.rangeltech.net/",
+    "admin": null,
+    "github": "https://github.com/LucasRangelSSouza/qwen-abliterated-api",
+    "readme": "https://github.com/LucasRangelSSouza/qwen-abliterated-api#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/LucasRangelSSouza/qwen-abliterated-api/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": null
+  },
+  {
+   "id": "autoai",
+   "nome": "AutoAI",
+   "tipo": "em_preparo",
+   "base": null,
+   "schema": null,
+   "servico": "autoos",
+   "hosts": [
+    "autoai.rangeltech.net"
+   ],
+   "cakto": [],
+   "links": {
+    "produto": "https://autoai.rangeltech.net/",
+    "admin": null,
+    "github": "https://github.com/RangelTech/autoos",
+    "readme": "https://github.com/RangelTech/autoos#readme",
+    "deploy": null,
+    "release": "https://github.com/RangelTech/autoos/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": null
+  },
+  {
+   "id": "luar",
+   "nome": "LUAR",
+   "tipo": "em_preparo",
+   "base": null,
+   "schema": null,
+   "servico": "chatwoot-rails",
+   "hosts": [
+    "ia.rangeltech.net",
+    "luar.rangeltech.net",
+    "chat.rangeltech.net",
+    "conector.rangeltech.net",
+    "bridge.rangeltech.net"
+   ],
+   "cakto": [],
+   "links": {
+    "produto": "https://ia.rangeltech.net/",
+    "admin": null,
+    "github": "https://github.com/RangelTech/luar_chatwoot",
+    "readme": "https://github.com/RangelTech/luar_chatwoot#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/luar_chatwoot/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": null
+  }
+ ]
+}

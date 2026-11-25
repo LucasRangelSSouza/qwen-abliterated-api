@@ -1,3 +1,42 @@
+<!-- readme-padrao -->
+# Qwen (LLM, fila, GPU e painel)
+
+> O Qwen, o LLM da casa: API de acesso (`access/`: contas, chaves, planos, cobrança, VMs do Segundo Cérebro e o **painel**), fila e controle da GPU na Vast (`queue/`) e a imagem da GPU. Atende todos os produtos.
+
+![Tela principal](docs/img/principal.webp)
+
+## O que é
+O Qwen, o LLM da casa: API de acesso (`access/`: contas, chaves, planos, cobrança, VMs do Segundo Cérebro e o **painel**), fila e controle da GPU na Vast (`queue/`) e a imagem da GPU. Atende todos os produtos.
+
+Estado: **no ar**.
+
+## Onde está no ar
+- https://qwen.rangeltech.net/admin
+
+## Onde faz o deploy
+Este repositório **só publica** o artefato (release com imagem e manifesto); **quem implanta é o `vps_rt_infra`**.
+
+- Serviço `llm-access`: `gh workflow run deploy.yml --repo RangelTech/vps_rt_infra -f service=llm-access` (só validar: `-f dry_run=true`; voltar versão: `-f version=<tag-antiga>`)
+- Serviço `llm-queue`: `gh workflow run deploy.yml --repo RangelTech/vps_rt_infra -f service=llm-queue` (só validar: `-f dry_run=true`; voltar versão: `-f version=<tag-antiga>`)
+
+Os `.env` desses serviços são gerados do Infisical no momento do deploy (spec 57, seção 0A).
+
+## Como funciona por dentro
+Resumo acima; os detalhes estão nas notas técnicas (README anterior) abaixo e na spec 57.
+
+## Segredos
+Nenhum valor de segredo fica neste repositório. Os segredos dos serviços ficam no Infisical (mapa em `vps_rt_infra/scripts/infisical/mapa_envs.json`) e chegam à VPS gerados no deploy.
+
+## Rodar e testar localmente
+Ver as notas técnicas abaixo (cada repositório tem o seu jeito); os testes de QA em produção são por cliques reais, com evidência em `new_ragente/qa/evidencias`.
+
+## Links
+- Repositório: https://github.com/LucasRangelSSouza/qwen-abliterated-api
+- Painel único: https://painel.rangeltech.net
+- Spec de organização geral: `new_ragente/specs/57_ORGANIZACAO_GERAL_PRODUTOS_E_PAINEL.md`
+
+## Notas técnicas (README anterior)
+
 # Qwen abliterado: a LLM, a fila e o painel de controle
 
 Este repositório é o sistema inteiro que serve o **Qwen3.8-27B abliterado** como uma API compatível com OpenAI (chat com stream, ferramentas,

@@ -637,21 +637,21 @@
   {
    "id": "autoai",
    "nome": "AutoAI",
-   "tipo": "em_preparo",
+   "tipo": "em_teste",
    "base": null,
    "schema": null,
-   "servico": "autoos",
+   "servico": "autoai",
    "hosts": [
     "autoai.rangeltech.net"
    ],
    "cakto": [],
    "links": {
     "produto": "https://autoai.rangeltech.net/",
-    "admin": null,
-    "github": "https://github.com/RangelTech/autoos",
-    "readme": "https://github.com/RangelTech/autoos#readme",
-    "deploy": null,
-    "release": "https://github.com/RangelTech/autoos/actions",
+    "admin": "https://autoai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/autoai",
+    "readme": "https://github.com/RangelTech/autoai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/autoai/actions",
     "monitor": "https://uptime.rangeltech.net/status/rangeltech"
    },
    "qa": null

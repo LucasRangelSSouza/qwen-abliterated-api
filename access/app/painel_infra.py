@@ -54,7 +54,7 @@ async def painel_infra(request: Request):
         p = por_servico.get(nome) or por_servico.get(lab.get("rt.service", "")) or por_servico.get(proj)
         status = c.get("Status", "")
         saude = "saudável" if "(healthy)" in status else "com problema" if "(unhealthy)" in status else "iniciando" if "health: starting" in status else "sem checagem"
-        grupo = ("Produto" if p and p["tipo"] in ("produto", "variante") else "Plataforma" if p else
+        grupo = ("Produto" if p and p["tipo"] in ("produto", "variante", "em_teste") else "Plataforma" if p else
                  "LUAR" if re.search(r"chatwoot|luar|kernel", nome) else "Infraestrutura")
         linhas.append({"nome": nome, "imagem": (c.get("Image") or "")[:60], "estado": c.get("State"), "status": status, "saude": saude,
                        "projeto": proj, "grupo": grupo, "produto": p["nome"] if p else None,

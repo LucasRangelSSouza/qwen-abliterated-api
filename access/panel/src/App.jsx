@@ -46,7 +46,7 @@ const NAV = [
 ]
 
 const GRUPOS = ['Segundo Cérebro', 'Produtos', 'Geral', 'Configurações']
-const TIPOS_PRODUTO = ['produto', 'variante', 'em_preparo']
+const TIPOS_PRODUTO = ['produto', 'variante', 'em_teste', 'em_preparo']
 
 function useRegistro() {
   const [itens, setItens] = useState([])
@@ -63,7 +63,7 @@ function ListaProdutos() {
         {itens.map((p) => (
           <a key={p.id} href={'#/p/' + p.id} className="rounded-[12px] border border-border-subtle bg-surface p-4 hover:bg-surface-2">
             <div className="font-medium text-text-main">{p.nome}</div>
-            <div className="text-xs text-text-muted">{(p.hosts || [])[0] || ''}{p.tipo === 'variante' ? ' · variante de ' + p.base : p.tipo === 'em_preparo' ? ' · em breve' : ''}</div>
+            <div className="text-xs text-text-muted">{(p.hosts || [])[0] || ''}{p.tipo === 'variante' ? ' · variante de ' + p.base : p.tipo === 'em_preparo' ? ' · em breve' : p.tipo === 'em_teste' ? ' · em teste' : ''}</div>
           </a>
         ))}
       </div>
@@ -168,7 +168,7 @@ function Shell({ onLogout, dark, toggleTheme }) {
                   className={cn('flex items-center gap-3 px-3 h-8 rounded-[10px] text-[13px] transition-colors',
                     route === 'p/' + p.id ? 'bg-brand-500/10 text-brand-text' : 'text-text-muted hover:bg-surface-2 hover:text-text-main',
                     p.tipo === 'variante' && 'pl-8 text-[12px]')}>
-                  {p.nome}{p.tipo === 'em_preparo' && <span className="text-[10px] text-text-subtle">em breve</span>}
+                  {p.nome}{p.tipo === 'em_preparo' && <span className="text-[10px] text-text-subtle">em breve</span>}{p.tipo === 'em_teste' && <span className="text-[10px] text-text-subtle">em teste</span>}
                 </a>
               ))}
             </div>

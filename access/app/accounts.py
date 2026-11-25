@@ -280,6 +280,8 @@ def _apply(ctx: Ctx, ev: dict, now: float) -> None:
     from app import vms  # produto "maquina virtual": cobranca propria da VM, nao mexe no plano nem no acesso da conta
     if vms.eh_produto_vm(ctx, ev["plan_hint"]):
         vms.registrar_pagamento(ctx, acc["id"], ev)
+        if ev["status"] == "active":  # pagou: a rotina das VMs cria na hora, sem esperar os 10 minutos (spec 57 §6.6)
+            vms.acordar_rotina(ctx)
         if plan_id is None:
             return  # so a VM
         # produto combinado ("<plano> + maquina virtual"): alem do pedido da VM, aplica o plano abaixo

@@ -53,7 +53,18 @@ def salvar_credenciais(ctx: Ctx, dados: dict) -> None:
     ctx.store.set_setting("contabo_credentials", _fernet(ctx).encrypt(corpo).decode())
 
 
+def credenciais_do_ambiente() -> dict | None:
+    """Fonte oficial (spec 57 §6.6, R2): Infisical qwen/contabo, entregue como CONTABO_* no ambiente. O banco fica so como copia de trabalho."""
+    import os
+    m = {"client_id": "CONTABO_CLIENT_ID", "client_secret": "CONTABO_CLIENT_SECRET", "api_user": "CONTABO_API_USER", "api_password": "CONTABO_API_PASSWORD"}
+    d = {k: (os.environ.get(v) or "").strip() for k, v in m.items()}
+    return d if all(d.values()) else None
+
+
 def carregar_credenciais(ctx: Ctx) -> dict | None:
+    amb = credenciais_do_ambiente()
+    if amb:
+        return amb
     v = ctx.store.get_setting("contabo_credentials")
     if not v:
         return None
@@ -64,7 +75,7 @@ def carregar_credenciais(ctx: Ctx) -> dict | None:
 
 
 def credenciais_configuradas(ctx: Ctx) -> bool:
-    return bool(ctx.store.get_setting("contabo_credentials"))
+    return bool(credenciais_do_ambiente() or ctx.store.get_setting("contabo_credentials"))
 
 
 def config(ctx: Ctx) -> dict:
@@ -154,6 +165,16 @@ class Contabo:
         j = await self._req("POST", "/instances", corpo)
         return (j.get("data") or [{}])[0]
 
+    async def firewall_da_instancia(self, instancia_id: str) -> str | None:
+        """Nome dos firewalls da Contabo ligados a instancia (so leitura). Firewalls ficam em /v1/firewalls, fora de /compute."""
+        r = await self.http.get("https://api.contabo.com/v1/firewalls?size=100", headers={
+            "Authorization": "Bearer " + await self._token(), "x-request-id": str(uuid.uuid4())})
+        if r.status_code >= 300:
+            return None
+        nomes = [f.get("name") or f.get("firewallId") for f in (r.json().get("data") or [])
+                 if any(str(x.get("instanceId")) == str(instancia_id) for x in ((f.get("status") or {}).get("instances") or f.get("instances") or []))]
+        return ", ".join(n for n in nomes if n) or None
+
     async def acao(self, instancia_id: str, acao: str) -> None:
         if acao not in ("start", "shutdown", "stop", "restart"):
             raise ContaboError("Acao nao permitida.")
@@ -182,7 +203,22 @@ def solicitar(ctx: Ctx, account_id: int) -> int:
     with ctx.store.tx() as c:
         cur = c.execute("INSERT INTO vms(account_id,name,status,product_id,region,cost_cents,price_cents,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?)",
                         (account_id, nome, "requested", cfg["product_id"], cfg["region"], cfg["cost_cents"], cfg["price_cents"], agora, agora))
-        return cur.lastrowid
+        vm_id = cur.lastrowid
+    evento(ctx, vm_id, "pedido", f"pedido aberto ({nome})")
+    return vm_id
+
+
+def evento(ctx: Ctx, vm_id: int, tipo: str, detalhe: str = "") -> None:
+    """Linha do tempo da VM no painel (spec 57 §6.6): comprada, criando, instalando, pronta, sem resposta, erro, suspensa..."""
+    try:
+        with ctx.store.tx() as c:
+            c.execute("INSERT INTO vm_eventos(vm_id,quando,tipo,detalhe) VALUES(?,?,?,?)", (vm_id, ctx.clock(), tipo, (detalhe or "")[:300]))
+    except Exception:  # noqa: BLE001  registro informativo nunca derruba a automacao
+        pass
+
+
+def linha_do_tempo(ctx: Ctx, vm_id: int) -> list[dict]:
+    return ctx.store.query("SELECT quando, tipo, detalhe FROM vm_eventos WHERE vm_id=? ORDER BY quando, id", (vm_id,))
 
 
 def _mudar(ctx: Ctx, vm_id: int, **campos) -> None:
@@ -219,8 +255,11 @@ async def provisionar(ctx: Ctx, vm_id: int, contabo: Contabo | None = None) -> d
                              ssh_keys=[int(cfg["ssh_secret_id"])] if cfg["ssh_secret_id"].isdigit() else None)
         _mudar(ctx, vm_id, status="provisioning", contabo_id=str(inst.get("instanceId") or ""), product_id=cfg["product_id"], region=cfg["region"],
                cost_cents=cfg["cost_cents"], price_cents=cfg["price_cents"], last_error=None)
+        evento(ctx, vm_id, "criando", f"criada na Contabo (instancia {inst.get('instanceId') or '?'}, plano {cfg['product_id']}, {cfg['region']})")
+        _avisar_dono(ctx, vm, cfg)
     except ContaboError as e:
         _mudar(ctx, vm_id, status="error", last_error=str(e)[:300])
+        evento(ctx, vm_id, "erro", str(e))
         raise
     finally:
         if contabo is None:
@@ -239,6 +278,7 @@ async def _acao(ctx: Ctx, vm_id: int, acao: str, novo: str, contabo: Contabo | N
         if contabo is None:
             await c.aclose()
     _mudar(ctx, vm_id, status=novo, suspended_at=ctx.clock() if novo == "suspended" else None)
+    evento(ctx, vm_id, "suspensa" if novo == "suspended" else "religada", "pagamento" if novo == "suspended" else "voltou a pagar")
 
 
 async def suspender(ctx: Ctx, vm_id: int, contabo: Contabo | None = None) -> None:
@@ -261,6 +301,7 @@ async def cancelar(ctx: Ctx, vm_id: int, contabo: Contabo | None = None) -> None
             if contabo is None:
                 await c.aclose()
     _mudar(ctx, vm_id, status="canceled")
+    evento(ctx, vm_id, "cancelada")
 
 
 def dias_de_atraso(ctx: Ctx, sub) -> float:
@@ -308,6 +349,7 @@ def registrar_pagamento(ctx: Ctx, account_id: int, ev: dict) -> int | None:
             return None  # so uma compra paga abre pedido
         vm_id = solicitar(ctx, account_id)
         vm = ctx.store.one("SELECT * FROM vms WHERE id=?", (vm_id,))
+        evento(ctx, vm_id, "comprada", f"pagamento confirmado na Cakto ({ev.get('external_id') or 'sem pedido'})")
     cobranca = vm["billing_status"] if ev["status"] == "pending" and vm["billing_status"] in ("active", "late") else ev["status"]  # evento "criada" nao rebaixa VM ja paga
     _mudar(ctx, vm["id"], external_id=ev.get("external_id") or vm["external_id"], billing_status=cobranca,
            next_payment_at=ev.get("next_payment_at") or vm["next_payment_at"])
@@ -365,12 +407,55 @@ async def sincronizar(ctx: Ctx, contabo: Contabo | None = None) -> int:
                 campos["last_error"] = None
             _mudar(ctx, vm["id"], **campos)
             if ficou_pronta:
+                evento(ctx, vm["id"], "instalando", f"ligada na Contabo ({ip}); o instalador do app roda agora")
                 _avisar_pronta(ctx, vm["account_id"])
+            if i.get("status") == "running" and ip:
+                await _checar_resposta(ctx, vm, ip, c)
             n += 1
     finally:
         if contabo is None:
             await c.aclose()
     return n
+
+
+async def porta_responde(ip: str, porta: int = 22, timeout: float = 5.0) -> bool:
+    """So abre e fecha uma conexao TCP (nao envia nada, nao altera a VM)."""
+    import asyncio
+    try:
+        _, w = await asyncio.wait_for(asyncio.open_connection(ip, porta), timeout)
+        w.close()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+async def _checar_resposta(ctx: Ctx, vm, ip: str, c: "Contabo") -> None:
+    """VM morta (spec 57 §6.6): a Contabo diz 'running' mas nenhuma porta responde (Fernando e Carlos, 23/11). Marca e mostra o firewall."""
+    checar = getattr(ctx, "porta_responde", None) or porta_responde
+    ok = await checar(ip)
+    antes = vm["app_status"] if "app_status" in vm.keys() else None
+    if ok:
+        _mudar(ctx, vm["id"], app_status="respondendo", app_checked_at=ctx.clock(), firewall=None)
+        if antes != "respondendo":
+            evento(ctx, vm["id"], "pronta" if antes is None else "voltou a responder", f"{ip} responde")
+        return
+    fw = None
+    try:
+        fw = await c.firewall_da_instancia(vm["contabo_id"])
+    except Exception:  # noqa: BLE001
+        pass
+    _mudar(ctx, vm["id"], app_status="sem resposta", app_checked_at=ctx.clock(), firewall=fw)
+    if antes != "sem resposta":
+        evento(ctx, vm["id"], "sem resposta", f"{ip}: a Contabo diz rodando, mas a porta 22 nao responde" + (f"; firewall: {fw}" if fw else ""))
+
+
+def _avisar_dono(ctx: Ctx, vm, cfg: dict) -> None:
+    """Aviso ao dono a cada VM criada, com o custo (so informativo; a criacao ja aconteceu apos o pagamento)."""
+    try:
+        from app import mailer
+        mailer.send_vm_criada_dono(ctx, vm["name"], vm["email"], cfg["cost_cents"], cfg["price_cents"], cfg["region"])
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _avisar_pronta(ctx: Ctx, account_id: int) -> None:
@@ -382,6 +467,17 @@ def _avisar_pronta(ctx: Ctx, account_id: int) -> None:
             mailer.send_vm_ready(ctx, acc["email"], acc["name"] or "")
     except Exception:  # noqa: BLE001
         pass
+
+
+def acordar_rotina(ctx: Ctx) -> None:
+    """Chamado pelo webhook (thread do servidor): acorda a rotina das VMs no loop principal."""
+    par = getattr(ctx, "acordar_vms", None)
+    if par:
+        laco, ev = par
+        try:
+            laco.call_soon_threadsafe(ev.set)
+        except RuntimeError:
+            pass
 
 
 async def provisionar_pagas(ctx: Ctx, contabo: Contabo | None = None) -> int:

@@ -60,6 +60,9 @@ CREATE TABLE IF NOT EXISTS vms(
   created_at REAL NOT NULL, updated_at REAL NOT NULL, suspended_at REAL, last_error TEXT,
   external_id TEXT, billing_status TEXT, next_payment_at REAL);
 CREATE INDEX IF NOT EXISTS vms_account ON vms(account_id);
+CREATE TABLE IF NOT EXISTS vm_eventos(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, vm_id INTEGER NOT NULL, quando REAL NOT NULL, tipo TEXT NOT NULL, detalhe TEXT);  -- registro: sobrevive a VM apagada
+CREATE INDEX IF NOT EXISTS vm_eventos_vm ON vm_eventos(vm_id, quando);
 CREATE TABLE IF NOT EXISTS free_trials(
   account_id INTEGER PRIMARY KEY REFERENCES accounts(id), ident TEXT NOT NULL UNIQUE, used INTEGER NOT NULL DEFAULT 0, verified INTEGER NOT NULL DEFAULT 0,
   code_hash TEXT, code_expires REAL, code_tries INTEGER NOT NULL DEFAULT 0, ip TEXT, created_at REAL NOT NULL, last_at REAL);
@@ -134,7 +137,8 @@ class Store:
                 if col not in cols_acc:
                     c.execute(f"ALTER TABLE accounts ADD COLUMN {col} {tipo}")
             cols_vms = {r["name"] for r in c.execute("PRAGMA table_info(vms)").fetchall()}
-            for col, tipo in (("external_id", "TEXT"), ("billing_status", "TEXT"), ("next_payment_at", "REAL")):  # cobranca propria da VM (produto da Cakto)
+            for col, tipo in (("external_id", "TEXT"), ("billing_status", "TEXT"), ("next_payment_at", "REAL"),  # cobranca propria da VM (produto da Cakto)
+                              ("app_status", "TEXT"), ("app_checked_at", "REAL"), ("firewall", "TEXT")):  # spec 57 §6.6: VM que nao responde
                 if col not in cols_vms:
                     c.execute(f"ALTER TABLE vms ADD COLUMN {col} {tipo}")
             self._c = c

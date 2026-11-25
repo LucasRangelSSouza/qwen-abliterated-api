@@ -103,6 +103,7 @@ function Machines() {
   const [open, setOpen] = useState(false)
   const [confirm, setConfirm] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [aberta, setAberta] = useState(null)  // linha do tempo aberta (spec 57 §6.6)
   const d = list.data
   const t = d?.total
   const run = async (fn, okMsg) => { setBusy(true); try { await fn(); toast.success(okMsg); list.refresh() } catch (e) { toast.error(e.message) } finally { setBusy(false); setConfirm(null) } }
@@ -118,7 +119,7 @@ function Machines() {
       </div>
       <Card className="overflow-hidden">
         <CardHeader icon={Server} title="Máquinas virtuais dos clientes" subtitle="Uma VPS por cliente, com o Segundo Cérebro em modo servidor. Pagamento em dia: ligada. Passou da carência: desligada sozinha"
-          action={<div className="flex gap-2"><Button variant="outline" icon={RefreshCw} onClick={() => run(() => api.syncVms(), 'Sincronizado com a Contabo.')} loading={busy}>Sincronizar</Button><Button icon={Plus} onClick={() => setOpen(true)}>Nova VM</Button></div>} />
+          action={<div className="flex gap-2"><Button variant="outline" icon={RefreshCw} onClick={() => run(() => api.syncVms(), 'Atualizado pela Contabo.')} loading={busy}>Atualizar agora</Button><Button icon={Plus} onClick={() => setOpen(true)}>Nova VM</Button></div>} />
         {list.error ? <ErrorState message={list.error} onRetry={list.reload} /> : list.loading && !d ? <div className="p-5 pt-0"><Skeleton className="h-40" /></div>
           : d.rows.length === 0 ? <EmptyState icon={Server} title="Nenhuma máquina virtual ainda" text="Quando um cliente contratar a VM (ou você registrar um pedido), ela aparece aqui com custo, recursos e situação." action={<Button icon={Plus} onClick={() => setOpen(true)}>Registrar pedido</Button>} />
           : (
@@ -137,7 +138,10 @@ function Machines() {
                     return (
                       <tr key={v.id} className="border-b border-border-subtle last:border-b-0 hover:bg-surface-2/50 align-top">
                         <td className="px-5 py-3.5 max-w-[210px]"><div className="font-semibold text-text-main truncate">{v.name_client || v.email}</div><div className="text-xs text-text-muted truncate">{v.email}</div><div className="text-xs font-mono text-text-subtle truncate">{v.name}</div><div className="text-xs text-text-muted">criada em {dia(v.created_at)}</div></td>
-                        <td className="px-3 py-3.5"><Badge variant={variant} dot pulse={v.status === 'provisioning'}>{label}</Badge>{v.last_error && <div className="text-xs text-red-600 dark:text-red-400 mt-1 max-w-[220px]">{v.last_error}</div>}{v.suspended_at && <div className="text-xs text-text-muted mt-1">desde {dia(v.suspended_at)}</div>}</td>
+                        <td className="px-3 py-3.5"><Badge variant={variant} dot pulse={v.status === 'provisioning'}>{label}</Badge>{v.last_error && <div className="text-xs text-red-600 dark:text-red-400 mt-1 max-w-[220px]">{v.last_error}</div>}{v.suspended_at && <div className="text-xs text-text-muted mt-1">desde {dia(v.suspended_at)}</div>}
+                          {v.app_status === 'sem resposta' && <div className="mt-1"><Badge variant="error" dot>sem resposta</Badge><div className="text-xs text-red-600 dark:text-red-400 mt-1 max-w-[220px]">A Contabo diz ligada, mas a porta 22 não responde{v.firewall ? `. Firewall: ${v.firewall}` : ''}</div></div>}
+                          {v.app_status === 'respondendo' && <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">respondendo</div>}
+                          {(v.eventos || []).length > 0 && <button className="text-xs text-text-muted underline mt-1" onClick={() => setAberta(aberta === v.id ? null : v.id)}>{aberta === v.id ? 'fechar linha do tempo' : 'linha do tempo'}</button>}</td>
                         <td className="px-3 py-3.5 text-xs text-text-muted whitespace-nowrap"><div className="flex items-center gap-1.5"><Cpu className="size-3.5" />{v.cores ? `${v.cores} vCPU` : '—'}</div><div className="flex items-center gap-1.5"><MemoryStick className="size-3.5" />{gb(v.ram_mb)}</div><div className="flex items-center gap-1.5"><HardDrive className="size-3.5" />{gb(v.disk_mb)}</div></td>
                         <td className="px-3 py-3.5 text-xs"><div className="font-mono text-text-main">{v.ip || '—'}</div><div className="text-text-muted">{v.region || '—'}</div></td>
                         <td className="px-3 py-3.5 num text-right">{brl(v.cost_cents)}</td>
@@ -153,6 +157,12 @@ function Machines() {
                         </td>
                       </tr>
                     )
+                  }).flatMap((linha, i) => {
+                    const v = d.rows[i]
+                    if (aberta !== v.id) return [linha]
+                    return [linha, <tr key={v.id + '-tl'} className="border-b border-border-subtle bg-bg-alt/40"><td colSpan={8} className="px-5 py-3">
+                      <ol className="space-y-1.5">{(v.eventos || []).map((e, k) => <li key={k} className="text-xs flex gap-3"><span className="text-text-muted whitespace-nowrap w-36">{dia(e.quando)} {(e.quando || '').slice(11, 16)}</span><b className="w-36 text-text-main">{e.tipo}</b><span className="text-text-muted">{e.detalhe}</span></li>)}</ol>
+                    </td></tr>]
                   })}
                 </tbody>
               </table>

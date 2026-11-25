@@ -23,8 +23,14 @@ from app.store import Store
 async def _rotina_vms(ctx) -> None:
     """De 10 em 10 minutos: atualiza as VMs de clientes e desliga/religa conforme o pagamento. So roda com a Contabo configurada."""
     from app import vms
+    acordar = asyncio.Event()
+    ctx.acordar_vms = (asyncio.get_running_loop(), acordar)  # o webhook da Cakto acorda a rotina (spec 57 §6.6: criar na hora)
     while True:
-        await asyncio.sleep(600)
+        try:
+            await asyncio.wait_for(acordar.wait(), 600)
+        except asyncio.TimeoutError:
+            pass
+        acordar.clear()
         try:
             if vms.credenciais_configuradas(ctx):
                 await vms.provisionar_pagas(ctx)

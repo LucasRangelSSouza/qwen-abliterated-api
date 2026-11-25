@@ -101,6 +101,9 @@ class PgStore:
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS external_id TEXT")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS billing_status TEXT")
             c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS next_payment_at DOUBLE PRECISION")
+            c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS app_status TEXT")  # spec 57 §6.6: respondendo | sem resposta
+            c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS app_checked_at DOUBLE PRECISION")
+            c.execute("ALTER TABLE vms ADD COLUMN IF NOT EXISTS firewall TEXT")
             try:  # aceites dos termos so de inclusao (trigger); se falhar o servico sobe igual (o codigo tambem nunca altera nem apaga)
                 c.execute(APPEND_ONLY_PG)
             except Exception:  # noqa: BLE001

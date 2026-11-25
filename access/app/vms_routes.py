@@ -18,7 +18,9 @@ def _view(r) -> dict:
             "contabo_id": r["contabo_id"], "ip": r["ip"], "product_id": r["product_id"], "region": r["region"],
             "cores": r["cores"], "ram_mb": r["ram_mb"], "disk_mb": r["disk_mb"], "cost_cents": r["cost_cents"], "price_cents": r["price_cents"],
             "margin_cents": (r["price_cents"] or 0) - (r["cost_cents"] or 0), "created_at": iso(r["created_at"]),
-            "suspended_at": iso(r["suspended_at"]) if r["suspended_at"] else None, "last_error": r["last_error"]}
+            "suspended_at": iso(r["suspended_at"]) if r["suspended_at"] else None, "last_error": r["last_error"],
+            "app_status": r["app_status"] if "app_status" in r.keys() else None, "firewall": r["firewall"] if "firewall" in r.keys() else None,
+            "app_checked_at": iso(r["app_checked_at"]) if "app_checked_at" in r.keys() and r["app_checked_at"] else None}
 
 
 @api.get("/vms")
@@ -27,6 +29,8 @@ def vms_list(request: Request):
     ctx = require(request)
     rows = ctx.store.query("SELECT v.*, a.email, a.name acc_name FROM vms v JOIN accounts a ON a.id=v.account_id ORDER BY v.id DESC")
     lista = [_view(r) for r in rows]
+    for v in lista:  # linha do tempo (spec 57 §6.6): poucos clientes, uma consulta por VM
+        v["eventos"] = [{"quando": iso(e["quando"]), "tipo": e["tipo"], "detalhe": e["detalhe"]} for e in V.linha_do_tempo(ctx, v["id"])][-30:]
     ativos = [v for v in lista if v["status"] in ("running", "provisioning", "suspended")]
     return {"rows": lista, "total": {"vms": len(ativos), "cost_cents": sum(v["cost_cents"] for v in ativos), "price_cents": sum(v["price_cents"] for v in ativos)}}
 

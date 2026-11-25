@@ -409,3 +409,95 @@ async def test_vm_ainda_nao_pronta_manda_email_do_espaco_exclusivo_e_pronta_mand
     assert len(enviados) == 2 and "pronto" in enviados[1][1] and "cliente@x.com" in enviados[1][2]
     await V.sincronizar(ctx)
     assert len(enviados) == 2
+
+
+# ---------------------------------------------------------------- spec 57 §6.6: linha do tempo, VM morta, criar na hora, aviso ao dono
+
+async def _responde(ip):
+    return True
+
+
+async def _morta(ip):
+    return False
+
+
+async def test_linha_do_tempo_da_compra_ate_pronta(rig2):
+    r, ctx, fake = rig2
+    ctx.store.set_setting("vm_auto_provision", "1")
+    ctx.porta_responde = _responde
+    await cakto(r, "purchase_approved")
+    assert await V.provisionar_pagas(ctx) == 1
+    await V.sincronizar(ctx)
+    vm = ctx.store.one("SELECT * FROM vms")
+    tipos = [e["tipo"] for e in V.linha_do_tempo(ctx, vm["id"])]
+    assert tipos == ["pedido", "comprada", "criando", "instalando", "pronta"], tipos
+    assert vm["status"] == "running" and vm["app_status"] == "respondendo"
+
+
+async def test_vm_morta_e_marcada_com_o_firewall_e_volta(rig2):
+    r, ctx, fake = rig2
+    ctx.store.set_setting("vm_auto_provision", "1")
+    await cakto(r, "purchase_approved")
+    await V.provisionar_pagas(ctx)
+    inst = [i for i in fake.instances.values() if str(i["displayName"]).startswith("sc-vm-")][0]
+    original = fake.handler
+
+    def com_firewall(req):
+        if req.method == "GET" and req.url.path == "/v1/firewalls":
+            return httpx.Response(200, json={"data": [{"firewallId": "fw1", "name": "Contabo - SSH Port Block Firewall",
+                                                       "status": {"instances": [{"instanceId": inst["instanceId"]}]}}]})
+        return original(req)
+    ctx.contabo_transport = httpx.MockTransport(com_firewall)
+    ctx.porta_responde = _morta
+    await V.sincronizar(ctx)
+    await V.sincronizar(ctx)  # segunda rodada não repete o evento
+    vm = ctx.store.one("SELECT * FROM vms")
+    assert vm["app_status"] == "sem resposta" and vm["firewall"] == "Contabo - SSH Port Block Firewall"
+    tipos = [e["tipo"] for e in V.linha_do_tempo(ctx, vm["id"])]
+    assert tipos.count("sem resposta") == 1
+    assert not [m for m, p in fake.mutacoes() if "firewall" in p]  # só leitura: nada muda na Contabo
+    ctx.porta_responde = _responde
+    await V.sincronizar(ctx)
+    vm = ctx.store.one("SELECT * FROM vms")
+    assert vm["app_status"] == "respondendo" and vm["firewall"] is None
+    assert V.linha_do_tempo(ctx, vm["id"])[-1]["tipo"] == "voltou a responder"
+
+
+async def test_aviso_ao_dono_com_o_custo(rig2, monkeypatch):
+    from app import mailer
+    r, ctx, fake = rig2
+    enviados = []
+    monkeypatch.setenv("VM_AVISO_EMAIL", "dono@exemplo.com")
+    monkeypatch.setattr(mailer, "send", lambda to, assunto, texto, html: enviados.append((to, assunto, texto)) or True)
+    ctx.store.set_setting("vm_auto_provision", "1")
+    ctx.store.set_setting("vm_cost_cents", "3300")
+    await cakto(r, "purchase_approved")
+    await V.provisionar_pagas(ctx)
+    avisos = [e for e in enviados if e[0] == "dono@exemplo.com"]
+    assert len(avisos) == 1 and "R$ 33,00" in avisos[0][1] and "ana@x.com" in avisos[0][1]
+
+
+async def test_pagamento_da_vm_acorda_a_rotina_na_hora(rig2):
+    import asyncio
+    r, ctx, fake = rig2
+    ev = asyncio.Event()
+    ctx.acordar_vms = (asyncio.get_running_loop(), ev)
+    await cakto(r, "purchase_approved")
+    for _ in range(20):
+        if ev.is_set():
+            break
+        await asyncio.sleep(0.01)
+    assert ev.is_set()
+
+
+async def test_credenciais_da_contabo_vem_do_ambiente_primeiro(make_rig, monkeypatch):
+    """Spec 57 §6.6: fonte oficial é o Infisical (CONTABO_* no ambiente); o banco é cópia de trabalho."""
+    r = await make_rig(secrets_key="chave-mestra-de-teste")
+    ctx = r.app.state.ctx
+    assert not V.credenciais_configuradas(ctx)
+    for k, v in {"CONTABO_CLIENT_ID": "amb-1", "CONTABO_CLIENT_SECRET": "s", "CONTABO_API_USER": "u", "CONTABO_API_PASSWORD": "p"}.items():
+        monkeypatch.setenv(k, v)
+    V.salvar_credenciais(ctx, CRED)
+    assert V.credenciais_configuradas(ctx) and V.carregar_credenciais(ctx)["client_id"] == "amb-1"
+    monkeypatch.delenv("CONTABO_API_PASSWORD")
+    assert V.carregar_credenciais(ctx)["client_id"] == "INT-1"  # incompleto no ambiente: volta para a cópia do banco

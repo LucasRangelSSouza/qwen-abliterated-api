@@ -154,6 +154,21 @@ def send_vm_preparing(ctx, to: str, name: str = "") -> bool:
     return send(to, "Seu espaço exclusivo no Segundo Cérebro está sendo preparado", texto, corpo)
 
 
+def send_vm_criada_dono(ctx, vm_nome: str, cliente: str, custo_cents: int, preco_cents: int, regiao: str) -> bool:
+    """Aviso ao dono (spec 57 §6.6): cada VM criada na Contabo, com o custo. Destino: VM_AVISO_EMAIL."""
+    para = (os.environ.get("VM_AVISO_EMAIL") or "").strip()
+    if not para:
+        return False
+    custo, preco = f"R$ {custo_cents / 100:.2f}".replace(".", ","), f"R$ {preco_cents / 100:.2f}".replace(".", ",")
+    paras = [f"Uma máquina virtual foi criada na Contabo depois do pagamento confirmado.",
+             f"VM: {vm_nome}. Cliente: {cliente}. Região: {regiao}.",
+             f"Custo para nós: {custo} por mês. Preço cobrado: {preco} por mês.",
+             "É só informativo: a criação já aconteceu. A linha do tempo da VM fica no painel, em Máquinas virtuais."]
+    texto = "\n\n".join(paras)
+    corpo = render_html("Máquina virtual criada", paras, "Abrir o painel", "https://painel.rangeltech.net/admin/#/vms", "Aviso automático do llm-access.")
+    return send(para, f"VM criada: {vm_nome} ({cliente}) — custo {custo}/mês", texto, corpo)
+
+
 def send_vm_ready(ctx, to: str, name: str = "") -> bool:
     """A maquina virtual ficou pronta: onde entrar e com que e-mail (a senha e a que a pessoa criou)."""
     remoto = "https://app.segundocerebro.pro"

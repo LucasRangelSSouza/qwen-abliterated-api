@@ -82,6 +82,7 @@ def create_app(s: Settings | None = None, *, http: httpx.AsyncClient | None = No
     from app import combos  # noqa: F401  combos rt-*: registra /admin/api/combos antes do include_router(admin.api)
     from app import custos  # noqa: F401  aba de custos: registra /admin/api/custos antes do include_router(admin.api)
     from app import produtos  # noqa: F401  painel do ecossistema: registra /admin/api/produtos antes do include_router(admin.api)
+    from app import painel_saude  # noqa: F401  abas Postgres e MinIO (spec 57 §6.10)
     from app import painel_produtos  # noqa: F401  painel unico (spec 57 §6.2): abas de produto do banco `produtos` e links do registro
     from app import diag  # relatorio de falha de instalacao: registra GET /admin/api/diag antes do include_router(admin.api)
     from fastapi.middleware.cors import CORSMiddleware

@@ -29,3 +29,13 @@ def test_qa_da_variante_usa_o_da_base(monkeypatch):
     assert pp._qa_de(reg["perfilai"])["email"] == "demo@rangeltech.net"
     assert pp._qa_de(reg["insta-ai"])["senha"] == "x"
     assert pp._qa_de(reg["cortai"]) is None
+
+
+def test_saude_sem_url_avisa(monkeypatch):
+    from app import painel_saude
+    monkeypatch.delenv("PAINEL_SAUDE_URL", raising=False)
+    try:
+        painel_saude._amostras(24)
+        assert False
+    except RuntimeError as e:
+        assert "PAINEL_SAUDE_URL" in str(e)

@@ -45,6 +45,7 @@ export const api = {
   produtos: () => request('GET', '/produtos'),
   painelRegistro: () => request('GET', '/painel/registro'),
   painelProduto: (id) => request('GET', `/painel/produtos/${id}`),
+  painelSaude: () => request('GET', '/painel/saude'),
   painelQa: (id) => request('GET', `/painel/produtos/${id}/qa`),
   painelEntrarQa: (id) => request('POST', `/painel/produtos/${id}/entrar-qa`),
   painelUsuarios: (id, o) => request('GET', `/painel/produtos/${id}/usuarios` + qs(o || {})),

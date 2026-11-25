@@ -39,3 +39,8 @@ def test_saude_sem_url_avisa(monkeypatch):
         assert False
     except RuntimeError as e:
         assert "PAINEL_SAUDE_URL" in str(e)
+
+
+def test_infra_importa_e_usa_proxy_so_leitura():
+    from app import painel_infra
+    assert painel_infra.PROXY.endswith("rt-docker-leitura:2375")

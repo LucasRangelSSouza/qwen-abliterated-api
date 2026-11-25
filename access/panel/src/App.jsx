@@ -18,6 +18,7 @@ import Custos from './pages/Custos.jsx'
 import Combos from './pages/Combos.jsx'
 import ProdutoPainel from './pages/ProdutoPainel.jsx'
 import { Postgres, Minio } from './pages/Saude.jsx'
+import Infra from './pages/Infra.jsx'
 import { Database, HardDrive } from 'lucide-react'
 import { Boxes } from 'lucide-react'
 
@@ -38,6 +39,7 @@ const NAV = [
   { id: 'combos', grupo: 'Geral', label: 'IA e combos', short: 'IA', icon: Brain, el: Combos },
   { id: 'afiliados', grupo: 'Segundo Cérebro', label: 'Afiliados', icon: BadgePercent, el: Affiliates },
   { id: 'termos', grupo: 'Segundo Cérebro', label: 'Termos de uso', short: 'Termos', icon: ScrollText, el: Terms },
+  { id: 'infra', grupo: 'Geral', label: 'Infraestrutura', icon: Server, el: Infra },
   { id: 'postgres', grupo: 'Geral', label: 'Postgres', icon: Database, el: Postgres },
   { id: 'minio', grupo: 'Geral', label: 'MinIO', icon: HardDrive, el: Minio },
   { id: 'config', grupo: 'Configurações', label: 'Configurações', short: 'Ajustes', icon: Cog, el: Settings },

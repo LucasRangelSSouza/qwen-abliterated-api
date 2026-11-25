@@ -19,6 +19,7 @@ import Combos from './pages/Combos.jsx'
 import ProdutoPainel from './pages/ProdutoPainel.jsx'
 import { Postgres, Minio } from './pages/Saude.jsx'
 import Infra from './pages/Infra.jsx'
+import AssinantesUnico from './pages/AssinantesUnico.jsx'
 import { Database, HardDrive } from 'lucide-react'
 import { Boxes } from 'lucide-react'
 
@@ -27,8 +28,7 @@ const Rendai = () => <Produto id="rendai" />
 
 // Menu do painel único (spec 57 §6.1): Segundo Cérebro, Produtos (do registro único), Geral e Configurações.
 const NAV = [
-  { id: 'pessoas', grupo: 'Segundo Cérebro', label: 'Pessoas', icon: Users, el: People },
-  { id: 'assinantes', grupo: 'Segundo Cérebro', label: 'Assinantes', icon: UserCheck, el: Subscribers },
+  { id: 'assinantes', grupo: 'Segundo Cérebro', label: 'Assinantes', icon: UserCheck, el: AssinantesUnico },
   { id: 'uso', grupo: 'Segundo Cérebro', label: 'Uso', icon: Activity, el: Usage },
   { id: 'llm', grupo: 'Geral', label: 'Qwen: LLM e GPU', short: 'LLM', icon: Cpu, el: MachineLlm },
   { id: 'fornecedores', grupo: 'Geral', label: 'Fornecedores', icon: Wallet, el: Providers },
@@ -73,7 +73,8 @@ function ListaProdutos() {
 
 function useHashRoute() {
   const read = () => {
-    const h = location.hash.replace(/^#\/?/, '') || 'pessoas'
+    let h = location.hash.replace(/^#\/?/, '') || 'assinantes'
+    if (h.startsWith('pessoas')) { history.replaceState(null, '', '#/assinantes?visao=chaves'); h = 'assinantes' }
     if (h.startsWith('p/')) return h.split(/[?]/)[0]
     return h.split(/[/?]/)[0]
   }
@@ -83,7 +84,7 @@ function useHashRoute() {
     addEventListener('hashchange', h)
     return () => removeEventListener('hashchange', h)
   }, [])
-  return r.startsWith('p/') || NAV.some((n) => n.id === r) ? r : 'pessoas'
+  return r.startsWith('p/') || NAV.some((n) => n.id === r) ? r : 'assinantes'
 }
 
 function useTheme() {

@@ -8,6 +8,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "viralizai",
+   "banco": null,
    "servico": "viralizai",
    "hosts": [
     "viralizai.rangeltech.net",
@@ -34,6 +35,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "cortai",
+   "banco": null,
    "servico": "cortai",
    "hosts": [
     "cortai.rangeltech.net"
@@ -58,6 +60,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "rendai",
+   "banco": null,
    "servico": "rendai",
    "hosts": [
     "rendai.rangeltech.net"
@@ -82,6 +85,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "perfilai",
+   "banco": null,
    "servico": "perfilai",
    "hosts": [
     "perfilai.rangeltech.net"
@@ -106,6 +110,7 @@
    "tipo": "variante",
    "base": "perfilai",
    "schema": "perfilai",
+   "banco": null,
    "servico": "perfilai",
    "hosts": [
     "insta-ai.rangeltech.net"
@@ -130,6 +135,7 @@
    "tipo": "variante",
    "base": "perfilai",
    "schema": "perfilai",
+   "banco": null,
    "servico": "perfilai",
    "hosts": [
     "face-ai.rangeltech.net"
@@ -154,6 +160,7 @@
    "tipo": "variante",
    "base": "perfilai",
    "schema": "perfilai",
+   "banco": null,
    "servico": "perfilai",
    "hosts": [
     "tittok-ai.rangeltech.net"
@@ -178,6 +185,7 @@
    "tipo": "variante",
    "base": "perfilai",
    "schema": "perfilai",
+   "banco": null,
    "servico": "perfilai",
    "hosts": [
     "linkdn-ai.rangeltech.net"
@@ -202,6 +210,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "animaai",
+   "banco": null,
    "servico": "animaai",
    "hosts": [
     "anima-ai.rangeltech.net"
@@ -226,6 +235,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "postaai",
+   "banco": null,
    "servico": "postaai",
    "hosts": [
     "posta-ai.rangeltech.net"
@@ -250,6 +260,7 @@
    "tipo": "variante",
    "base": "postaai",
    "schema": "postaai",
+   "banco": null,
    "servico": "postaai",
    "hosts": [
     "posta-insta.rangeltech.net"
@@ -274,6 +285,7 @@
    "tipo": "variante",
    "base": "postaai",
    "schema": "postaai",
+   "banco": null,
    "servico": "postaai",
    "hosts": [
     "posta-face.rangeltech.net"
@@ -298,6 +310,7 @@
    "tipo": "variante",
    "base": "postaai",
    "schema": "postaai",
+   "banco": null,
    "servico": "postaai",
    "hosts": [
     "posta-tiktok.rangeltech.net"
@@ -322,6 +335,7 @@
    "tipo": "variante",
    "base": "postaai",
    "schema": "postaai",
+   "banco": null,
    "servico": "postaai",
    "hosts": [
     "posta-linkdn.rangeltech.net"
@@ -346,6 +360,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "atendeai",
+   "banco": null,
    "servico": "atendeai",
    "hosts": [
     "atende-ai.rangeltech.net"
@@ -370,6 +385,7 @@
    "tipo": "variante",
    "base": "atendeai",
    "schema": "atendeai",
+   "banco": null,
    "servico": "atendeai",
    "hosts": [
     "atende-whats.rangeltech.net"
@@ -394,6 +410,7 @@
    "tipo": "variante",
    "base": "atendeai",
    "schema": "atendeai",
+   "banco": null,
    "servico": "atendeai",
    "hosts": [
     "atende-insta.rangeltech.net"
@@ -418,6 +435,7 @@
    "tipo": "variante",
    "base": "atendeai",
    "schema": "atendeai",
+   "banco": null,
    "servico": "atendeai",
    "hosts": [
     "atende-face.rangeltech.net"
@@ -442,6 +460,7 @@
    "tipo": "variante",
    "base": "atendeai",
    "schema": "atendeai",
+   "banco": null,
    "servico": "atendeai",
    "hosts": [
     "atende-tiktok.rangeltech.net"
@@ -466,6 +485,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "astralai",
+   "banco": null,
    "servico": "astralai",
    "hosts": [
     "astral.rangeltech.net",
@@ -491,6 +511,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "shapeai",
+   "banco": null,
    "servico": "shapeai",
    "hosts": [
     "shape.rangeltech.net",
@@ -516,6 +537,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "casaai",
+   "banco": null,
    "servico": "casaai",
    "hosts": [
     "casa.rangeltech.net",
@@ -541,6 +563,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "arenabruta",
+   "banco": null,
    "servico": "arenabruta",
    "hosts": [
     "arena.rangeltech.net"
@@ -565,6 +588,7 @@
    "tipo": "produto",
    "base": null,
    "schema": "boateazul",
+   "banco": null,
    "servico": "boateazul",
    "hosts": [
     "azul.rangeltech.net"
@@ -584,11 +608,37 @@
    "qa": "rt-produtos/boateazul/qa"
   },
   {
+   "id": "caixai",
+   "nome": "Caixaí",
+   "tipo": "produto",
+   "base": null,
+   "schema": "painel",
+   "banco": "caixai",
+   "servico": "caixai",
+   "hosts": [
+    "caixai.rangeltech.net"
+   ],
+   "cakto": [
+    "lucas"
+   ],
+   "links": {
+    "produto": "https://caixai.rangeltech.net/",
+    "admin": "https://caixai.rangeltech.net/admin",
+    "github": "https://github.com/RangelTech/caixai",
+    "readme": "https://github.com/RangelTech/caixai#readme",
+    "deploy": "https://github.com/RangelTech/vps_rt_infra/actions/workflows/deploy.yml",
+    "release": "https://github.com/RangelTech/caixai/actions",
+    "monitor": "https://uptime.rangeltech.net/status/rangeltech"
+   },
+   "qa": null
+  },
+  {
    "id": "segundo-cerebro",
    "nome": "Segundo Cérebro",
    "tipo": "plataforma",
    "base": null,
    "schema": null,
+   "banco": null,
    "servico": "segundo-cerebro-remoto",
    "hosts": [
     "brain.rangeltech.net",
@@ -616,6 +666,7 @@
    "tipo": "plataforma",
    "base": null,
    "schema": null,
+   "banco": null,
    "servico": "llm-access",
    "hosts": [
     "qwen.rangeltech.net",
@@ -640,6 +691,7 @@
    "tipo": "em_teste",
    "base": null,
    "schema": null,
+   "banco": null,
    "servico": "autoai",
    "hosts": [
     "autoai.rangeltech.net"
@@ -662,6 +714,7 @@
    "tipo": "em_preparo",
    "base": null,
    "schema": null,
+   "banco": null,
    "servico": "chatwoot-rails",
    "hosts": [
     "ia.rangeltech.net",

@@ -26,12 +26,15 @@ def registro() -> list[dict]:
         return []
 
 
-def _conexao():
+def _conexao(banco: str | None = None):
+    """Banco `produtos` por padrão; produto com banco próprio (ex.: Caixaí) usa o mesmo usuário `painel_leitura` em outro banco."""
     import psycopg
     from psycopg.rows import dict_row
     url = os.environ.get("PRODUTOS_LEITURA_URL", "")
     if not url:
         raise RuntimeError("PRODUTOS_LEITURA_URL não configurada")
+    if banco and re.fullmatch(r"[a-z][a-z0-9_]{1,40}", banco):
+        url = re.sub(r"/[A-Za-z0-9_]+(?=\?|$)", "/" + banco, url, count=1)
     return psycopg.connect(url, row_factory=dict_row, autocommit=True, connect_timeout=5)
 
 
@@ -39,9 +42,9 @@ def _schema_valido(s: str | None) -> str | None:
     return s if s and re.fullmatch(r"[a-z][a-z0-9_]{1,40}", s) else None
 
 
-def _resumo(schema: str) -> dict:
+def _resumo(schema: str, banco: str | None = None) -> dict:
     agora = time.time()
-    with _conexao() as c, c.cursor() as cur:
+    with _conexao(banco) as c, c.cursor() as cur:
         cur.execute("select 1 from information_schema.tables where table_schema=%s and table_name='assinaturas'", (schema,))
         tem_ass = cur.fetchone() is not None
         ativo = (f'greatest(coalesce(u.ativo_ate,0), coalesce((select max(a.ativo_ate) from "{schema}".assinaturas a where a.usuario=u.id),0))'
@@ -72,12 +75,12 @@ def painel_produto(pid: str, request: Request):
     out = {**p}
     schema = _schema_valido(p.get("schema"))
     if schema:
-        ch = ("resumo", schema)
+        ch = ("resumo", p.get("banco"), schema)
         if ch in _cache and time.time() - _cache[ch][0] < 30:
             out["resumo"] = _cache[ch][1]
         else:
             try:
-                out["resumo"] = _resumo(schema)
+                out["resumo"] = _resumo(schema, p.get("banco"))
                 _cache[ch] = (time.time(), out["resumo"])
             except Exception as e:  # noqa: BLE001
                 out["erro"] = f"não consegui ler o banco do produto: {type(e).__name__}"
@@ -94,7 +97,7 @@ def painel_usuarios(pid: str, request: Request, q: str = "", situacao: str = "to
     if not schema:
         raise fail(404, "produto sem banco no registro", "invalid_request_error", "produto_sem_banco")
     agora = time.time()
-    with _conexao() as c, c.cursor() as cur:
+    with _conexao((p or {}).get("banco")) as c, c.cursor() as cur:
         cur.execute("select 1 from information_schema.tables where table_schema=%s and table_name='assinaturas'", (schema,))
         tem_ass = cur.fetchone() is not None
         ativo = (f'greatest(coalesce(u.ativo_ate,0), coalesce((select max(a.ativo_ate) from "{schema}".assinaturas a where a.usuario=u.id),0))'

@@ -44,3 +44,22 @@ def test_saude_sem_url_avisa(monkeypatch):
 def test_infra_importa_e_usa_proxy_so_leitura():
     from app import painel_infra
     assert painel_infra.PROXY.endswith("rt-docker-leitura:2375")
+
+
+def test_caixai_le_do_proprio_banco(monkeypatch):
+    """Caixaí tem banco próprio: o painel usa o mesmo painel_leitura trocando só o nome do banco (visão painel.usuarios)."""
+    reg = {p["id"]: p for p in pp.registro()}
+    assert reg["caixai"]["banco"] == "caixai" and reg["caixai"]["schema"] == "painel"
+    vistos = []
+
+    class Falso:
+        def __init__(self, url, **kw):
+            vistos.append(url)
+
+    import psycopg
+    monkeypatch.setattr(psycopg, "connect", Falso)
+    monkeypatch.setenv("PRODUTOS_LEITURA_URL", "postgresql://painel_leitura:x@postgres:5432/produtos")
+    pp._conexao("caixai")
+    pp._conexao(None)
+    pp._conexao("x; drop")
+    assert vistos == ["postgresql://painel_leitura:x@postgres:5432/caixai"] + ["postgresql://painel_leitura:x@postgres:5432/produtos"] * 2
